@@ -701,6 +701,17 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #ff8a65
 .hd-h { font-weight: 700; font-size: .9rem; text-transform: capitalize; color: var(--muted); }
 .hd-none { color: var(--muted); font-size: .88rem; padding: 6px 2px; }
 .home-day .pl-it.late { --c: var(--s-refused); }
+@media (max-width: 819px) {
+  nav.tabs { position: fixed; top: auto; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); margin: 0; z-index: 35; padding: 6px; gap: 2px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+    border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 10px 30px color-mix(in srgb, #5a1a33 22%, transparent), 0 2px 6px color-mix(in srgb, #000 8%, transparent); }
+  nav.tabs a { padding: 7px 2px 6px; border-radius: 16px; }
+  nav.tabs a[aria-current="page"] { color: #fff; background: var(--hero); }
+  .wrap { padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .hero-mini { padding-top: env(safe-area-inset-top, 0px); }
+  .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .live { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+}
 </style>
 
 <div class="wrap">
