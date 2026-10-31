@@ -15,7 +15,8 @@
   .jb-card .err{color:#c0392b;font-size:.86rem;text-align:center;min-height:1.2em}
   .jb-card .row{display:flex;gap:8px}.jb-card .row>*{flex:1}
   .jb-card h2{margin:6px 0 0;font-size:1rem}
-  .jb-gear{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(84px + env(safe-area-inset-bottom));z-index:50;width:44px;height:44px;border-radius:50%;border:0;background:#EC4F86;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:20px;cursor:pointer}
+  @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .jb-card{background:#281a20;color:#f8eaee}:root:not([data-theme=light]) .jb-card input{background:#322229;border-color:#47303a;color:#f8eaee}:root:not([data-theme=light]) .jb-card p,:root:not([data-theme=light]) .jb-card label{color:#c4a5ae}}:root[data-theme=dark] .jb-card{background:#281a20;color:#f8eaee}:root[data-theme=dark] .jb-card input{background:#322229;border-color:#47303a;color:#f8eaee}:root[data-theme=dark] .jb-card p,:root[data-theme=dark] .jb-card label{color:#c4a5ae}
+  .jb-gear{background:linear-gradient(135deg,#FF9A5A,#EC4F86);position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(84px + env(safe-area-inset-bottom));z-index:50;width:44px;height:44px;border-radius:50%;border:0;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:20px;cursor:pointer}
   @media (min-width:820px){.jb-gear{bottom:24px}}`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const ov = (html) => { const d = document.createElement("div"); d.className = "jb-ov"; d.innerHTML = `<div class="jb-card">${html}</div>`; document.body.appendChild(d); return d; };
@@ -69,6 +70,7 @@
     if (document.querySelector(".jb-ov")) return;
     const k = ls.get("aiKey", "");
     const d = ov(`<h1 style="font-size:1.3rem">Réglages</h1>
+      <h2>Apparence</h2><div class="row jb-theme">${[["auto","Auto"],["light","Clair"],["dark","Sombre"]].map(([v,l])=>`<button class="${ls.get("theme","auto")===v?"":"ghost"}" data-theme-set="${v}">${l}</button>`).join("")}</div>
       <h2>Claude</h2><p style="text-align:left">Facultatif. Sans clé, Claude fait ce travail depuis ton projet et le range ici. Avec une clé Anthropic (payante), les boutons Claude marchent aussi dans l'appli.</p>
       <input id="jb-key" type="password" placeholder="${k ? "Clé enregistrée" : "sk-ant-…"}" autocomplete="off">
       <h2>Mes données</h2><p style="text-align:left">${user ? "Connecté : " + user.email + ". Tes données sont synchronisées entre tes appareils." : "Tes données sont rangées sur cet appareil."}</p>
@@ -76,6 +78,7 @@
       <input id="jb-file" type="file" accept="application/json,.json" hidden>
       <div class="err" id="jb-err"></div>
       <button id="jb-ok">Enregistrer</button>${user ? `<button class="ghost" id="jb-out">Se déconnecter</button>` : ""}<button class="ghost" id="jb-close">Fermer</button>`);
+    d.querySelectorAll("[data-theme-set]").forEach((b) => (b.onclick = () => { window.jobelloTheme(b.dataset.themeSet); d.querySelectorAll("[data-theme-set]").forEach((x) => (x.className = x === b ? "" : "ghost")); }));
     if (focus === "cle") $(d, "#jb-key").focus();
     $(d, "#jb-close").onclick = () => d.remove();
     $(d, "#jb-ok").onclick = () => { const v = $(d, "#jb-key").value.trim(); if (v) ls.set("aiKey", v); d.remove(); };

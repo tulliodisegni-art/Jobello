@@ -10,6 +10,10 @@
     set(k, v) { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch {} },
   };
   window.jobelloStore = ls;
+  // apparence choisie (auto, clair, sombre)
+  const applyTheme = (t) => { const r = document.documentElement; if (t === "light" || t === "dark") r.dataset.theme = t; else delete r.dataset.theme; const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = (t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)) ? "#1d1317" : "#fff6f1"; };
+  window.jobelloTheme = (t) => { if (t !== undefined) ls.set("theme", t); applyTheme(ls.get("theme", "auto")); };
+  applyTheme(ls.get("theme", "auto")); addEventListener("DOMContentLoaded", () => applyTheme(ls.get("theme", "auto")));
 
   /* ---------- Base locale (IndexedDB) au format attendu par l'appli ---------- */
   const idb = new Promise((res, rej) => {
