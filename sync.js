@@ -54,7 +54,7 @@
       const go = async (up) => {
         const email = $(d, "#jb-mail").value.trim(), password = $(d, "#jb-pass").value; $(d, "#jb-err").textContent = "";
         if (!email || password.length < 6) { $(d, "#jb-err").textContent = "E-mail et mot de passe (6 caractères minimum)"; return; }
-        const r = up ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+        const r = up ? await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } }) : await sb.auth.signInWithPassword({ email, password });
         if (r.error) { $(d, "#jb-err").textContent = /Invalid login/i.test(r.error.message) ? "E-mail ou mot de passe incorrect" : /confirm/i.test(r.error.message) ? "Confirme d'abord ton adresse avec le mail reçu" : r.error.message; return; }
         if (!r.data.session) { $(d, "#jb-err").textContent = "Compte créé : clique sur le lien reçu par mail, puis connecte-toi."; return; }
         d.remove(); res(r.data.user);
