@@ -694,6 +694,13 @@ nav.tabs a[aria-current="page"] { background: var(--accent-soft); }
 button.primary, .btn.primary { background-image: linear-gradient(135deg, #ff8a65, var(--accent)); border-color: transparent; }
 .wk-day.today { background: var(--hero); color: #fff; border-color: transparent; }
 .wk-day.today small, .wk-day.today em { color: #fff; }
+.wk-day { cursor: pointer; font: inherit; }
+.wk-day.sel:not(.today) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.wk-day.today.sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.home-day { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.hd-h { font-weight: 700; font-size: .9rem; text-transform: capitalize; color: var(--muted); }
+.hd-none { color: var(--muted); font-size: .88rem; padding: 6px 2px; }
+.home-day .pl-it.late { --c: var(--s-refused); }
 </style>
 
 <div class="wrap">
@@ -725,7 +732,7 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #ff8a65
     <div class="home-grid">
       <section class="home-block" id="todo-panel"><div class="row between"><h2 class="home-h">À faire</h2><span class="home-more" id="todo-n"></span></div><div class="tasks" id="todo"></div></section>
       <div class="home-side2">
-        <section class="home-block"><div class="row between"><h2 class="home-h">Ma semaine</h2><a href="#agenda" class="home-more">Planning ›</a></div><div class="wk-strip" id="home-week"></div></section>
+        <section class="home-block"><div class="row between"><h2 class="home-h">Ma semaine</h2><a href="#agenda" class="home-more">Planning ›</a></div><div class="wk-strip" id="home-week"></div><div class="home-day" id="home-day"></div></section>
         <section class="home-block"><div class="row between"><h2 class="home-h">Où j'en suis</h2><a href="#candidatures" class="home-more">Suivi ›</a></div><div class="funnel" id="funnel"></div></section>
       </div>
     </div>
@@ -985,6 +992,7 @@ document.addEventListener("click", async (e) => {
   } catch (x) { meta.textContent = "Export impossible : " + (x.message || x); }
 });
 document.addEventListener("click", (e) => { const w = e.target.closest("[data-plweek]"); if (!w) return; const n = +w.dataset.plweek; plWeek = n ? addDays(plWeek || mondayOf(todayISO()), 7 * n) : mondayOf(todayISO()); renderAgenda(); });
+document.addEventListener("click", (e) => { const w = e.target.closest("[data-wk]"); if (!w) return; homeDay = w.dataset.wk; document.querySelectorAll("#home-week .wk-day").forEach((b) => b.classList.toggle("sel", b === w)); renderHomeDay(); });
 document.addEventListener("click", (e) => { const a = e.target.closest("a.rap-ag"); if (a && location.hash === a.getAttribute("href")) { e.preventDefault(); showTab(location.hash.slice(1)); } });
 showTab(location.hash.slice(1));
 $("#today").textContent = ((d) => d[0].toUpperCase() + d.slice(1))(new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }));
@@ -1035,6 +1043,22 @@ function homeTasks() {
 }
 const taskAttrs = (x) => x.href ? `href="${x.href}"` : x.contact ? `data-contact="${esc(x.contact)}"` : `data-open="${esc(x.c.id)}"${x.task ? ` data-task="${x.task}"` : ""}`;
 const TASK_ST = { suite: "entretien", rep: "entretien", offre: "offre", ent: "entretien", merci: "entretien", rel: "relancee", send: "a_envoyer", li: "envoyee", net: "envoyee" };
+let homeDay = "";
+function renderHomeDay(evs) {
+  const today = todayISO(); if (!homeDay || homeDay < today || homeDay > addDays(today, 6)) homeDay = today;
+  const box = $("#home-day"); if (!box) return;
+  const list = (evs || agendaEvents()).filter((x) => x.date === homeDay || (homeDay === today && x.date < today)).sort((a, b) => (a.st === "entretien" ? 0 : 1) - (b.st === "entretien" ? 0 : 1) || (a.c?.heureEntretien || "").localeCompare(b.c?.heureEntretien || ""));
+  const head = homeDay === today ? "Aujourd'hui" : fmt(homeDay, { weekday: "long", day: "numeric", month: "long" });
+  const it = (e) => {
+    const late = e.date < today && e.st !== "entretien";
+    if (e.st === "entretien") return `<button type="button" class="pl-it ent" data-open="${esc(e.c.id)}"><b>${esc(e.c.entreprise || "")}</b><span>${esc(e.kind)}</span></button>`;
+    if (e.p) return `<button type="button" class="pl-it li" data-contact="${esc(e.p.id)}"><b>${esc(e.p.nom || e.p.entreprise || "Contact")}</b><span>${esc(e.kind)}${late ? " · en retard" : ""}</span></button>`;
+    return `<button type="button" class="pl-it rel${late ? " late" : ""}" data-open="${esc(e.c.id)}"${e.task ? ` data-task="${e.task}"` : ""}><b>${esc(e.c.entreprise || "")}</b><span>${esc(e.kind === "Relance" ? "Relancer" : e.kind)}${late ? " · en retard" : ""}</span></button>`;
+  };
+  if (homeDay === today) { box.innerHTML = `<div class="hd-none">Touche un jour pour voir ce qui est prévu. Pour aujourd'hui, c'est la liste « À faire » au-dessus.</div>`; return; }
+  const shown = list.slice(0, 5), more = list.slice(5);
+  box.innerHTML = `<div class="hd-h">${esc(head)}</div>` + (list.length ? shown.map(it).join("") + (more.length ? `<details class="task-more"><summary>Voir les ${more.length} autres</summary>${more.map(it).join("")}</details>` : "") : `<div class="hd-none">Rien de prévu ce jour-là.</div>`);
+}
 function renderHome() {
   const all = state.cands, today = todayISO();
   $("#hello").textContent = prenom() ? `Bonjour ${prenom()}` : "Bonjour"; if ($("#hm-hello")) $("#hm-hello").textContent = $("#hello").textContent;
@@ -1064,7 +1088,8 @@ function renderHome() {
   // semaine : 7 jours à partir d'aujourd'hui
   const evs = agendaEvents();
   $("#home-week").innerHTML = Array.from({ length: 7 }, (_, i) => { const d = addDays(today, i), e = evs.filter((x) => x.date === d || (i === 0 && x.date < today)); const ent = e.some((x) => x.st === "entretien");
-    return `<a class="wk-day${i === 0 ? " today" : ""}" href="#agenda:d-${d}"><small>${fmt(d, { weekday: "short" }).replace(".", "")}</small><b>${new Date(d + "T12:00:00").getDate()}</b><span class="wk-dots">${e.length ? (ent ? `<i class="ent"></i>` : "") + `<em>${e.length}</em>` : ""}</span></a>`; }).join("");
+    return `<button type="button" class="wk-day${i === 0 ? " today" : ""}${d === homeDay ? " sel" : ""}" data-wk="${d}"><small>${fmt(d, { weekday: "short" }).replace(".", "")}</small><b>${new Date(d + "T12:00:00").getDate()}</b><span class="wk-dots">${e.length ? (ent ? `<i class="ent"></i>` : "") + `<em>${e.length}</em>` : ""}</span></button>`; }).join("");
+  renderHomeDay(evs);
   const sent = all.filter((c) => c.statut !== "a_envoyer"), F = [["Envoyées", sent.length, "envoyee"], ["Réponses", sent.filter(answered).length, "relancee"], ["Entretiens", all.filter((c) => (c.entretiens || []).length || ["entretien", "offre"].includes(c.statut)).length, "entretien"], ["Offres", all.filter((c) => c.statut === "offre" || c.offre).length, "offre"]];
   const mx = Math.max(1, F[0][1]);
   $("#funnel").innerHTML = F.map(([l, n, st]) => `<div class="fn st-${st}"><span class="fn-l">${l}</span><span class="fn-bar"><i style="width:${Math.max(n ? 6 : 0, Math.round(n / mx * 100))}%"></i></span><b>${n}</b></div>`).join("");

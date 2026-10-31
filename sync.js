@@ -16,8 +16,8 @@
   .jb-card .row{display:flex;gap:8px}.jb-card .row>*{flex:1}
   .jb-card h2{margin:6px 0 0;font-size:1rem}
   @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .jb-card{background:#281a20;color:#f8eaee}:root:not([data-theme=light]) .jb-card input{background:#322229;border-color:#47303a;color:#f8eaee}:root:not([data-theme=light]) .jb-card p,:root:not([data-theme=light]) .jb-card label{color:#c4a5ae}}:root[data-theme=dark] .jb-card{background:#281a20;color:#f8eaee}:root[data-theme=dark] .jb-card input{background:#322229;border-color:#47303a;color:#f8eaee}:root[data-theme=dark] .jb-card p,:root[data-theme=dark] .jb-card label{color:#c4a5ae}
-  .jb-gear{background:linear-gradient(135deg,#FF9A5A,#EC4F86);position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(84px + env(safe-area-inset-bottom));z-index:50;width:44px;height:44px;border-radius:50%;border:0;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:20px;cursor:pointer}
-  @media (min-width:820px){.jb-gear{bottom:24px}}`;
+  .jb-gear{position:absolute;right:12px;bottom:10px;z-index:2;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:transparent;color:rgba(255,255,255,.6);display:grid;place-items:center;cursor:pointer}.jb-gear:hover{color:#fff;background:rgba(255,255,255,.15)}
+`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const ov = (html) => { const d = document.createElement("div"); d.className = "jb-ov"; d.innerHTML = `<div class="jb-card">${html}</div>`; document.body.appendChild(d); return d; };
   const $ = (r, s) => r.querySelector(s);
@@ -105,6 +105,6 @@
     return out;
   }
   window.jobelloRemote = () => (user ? remote : null);
-  addEventListener("DOMContentLoaded", () => { const g = document.createElement("button"); g.className = "jb-gear"; g.setAttribute("aria-label", "Réglages"); g.textContent = "⚙︎"; g.onclick = () => window.jobelloSettings(); document.body.appendChild(g); });
+  addEventListener("DOMContentLoaded", () => { const h = document.querySelector(".home-head"); const g = document.createElement("button"); g.type = "button"; g.className = "jb-gear"; g.setAttribute("aria-label", "Réglages"); g.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'; g.onclick = () => window.jobelloSettings(); (h || document.body).appendChild(g); });
   start();
 })();
