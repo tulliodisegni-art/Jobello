@@ -1,6 +1,6 @@
-// Garde l'écran d'accueil de l'appli disponible même sans réseau.
-const CACHE = "jobello-v2";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
+// Garde Jobello disponible même avec un réseau faible : la page et ses scripts sont mis de côté.
+const CACHE = "jobello-v3";
+const SHELL = ["./", "index.html", "config.js", "shim.js", "sync.js", "vendor/supabase.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {

@@ -1,5 +1,9 @@
 # Jobello
 
-Mon carnet de candidatures : candidatures, relances, entretiens et planning.
+Mes candidatures, mes relances, mes entretiens et mon planning, dans une vraie appli.
 
-C'est une appli web installable : ouvrir le lien dans Safari, puis Partager → « Sur l'écran d'accueil ». L'icône ouvre le carnet dans claude.ai, où Claude lit les mails des recruteurs et prépare les dossiers.
+Installer : ouvrir https://tulliodisegni-art.github.io/Jobello/ dans Safari, puis Partager → « Sur l'écran d'accueil ».
+
+- Claude (dossiers, lettres, relances, lecture des mails) marche avec une clé Anthropic enregistrée sur l'appareil (⚙︎ Réglages).
+- Les données sont rangées dans Supabase (`config.js`, tables créées par `supabase.sql`) et synchronisées entre appareils ; sans configuration elles restent sur l'appareil.
+- `index.html` est assemblé par `python3 build.py carnet.html` à partir de la page de l'appli.
