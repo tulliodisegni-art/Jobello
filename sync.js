@@ -71,6 +71,7 @@
     const k = ls.get("aiKey", "");
     const d = ov(`<h1 style="font-size:1.3rem">Réglages</h1>
       <h2>Apparence</h2><div class="row jb-theme">${[["auto","Auto"],["light","Clair"],["dark","Sombre"]].map(([v,l])=>`<button class="${ls.get("theme","auto")===v?"":"ghost"}" data-theme-set="${v}">${l}</button>`).join("")}</div>
+      <h2>Partager Jobello</h2><p style="text-align:left">Envoie le lien à un proche : il crée son compte et a son propre carnet, séparé du tien.</p><div class="row"><button class="ghost" id="jb-shr">Envoyer le lien</button></div>
       <h2>Claude</h2><p style="text-align:left">Facultatif. Sans clé, Claude fait ce travail depuis ton projet et le range ici. Avec une clé Anthropic (payante), les boutons Claude marchent aussi dans l'appli.</p>
       <input id="jb-key" type="password" placeholder="${k ? "Clé enregistrée" : "sk-ant-…"}" autocomplete="off">
       <h2>Mes données</h2><p style="text-align:left">${user ? "Connecté : " + user.email + ". Tes données sont synchronisées entre tes appareils." : "Tes données sont rangées sur cet appareil."}</p>
@@ -83,6 +84,7 @@
     $(d, "#jb-close").onclick = () => d.remove();
     $(d, "#jb-ok").onclick = () => { const v = $(d, "#jb-key").value.trim(); if (v) ls.set("aiKey", v); d.remove(); };
     if (user) $(d, "#jb-out").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+    $(d, "#jb-shr").onclick = () => window.jobelloShare();
     $(d, "#jb-imp").onclick = () => $(d, "#jb-file").click();
     $(d, "#jb-file").onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return; const err = $(d, "#jb-err"); err.style.color = "#6b5560"; err.textContent = "Import en cours…";
@@ -105,6 +107,13 @@
     return out;
   }
   window.jobelloRemote = () => (user ? remote : null);
+  window.jobelloShare = async () => {
+    const url = "https://tulliodisegni-art.github.io/Jobello/", data = { title: "Jobello", text: "Jobello, l'appli pour suivre ses candidatures. Ouvre le lien, puis Partager > Sur l'écran d'accueil pour l'installer.", url };
+    try { if (navigator.share) { await navigator.share(data); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(url); } catch (e) { const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+    const el = document.getElementById("toast"); if (el) { el.textContent = "Lien de Jobello copié"; el.hidden = false; setTimeout(() => el.hidden = true, 2400); } else alert("Lien copié : " + url);
+  };
+  addEventListener("DOMContentLoaded", () => { const a = document.querySelector(".home-head .home-acts"); if (!a) return; const b = document.createElement("button"); b.type = "button"; b.className = "icon-btn"; b.setAttribute("aria-label", "Partager l'appli"); b.title = "Partager l'appli"; b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>'; b.onclick = () => window.jobelloShare(); a.prepend(b); });
   addEventListener("DOMContentLoaded", () => { const h = document.querySelector(".home-head"); const g = document.createElement("button"); g.type = "button"; g.className = "jb-gear"; g.setAttribute("aria-label", "Réglages"); g.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'; g.onclick = () => window.jobelloSettings(); (h || document.body).appendChild(g); });
   start();
 })();
