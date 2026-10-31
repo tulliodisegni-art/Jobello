@@ -69,7 +69,7 @@
     if (document.querySelector(".jb-ov")) return;
     const k = ls.get("aiKey", "");
     const d = ov(`<h1 style="font-size:1.3rem">Réglages</h1>
-      <h2>Claude</h2><p style="text-align:left">Ta clé Anthropic reste sur cet appareil. Elle sert à préparer dossiers, lettres et relances.</p>
+      <h2>Claude</h2><p style="text-align:left">Facultatif. Sans clé, Claude fait ce travail depuis ton projet et le range ici. Avec une clé Anthropic (payante), les boutons Claude marchent aussi dans l'appli.</p>
       <input id="jb-key" type="password" placeholder="${k ? "Clé enregistrée" : "sk-ant-…"}" autocomplete="off">
       <h2>Mes données</h2><p style="text-align:left">${user ? "Connecté : " + user.email + ". Tes données sont synchronisées entre tes appareils." : "Tes données sont rangées sur cet appareil."}</p>
       <div class="row"><button class="ghost" id="jb-imp">Importer</button><button class="ghost" id="jb-exp">Exporter</button></div>

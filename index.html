@@ -1373,7 +1373,7 @@ async function liAction(a) {
   drawContact();
 }
 async function liPersonalize() {
-  const out = $("#li-text"); if (!state.sample) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  const out = $("#li-text"); if (!state.sample) return toast("Demande-le à Claude dans ton projet Jobello");
   readContact();
   const btn = document.querySelector("[data-act=li-ai]"); btn.disabled = true; const before = out.value; out.value = "Claude personnalise ton message…";
   aiCtl = new AbortController();
@@ -1497,7 +1497,7 @@ function qPosteHTML(c) {
   return `<details class="sec"${c.statut === "entretien" ? " open" : ""}><summary>Questions probables pour ce poste <small>${Q.length || "à préparer"}</small></summary><div class="body">${body}</div></details>`;
 }
 async function qPosteAI(btn) {
-  const c = editing; if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  const c = editing; if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   btn.disabled = true; btn.textContent = "Claude prépare…";
   try {
     const r = await state.sample.json(`Prépare 5 questions d'entretien probables et spécifiques à CE poste (techniques ou liées aux missions, pas les questions générales de parcours, de motivation ou de salaire), avec pour chacune une réponse de 60 à 110 mots à la première personne, fondée uniquement sur des faits réels du CV. Si le CV ne prouve pas une compétence demandée, la réponse le dit honnêtement et montre comment compenser. Réponds uniquement en JSON : [{"q":"…","a":"…"}]
@@ -1549,7 +1549,7 @@ function renderComp() {
 }
 async function compSave(list, msg) { const ok = await saveProfil({ competencesDetail: list }, msg); renderComp(); return ok; }
 async function compAI(btn) {
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte && d.contenu);
   if (!cvs.length) return toast("Ajoute d'abord un CV dans « Mes CV »");
   btn.disabled = true; btn.textContent = "Claude lit tes CV…";
@@ -1832,7 +1832,7 @@ function fitSection(c) {
 }
 async function aiFit() {
   readDossier();
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const btn = $("#ai-fit-btn"), st = $("#fit-status"); btn.disabled = true; st.textContent = "Claude compare l'offre à ton CV…";
   aiCtl = new AbortController();
   try {
@@ -1962,7 +1962,7 @@ function openProfil() {
 let aiCtl = null;
 function aiError(e) {
   return ({ not_granted: "Tu n'as pas autorisé l'appli à utiliser Claude. Tu peux le réactiver dans le menu Autorisations de l'appli.", rate_limited: "Trop de demandes pour le moment. Réessaie un peu plus tard.",
-    session_expired: "Vérifie ta clé Anthropic dans Réglages (⚙︎).", sampling_disabled: "Claude n'est pas disponible pour ce compte.", refused: "Claude n'a pas pu traiter cette demande. Reformule-la." }[e?.code]) || "La rédaction a été interrompue. Réessaie.";
+    session_expired: "Demande-le à Claude dans ton projet Jobello.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", refused: "Claude n'a pas pu traiter cette demande. Reformule-la." }[e?.code]) || "La rédaction a été interrompue. Réessaie.";
 }
 const dispo = () => state.profil?.disponibilite || "Disponible sous 1 mois (préavis)";
 function profileText() {
@@ -2051,7 +2051,7 @@ const letterMetaFields = (c) => ({ societe: c.entreprise || "", poste: c.poste |
 async function aiLetter() {
   readDossier();
   const box = $("#ai-letter"), btn = $("#ai-letter-btn");
-  if (!state.sample) { box.hidden = false; box.innerHTML = `<span class="muted">Ajoute ta clé Anthropic dans Réglages (⚙︎).</span>`; return; }
+  if (!state.sample) { box.hidden = false; box.innerHTML = `<span class="muted">Demande-le à Claude dans ton projet Jobello.</span>`; return; }
   const c = editing;
   const base = state.docs.find((d) => d.id === c.lettre) || state.docs.find((d) => d.type === "lettre" && d.domaine && c.domaine && d.domaine === c.domaine) || state.docs.find((d) => d.type === "lettre" && d.contenu);
   const prompt = `Rédige en français une lettre de motivation complète et prête à envoyer pour l'offre ci-dessous. Réponds uniquement avec le texte de la lettre, sans titre ni commentaire.\n\n${letterRules(c)}\n\nOFFRE :\nPoste : ${c.poste}\nSociété : ${c.entreprise}${c.groupe ? " (groupe " + c.groupe + ")" : ""}\nDomaine : ${c.domaine}\nVille : ${c.ville}\nRecruteur : ${c.contact}\nNotes sur l'offre : ${(c.notes || "").slice(0, 2000)}\nRésumé : ${c.resume || ""}\nTexte de l'offre : ${(c.description || "").slice(0, 4000)}\n\n${socText(c)}\n\n${profileText()}\n\n${base?.contenu ? "LETTRE DE BASE (reprends ses faits, pas sa structure) :\n" + base.contenu.slice(0, 5000) : ""}`;
@@ -2081,7 +2081,7 @@ async function keepAiLetter() {
 }
 async function aiImproveDoc() {
   const out = $("#ai-doc-out"), txt = $("#d-contenu").value.trim(), instr = $("#ai-instr").value.trim();
-  if (!state.sample) { out.hidden = false; out.innerHTML = `<span class="muted">Ajoute ta clé Anthropic dans Réglages (⚙︎).</span>`; return; }
+  if (!state.sample) { out.hidden = false; out.innerHTML = `<span class="muted">Demande-le à Claude dans ton projet Jobello.</span>`; return; }
   if (!txt) { toast("Écris ou colle d'abord un texte"); return; }
   const btn = document.querySelector("[data-act=ai-doc]"); btn.disabled = true;
   out.hidden = false; out.innerHTML = `<div class="msg" id="ai-doc-text">Claude réfléchit…</div><div class="row" id="ai-doc-actions"><button type="button" class="small" data-act="ai-stop">Arrêter</button></div>`;
@@ -2359,7 +2359,7 @@ async function openLiMaj() {
 }
 async function runLiMaj(btn) {
   const txt = $("#lm-text").value.trim(); if (!txt && !mailImgs.length) return toast("Écris ce qui change, en 2 lignes");
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const p = state.profil || {}, kit = p.kit || {}, cvId = $("#lm-cv")?.value || "";
   const cv = state.docs.find((d) => d.id === cvId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
   const post = $("#lm-post").checked, out = $("#lm-out");
@@ -2428,7 +2428,7 @@ function addMailImgs(files) {
 }
 async function readMail() {
   const text = $("#m-text").value.trim();
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   if (!text && !mailImgs.length) return toast("Colle le mail ou ajoute une capture");
   const btn = $("#m-read"), out = $("#m-out"); btn.disabled = true; btn.textContent = "Claude lit le mail…"; out.innerHTML = "";
   const list = state.cands.map((c) => `${c.id} | ${c.entreprise || ""} | ${c.groupe || ""} | ${c.poste || ""} | ${LABEL[c.statut] || c.statut} | envoyée ${c.dateEnvoi || "?"}`).join("\n");
@@ -2768,7 +2768,7 @@ function societeHTML(c) {
     ${links}</div></details>`;
 }
 async function aiSociete(btn) {
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const c = editing; btn.disabled = true; btn.textContent = "Claude prépare la fiche…";
   try {
     const r = await state.sample.json(`Fais une fiche société en français pour un candidat ingénieur mécanique. Société : ${c.entreprise}${c.groupe ? " (groupe " + c.groupe + ")" : ""}, ${c.ville || ""}. Poste visé : ${c.poste || ""}.
@@ -2811,7 +2811,7 @@ function prepaHTML(c) {
   </div></details>`;
 }
 async function aiPrepa(btn) {
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const c = editing, s = societeOf(c); btn.disabled = true; btn.textContent = "Claude prépare ton entretien…";
   aiCtl = new AbortController();
   try {
@@ -2914,7 +2914,7 @@ function offreHTML(c) {
     <div class="row"><button type="button" class="primary" data-act="offre-ok">J'accepte le poste</button><button type="button" class="ghost danger" data-act="offre-non">Je décline</button></div></div>`;
 }
 async function aiThanks(btn) {
-  if (!state.sample) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample) return toast("Demande-le à Claude dans ton projet Jobello");
   const c = editing, out = $("#rl-msg"); c.notesEntretien = $("#ni-notes").value; btn.disabled = true;
   try {
     const { text } = await state.sample(`Rédige un court message de remerciement après un entretien d'embauche (80 à 120 mots, vouvoiement, sobre, sans flatterie). Reprends un ou deux points précis des notes, sans rien inventer. Réponds uniquement avec le message, signé ${state.profil?.nom || ""}.\n${HUMAN_STYLE}\nPoste : ${c.poste} chez ${c.entreprise}. Interlocuteur : ${c.contact || "inconnu"}.\nNotes de l'entretien : ${c.notesEntretien || "(aucune)"}`, { cache: false, onText: ({ text }) => { out.value = text; } });
@@ -2925,7 +2925,7 @@ async function aiThanks(btn) {
 
 /* ---------- CV et lettre en un clic ---------- */
 async function oneClick(btn) {
-  if (!state.sample?.json) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const c = editing, cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte);
   btn.disabled = true; btn.textContent = "Claude choisit ton CV et écrit la lettre…";
   try {
@@ -3156,7 +3156,7 @@ async function prepDossier(url, btn) {
   const o = offerByUrl(url); if (!o) return toast("Offre introuvable, relance la recherche.");
   const dup = state.cands.find((c) => c.lien === o.url || offerKey(c) === offerKey(o));
   if (dup) { toast("Tu as déjà un dossier pour cette offre : je l'ouvre."); return openCand(dup.id); }
-  if (!state.sample?.json || !state.db) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json || !state.db) return toast("Demande-le à Claude dans ton projet Jobello");
   if (prepBusy) return toast("Un dossier est déjà en préparation…");
   prepBusy = true; const lbl = btn.textContent; btn.disabled = true;
   const ctl = new AbortController(); liveStart(o, ctl);
@@ -3232,7 +3232,7 @@ ${desc ? desc.slice(0, 6000) : "(texte complet indisponible : base-toi sur le ti
 }
 async function relanceAI(btn) {
   const c = editing, ta = $("#rl-msg"); if (!ta) return;
-  if (!state.sample) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample) return toast("Demande-le à Claude dans ton projet Jobello");
   const n = (c.historique || []).filter((h) => /^relanc/i.test(h.texte || "")).length;
   btn.disabled = true; btn.textContent = "Claude écrit…";
   try {
@@ -3250,7 +3250,7 @@ ${profileText().slice(0, 2500)}`, { cache: false, onText: ({ text }) => { ta.val
 }
 async function adaptCV(btn) {
   const c = editing, cv = state.docs.find((d) => d.id === c.cv);
-  if (!state.sample?.json || !state.db) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample?.json || !state.db) return toast("Demande-le à Claude dans ton projet Jobello");
   if (!cv?.contenu) return toast("Ce CV n'a pas de texte à adapter");
   btn.disabled = true; btn.textContent = "Claude adapte ton CV…";
   try {
@@ -3274,7 +3274,7 @@ ${cv.contenu.slice(0, 6000)}`, { cache: false });
 }
 async function apMsgAI(btn) {
   const c = editing, ta = $("#ap-msg"); if (!ta) return;
-  if (!state.sample) return toast("Ajoute ta clé Anthropic dans Réglages (⚙︎)");
+  if (!state.sample) return toast("Demande-le à Claude dans ton projet Jobello");
   const cv = state.docs.find((d) => d.id === c.cv) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
   btn.disabled = true; btn.textContent = "Claude écrit…";
   try {

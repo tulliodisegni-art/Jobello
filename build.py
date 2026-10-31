@@ -3,13 +3,13 @@ import sys, re
 src = open(sys.argv[1]).read()
 REPL = [
   ("Connecte-toi à claude.ai pour enregistrer", "Connecte-toi à Jobello pour enregistrer"),
-  ("L'analyse avec Claude est disponible dans claude.ai", "Ajoute ta clé Anthropic dans Réglages (⚙︎)"),
-  ("La lecture par Claude marche dans claude.ai", "Ajoute ta clé Anthropic dans Réglages (⚙︎)"),
-  ("Disponible seulement dans claude.ai", "Ajoute ta clé Anthropic dans Réglages (⚙︎)"),
-  ("Disponible dans claude.ai", "Ajoute ta clé Anthropic dans Réglages (⚙︎)"),
-  ("Reconnecte-toi à claude.ai puis réessaie.", "Vérifie ta clé Anthropic dans Réglages (⚙︎)."),
+  ("L'analyse avec Claude est disponible dans claude.ai", "Demande-le à Claude dans ton projet Jobello"),
+  ("La lecture par Claude marche dans claude.ai", "Demande-le à Claude dans ton projet Jobello"),
+  ("Disponible seulement dans claude.ai", "Demande-le à Claude dans ton projet Jobello"),
+  ("Disponible dans claude.ai", "Demande-le à Claude dans ton projet Jobello"),
+  ("Reconnecte-toi à claude.ai puis réessaie.", "Demande-le à Claude dans ton projet Jobello."),
   ("Ouvre l'appli depuis claude.ai, connecté à ton compte, pour retrouver tes candidatures.", "Connecte-toi pour retrouver tes candidatures."),
-  ("La rédaction avec Claude n'est pas disponible dans cette vue.", "Ajoute ta clé Anthropic dans Réglages (⚙︎)."),
+  ("La rédaction avec Claude n'est pas disponible dans cette vue.", "Demande-le à Claude dans ton projet Jobello."),
 ]
 for a, b in REPL: src = src.replace(a, b)
 src = re.sub(r'<meta name="claude:[^>]*>\n?', "", src)

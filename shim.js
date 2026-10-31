@@ -87,7 +87,7 @@
   const toB64 = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.readAsDataURL(blob); });
   async function call(input, opts = {}) {
     const key = ls.get("aiKey", "");
-    if (!key) { window.jobelloSettings && window.jobelloSettings("cle"); throw { code: "not_granted", message: "Ajoute ta clé Anthropic dans Réglages" }; }
+    if (!key) { throw { code: "not_granted", message: "Demande-le à Claude dans ton projet Jobello" }; }
     let messages = typeof input === "string" ? [{ role: "user", content: input }] : input.map((m) => ({ role: m.role, content: m.content }));
     if (opts.images && opts.images.length) {
       const last = messages[messages.length - 1];
