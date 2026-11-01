@@ -1072,7 +1072,7 @@ function renderHomeDay(evs) {
 }
 function renderHome() {
   const all = state.cands, today = todayISO();
-  $("#hello").textContent = prenom() ? `Bonjour ${prenom()}` : "Bonjour"; if ($("#hm-hello")) $("#hm-hello").textContent = $("#hello").textContent;
+  $("#hello").textContent = prenom() ? `${new Date().getHours() >= 18 ? "Bonsoir" : "Bonjour"} ${prenom()}` : (new Date().getHours() >= 18 ? "Bonsoir" : "Bonjour"); if ($("#hm-hello")) $("#hm-hello").textContent = $("#hello").textContent;
   const T = homeTasks(), urgent = T.filter((x) => x.p <= 2).length;
   $("#hero-summary").textContent = !state.loaded ? "Chargement de ton carnet…" : !all.length ? "Ton carnet est prêt. Ajoute une candidature ou trouve une offre dans l'onglet Offres."
     : !T.length ? "Tout est à jour. Rien à faire aujourd'hui." : urgent ? `${urgent} chose${urgent > 1 ? "s" : ""} urgente${urgent > 1 ? "s" : ""} aujourd'hui.` : "Rien d'urgent. Tu peux avancer tes candidatures.";
