@@ -27,7 +27,7 @@
      Seul Tullio voit « Partager l'appli » : reconnu par son compte, ou par le code propriétaire (empreinte ci-dessous). */
   const OWNER_MAIL = "tulliodisegni@icloud.com", OWNER_H = "63fda2eab9893320e9e13b672e032351a66650386c54f3f430a19d37165aaffd";
   const ownerFlag = () => { try { return localStorage.getItem("jb_owner") === "1"; } catch (e) { return false; } };
-  window.jobelloIsOwner = () => ownerFlag() || (!!user && (user.email || "").toLowerCase() === OWNER_MAIL);
+  window.jobelloIsOwner = () => ownerFlag() || !!(window.Gate && window.Gate.isOwner()) || (!!user && (user.email || "").toLowerCase() === OWNER_MAIL);
   window.jobelloOwnerCode = async (code) => {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("owner:" + String(code || "").trim()));
     const h = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -97,7 +97,8 @@
     $(d, "#jb-ok").onclick = () => { const v = $(d, "#jb-key").value.trim(); if (v) ls.set("aiKey", v); d.remove(); };
     if (user) $(d, "#jb-out").onclick = async () => { await sb.auth.signOut(); location.reload(); };
     if ($(d, "#jb-shr")) $(d, "#jb-shr").onclick = () => window.jobelloShare();
-    if ($(d, "#jb-own")) $(d, "#jb-own").onclick = async () => { const c = prompt("Code propriétaire"); if (!c) return; if (await window.jobelloOwnerCode(c)) { d.remove(); window.jobelloSettings(); } else alert("Code incorrect"); };
+    if ($(d, "#jb-own") && window.Gate) $(d, "#jb-own").onclick = async () => { if (await window.Gate.ownerLogin()) { applyOwner(); d.remove(); window.jobelloSettings(); } };
+    else if ($(d, "#jb-own")) $(d, "#jb-own").onclick = async () => { const c = prompt("Code propriétaire"); if (!c) return; if (await window.jobelloOwnerCode(c)) { d.remove(); window.jobelloSettings(); } else alert("Code incorrect"); };
     $(d, "#jb-imp").onclick = () => $(d, "#jb-file").click();
     $(d, "#jb-file").onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return; const err = $(d, "#jb-err"); err.style.color = "#56697a"; err.textContent = "Import en cours…";
@@ -122,6 +123,7 @@
   window.jobelloRemote = () => (user ? remote : null);
   window.jobelloShare = async () => {
     if (!window.jobelloIsOwner()) return;
+    if (window.Gate) { window.Gate.invite(); return; } // une invitation à usage unique par personne
     const url = "https://tulliodisegni-art.github.io/Jobello/", data = { title: "Jobello", text: "Jobello, l'appli pour suivre ses candidatures. Ouvre le lien, puis Partager > Sur l'écran d'accueil pour l'installer.", url };
     try { if (navigator.share) { await navigator.share(data); return; } } catch (e) { if (e && e.name === "AbortError") return; }
     try { await navigator.clipboard.writeText(url); } catch (e) { const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }

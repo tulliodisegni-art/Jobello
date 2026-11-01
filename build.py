@@ -27,6 +27,7 @@ head = '''<!doctype html>
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
+<script>window.GATE_CFG={app:"jobello",name:"Jobello",url:"https://vvxkkqcmjrwytagbxdfg.supabase.co",key:"sb_publishable_A-kJQIoJXxdXmjHF8iM40g_RP6myhMo",link:"https://tulliodisegni-art.github.io/Jobello/",logo:"icons/icon-192.png",accent:"#E9B949",isOwner:function(){try{if(localStorage.getItem("jb_owner")==="1")return true;var a=JSON.parse(localStorage.getItem("jobello.auth")||"null");return !!(a&&a.user&&String(a.user.email).toLowerCase()==="tulliodisegni@icloud.com")}catch(e){return false}}};</script><script src="gate.js"></script>
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
 <script src="shim.js"></script>
