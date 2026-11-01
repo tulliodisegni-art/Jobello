@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fff6f1">
+<meta name="theme-color" content="#f4f8f7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -24,34 +24,34 @@
 <style>
 /* Layout : une appli calme. Accueil = ce qu'il faut faire aujourd'hui ; chaque candidature est un dossier rangé par société, groupe, domaine ou statut ; onglets en bas sur téléphone, en haut sur ordinateur */
 :root {
-  --bg: #fff6f1;
+  --bg: #f4f8f7;
   --surface: #ffffff;
-  --surface-2: #fff0ea;
-  --line: #f2d9d1;
-  --fg: #2a1418;
-  --muted: #84666c;
-  --accent: #e0457b;
+  --surface-2: #eaf3f0;
+  --line: #d5e5df;
+  --fg: #0e1f2b;
+  --muted: #56697a;
+  --accent: #0e7a5a;
   --accent-ink: #ffffff;
-  --accent-soft: #fde4ec;
-  --hero: linear-gradient(135deg, #ff9a5a 0%, #ec4f86 55%, #8e4fd8 100%);
+  --accent-soft: #dff3ea;
+  --hero: linear-gradient(135deg, #0b2e6b 0%, #11557a 55%, #0e7a5a 100%);
   --hero-fg: #ffffff;
-  --hero-muted: #ffe2d4;
-  --sun: #ffe27a;
-  --s-todo: #9a8a8e; --s-sent: #4f7fd6; --s-follow: #e8782f; --s-interview: #8e4fd8; --s-offer: #22a061; --s-refused: #d9433a; --s-dropped: #8a7f82;
+  --hero-muted: #cfe6ef;
+  --sun: #b8f28a;
+  --s-todo: #8a979c; --s-sent: #4f7fd6; --s-follow: #e8782f; --s-interview: #8e4fd8; --s-offer: #22a061; --s-refused: #d9433a; --s-dropped: #7f8a8e;
   --warn-bg: #fff1dc; --warn-fg: #7a4a00;
   --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #1d1317; --surface: #281a20; --surface-2: #322229; --line: #47303a; --fg: #f8eaee; --muted: #c4a5ae;
-  --accent: #ff7fa8; --accent-ink: #2a0e18; --accent-soft: #4a2433; --hero: linear-gradient(135deg, #e07c46 0%, #c63f73 55%, #7443c0 100%); --hero-fg: #fff6f8; --hero-muted: #ffd9cb; --sun: #ffe27a;
-  --s-todo: #b9a7ac; --s-sent: #86aef0; --s-follow: #ffa25c; --s-interview: #c39bff; --s-offer: #5fd395; --s-refused: #ff7b70; --s-dropped: #b2a5a9;
+  --bg: #0e191e; --surface: #15232a; --surface-2: #1b2d35; --line: #29414a; --fg: #e6f1ef; --muted: #9db4b1;
+  --accent: #3fcf9b; --accent-ink: #04231a; --accent-soft: #15382f; --hero: linear-gradient(135deg, #0a2557 0%, #0e4766 55%, #0b6a4e 100%); --hero-fg: #f2fbf8; --hero-muted: #bcd9e4; --sun: #b8f28a;
+  --s-todo: #a5b3b6; --s-sent: #86aef0; --s-follow: #ffa25c; --s-interview: #c39bff; --s-offer: #5fd395; --s-refused: #ff7b70; --s-dropped: #a3aeb1;
   --warn-bg: #3d2a14; --warn-fg: #f6d08f; color-scheme: dark; } }
 :root[data-theme="dark"] {
-  --bg: #1d1317; --surface: #281a20; --surface-2: #322229; --line: #47303a; --fg: #f8eaee; --muted: #c4a5ae;
-  --accent: #ff7fa8; --accent-ink: #2a0e18; --accent-soft: #4a2433; --hero: linear-gradient(135deg, #e07c46 0%, #c63f73 55%, #7443c0 100%); --hero-fg: #fff6f8; --hero-muted: #ffd9cb; --sun: #ffe27a;
-  --s-todo: #b9a7ac; --s-sent: #86aef0; --s-follow: #ffa25c; --s-interview: #c39bff; --s-offer: #5fd395; --s-refused: #ff7b70; --s-dropped: #b2a5a9;
+  --bg: #0e191e; --surface: #15232a; --surface-2: #1b2d35; --line: #29414a; --fg: #e6f1ef; --muted: #9db4b1;
+  --accent: #3fcf9b; --accent-ink: #04231a; --accent-soft: #15382f; --hero: linear-gradient(135deg, #0a2557 0%, #0e4766 55%, #0b6a4e 100%); --hero-fg: #f2fbf8; --hero-muted: #bcd9e4; --sun: #b8f28a;
+  --s-todo: #a5b3b6; --s-sent: #86aef0; --s-follow: #ffa25c; --s-interview: #c39bff; --s-offer: #5fd395; --s-refused: #ff7b70; --s-dropped: #a3aeb1;
   --warn-bg: #3d2a14; --warn-fg: #f6d08f; color-scheme: dark; }
 
 * { box-sizing: border-box; }
@@ -683,7 +683,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 }
 
 /* Ambiance chaleureuse Jobello (dégradé de l'icône) */
-.home-head { background: var(--hero); color: var(--hero-fg); border-radius: 22px; padding: 18px 18px 20px; box-shadow: 0 14px 34px -16px rgba(200, 60, 110, .55); position: relative; overflow: hidden; }
+.home-head { background: var(--hero); color: var(--hero-fg); border-radius: 22px; padding: 18px 18px 20px; box-shadow: 0 14px 34px -16px rgba(11, 60, 90, .5); position: relative; overflow: hidden; }
 .home-head::after { content: ""; position: absolute; right: -60px; top: -70px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,.12); pointer-events: none; }
 .home-head .date, .home-head .home-sum { color: var(--hero-muted); }
 .home-head h1 { color: #fff; }
@@ -691,7 +691,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .home-head .icon-btn.primary { background: #fff; border-color: #fff; color: var(--accent); }
 .kpi { background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
 nav.tabs a[aria-current="page"] { background: var(--accent-soft); }
-button.primary, .btn.primary { background-image: linear-gradient(135deg, #ff8a65, var(--accent)); border-color: transparent; }
+button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077, var(--accent)); border-color: transparent; }
 .wk-day.today { background: var(--hero); color: #fff; border-color: transparent; }
 .wk-day.today small, .wk-day.today em { color: #fff; }
 .wk-day { cursor: pointer; font: inherit; }
@@ -704,7 +704,7 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #ff8a65
 @media (max-width: 819px) {
   nav.tabs { position: fixed; top: auto; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); margin: 0; z-index: 35; padding: 6px; gap: 2px;
     background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
-    border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 10px 30px color-mix(in srgb, #5a1a33 22%, transparent), 0 2px 6px color-mix(in srgb, #000 8%, transparent); }
+    border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 10px 30px color-mix(in srgb, #0b2e4a 22%, transparent), 0 2px 6px color-mix(in srgb, #000 8%, transparent); }
   nav.tabs a { padding: 7px 2px 6px; border-radius: 16px; }
   nav.tabs a[aria-current="page"] { color: #fff; background: var(--hero); }
   .wrap { padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }

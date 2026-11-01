@@ -3,19 +3,19 @@
 (function () {
   const ls = window.jobelloStore, C = window.JOBELLO_CONFIG || {};
   const css = `
-  .jb-ov{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#FF9A5A,#EC4F86 55%,#8E4FD8);display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#2a1418}
+  .jb-ov{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0B2E6B,#11557A 55%,#0E7A5A);display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#0e1f2b}
   .jb-card{background:#fff;border-radius:24px;padding:26px 22px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(60,10,40,.35);display:flex;flex-direction:column;gap:12px}
   .jb-card img{width:72px;height:72px;border-radius:18px;align-self:center}
   .jb-card h1{margin:0;text-align:center;font-size:1.6rem}
-  .jb-card p{margin:0;color:#6b5560;font-size:.92rem;text-align:center}
-  .jb-card label{font-size:.82rem;font-weight:600;color:#6b5560}
-  .jb-card input{font:inherit;padding:12px 14px;border-radius:12px;border:1px solid #e6d6dc;background:#fff8fa;color:#2a1418;width:100%;box-sizing:border-box}
-  .jb-card button{font:inherit;font-weight:700;padding:13px;border-radius:999px;border:0;background:#EC4F86;color:#fff;cursor:pointer}
-  .jb-card button.ghost{background:transparent;color:#EC4F86;border:1px solid #f3c7d7}
+  .jb-card p{margin:0;color:#56697a;font-size:.92rem;text-align:center}
+  .jb-card label{font-size:.82rem;font-weight:600;color:#56697a}
+  .jb-card input{font:inherit;padding:12px 14px;border-radius:12px;border:1px solid #d5e5df;background:#f7fbfa;color:#0e1f2b;width:100%;box-sizing:border-box}
+  .jb-card button{font:inherit;font-weight:700;padding:13px;border-radius:999px;border:0;background:#0E7A5A;color:#fff;cursor:pointer}
+  .jb-card button.ghost{background:transparent;color:#0E7A5A;border:1px solid #bfe3d4}
   .jb-card .err{color:#c0392b;font-size:.86rem;text-align:center;min-height:1.2em}
   .jb-card .row{display:flex;gap:8px}.jb-card .row>*{flex:1}
   .jb-card h2{margin:6px 0 0;font-size:1rem}
-  @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .jb-card{background:#281a20;color:#f8eaee}:root:not([data-theme=light]) .jb-card input{background:#322229;border-color:#47303a;color:#f8eaee}:root:not([data-theme=light]) .jb-card p,:root:not([data-theme=light]) .jb-card label{color:#c4a5ae}}:root[data-theme=dark] .jb-card{background:#281a20;color:#f8eaee}:root[data-theme=dark] .jb-card input{background:#322229;border-color:#47303a;color:#f8eaee}:root[data-theme=dark] .jb-card p,:root[data-theme=dark] .jb-card label{color:#c4a5ae}
+  @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .jb-card{background:#15232a;color:#e6f1ef}:root:not([data-theme=light]) .jb-card input{background:#1b2d35;border-color:#29414a;color:#e6f1ef}:root:not([data-theme=light]) .jb-card p,:root:not([data-theme=light]) .jb-card label{color:#9db4b1}}:root[data-theme=dark] .jb-card{background:#15232a;color:#e6f1ef}:root[data-theme=dark] .jb-card input{background:#1b2d35;border-color:#29414a;color:#e6f1ef}:root[data-theme=dark] .jb-card p,:root[data-theme=dark] .jb-card label{color:#9db4b1}
   .jb-gear{position:absolute;right:12px;bottom:10px;z-index:2;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:transparent;color:rgba(255,255,255,.6);display:grid;place-items:center;cursor:pointer}.jb-gear:hover{color:#fff;background:rgba(255,255,255,.15)}
 `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
@@ -87,7 +87,7 @@
     $(d, "#jb-shr").onclick = () => window.jobelloShare();
     $(d, "#jb-imp").onclick = () => $(d, "#jb-file").click();
     $(d, "#jb-file").onchange = async (e) => {
-      const f = e.target.files[0]; if (!f) return; const err = $(d, "#jb-err"); err.style.color = "#6b5560"; err.textContent = "Import en cours…";
+      const f = e.target.files[0]; if (!f) return; const err = $(d, "#jb-err"); err.style.color = "#56697a"; err.textContent = "Import en cours…";
       try { const n = await importData(JSON.parse(await f.text()), (m) => (err.textContent = m)); err.textContent = `C'est fait : ${n} éléments importés.`; window.jobelloRefresh(); }
       catch (x) { err.style.color = "#c0392b"; err.textContent = "Import impossible : " + (x.message || x); }
     };
