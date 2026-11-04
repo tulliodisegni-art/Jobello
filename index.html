@@ -794,6 +794,7 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077
 
   <!-- DOCUMENTS -->
   <section class="view" id="v-documents" hidden>
+    <div class="panel" id="photo-panel"></div>
     <div class="panel li-panel"><div class="row between" style="align-items:center"><div style="min-width:0"><h2 style="margin:0">Mettre à jour mon LinkedIn</h2><p class="muted" style="margin:2px 0 0;font-size:.86rem" id="li-maj-meta">Nouveau poste, nouveau projet ? Claude prépare tous les textes à coller, et ton CV suit.</p></div><button type="button" class="primary" data-action="li-maj">Mettre à jour</button></div></div>
     <div class="panel" id="jb-export" hidden><div class="row between" style="align-items:center"><div style="min-width:0"><h2 style="margin:0">Passer à l'appli Jobello</h2><p class="muted" style="margin:2px 0 0;font-size:.86rem" id="jb-export-meta">Télécharge toutes tes données (candidatures, contacts, CV en PDF) pour les importer dans Jobello.</p></div><button type="button" class="primary" data-action="jb-export">Télécharger</button></div></div>
     <details class="fold" id="sec-entr"><summary><span class="fold-t">S'entraîner à l'entretien</span><span class="fold-s" id="fs-entr"></span></summary><div class="fold-b" id="entr"></div></details>
@@ -1003,7 +1004,7 @@ document.addEventListener("click", async (e) => {
   } catch (x) { meta.textContent = "Export impossible : " + (x.message || x); }
 });
 document.addEventListener("change", async (e) => {
-  if (e.target.id !== "cv-photo" || !e.target.files?.[0]) return;
+  if (!["cv-photo", "cv-photo-2"].includes(e.target.id) || !e.target.files?.[0]) return;
   const file = e.target.files[0];
   if (!/^image\/(png|jpe?g)$/i.test(file.type)) { toast("Choisis une photo en JPG ou PNG"); return; }
   if (!state.assets) { toast("Envoi de photo indisponible ici"); return; }
@@ -1478,6 +1479,10 @@ function openBulk() {
 /* ---------- Rendu : documents ---------- */
 function renderDocs() {
   const p = state.profil;
+  const ph = p?.photoAssetId;
+  $("#photo-panel").innerHTML = `<div class="row" style="align-items:center;gap:14px;flex-wrap:nowrap">${ph ? `<a href="/_blob/${esc(ph)}" target="_blank" rel="noopener" style="flex:none"><img src="/_blob/${esc(ph)}" alt="Ma photo" style="width:54px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block"></a>` : `<label for="cv-photo-2" class="avatar" style="flex:none;cursor:pointer">+</label>`}
+    <div style="min-width:0;flex:1"><h2 style="margin:0">Ma photo de CV</h2><p class="muted" style="margin:2px 0 0;font-size:.86rem">${ph ? "Elle est sur tous tes CV refaits par l'appli." : "Ajoute-la pour qu'elle soit sur tes CV."}</p></div>
+    <div class="row" style="flex:none;gap:6px">${ph ? `<a class="btn small" href="/_blob/${esc(ph)}" target="_blank" rel="noopener">Voir</a>` : ""}<label class="btn small primary" for="cv-photo-2">${ph ? "Changer" : "Ajouter"}</label></div></div><input type="file" id="cv-photo-2" accept="image/png,image/jpeg" hidden>`;
   $("#fs-profil").textContent = p ? [p.nom, (p.postes || [])[0]].filter(Boolean).join(" · ") : "À remplir";
   $("#profile-card").innerHTML = p ? `<div class="profile"><label class="avatar" for="cv-photo" title="Photo de tes CV" style="cursor:pointer;overflow:hidden">${p.photoAssetId ? `<img src="/_blob/${esc(p.photoAssetId)}" alt="" style="width:100%;height:100%;object-fit:cover">` : initials(p.nom)}</label><input type="file" id="cv-photo" accept="image/png,image/jpeg" hidden>
       <div style="min-width:0"><h2>${esc(p.nom)}</h2><p class="muted">${esc(p.titre || "")}</p><label for="cv-photo" class="muted" style="font-size:.8rem;cursor:pointer;text-decoration:underline">${p.photoAssetId ? "Changer la photo de mes CV" : "Ajouter ma photo pour les CV"}</label></div>
