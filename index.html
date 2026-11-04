@@ -277,6 +277,7 @@ details.group > summary .gcount { font-size: 0.8rem; color: var(--muted); }
 .qa-tip { margin: 0; font-size: .85rem; color: var(--muted); }
 .suite { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
 .suite .seg { flex-wrap: wrap; }
+.suite.top { border-top: 0; margin-top: 0; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
 .round { padding: 6px 0; border-bottom: 1px solid var(--line); } .round:last-child { border-bottom: 0; }
 .done-box { border-color: var(--s-offer); }
 .age { font-size: .74rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
@@ -1068,7 +1069,7 @@ function homeTasks() {
       return T.push({ ...base, p: 0, k: "ent", t: `Entretien chez ${ent}`, s: [c.typeEntretien, c.poste].filter(Boolean).join(" · "), w: d + (c.heureEntretien ? " · " + c.heureEntretien.replace(":", " h ") : ""), hot: c.dateEntretien <= addDays(today, 1) });
     }
     if (needThanks(c)) return T.push({ ...base, p: 1, k: "merci", t: `Remercier ${ent} après l'entretien` });
-    if (afterInterview(c) && !c.prochaineRelance) return T.push({ ...base, p: 1, k: "suite", t: `Ton entretien chez ${ent} : et ensuite ?`, s: "Note comment ça s'est passé et ce qui suit" });
+    if (afterInterview(c) && !c.prochaineRelance) return T.push({ ...base, p: 1, k: "suite", t: `Ton entretien chez ${ent} : et ensuite ?`, s: c.notesEntretien ? "Tes notes sont là : dis-moi juste la suite" : "Note comment ça s'est passé et ce qui suit" });
     if (c.statut === "entretien" && !c.dateEntretien && !isDue(c) && c.decision !== "pause") return T.push({ ...base, p: 2, k: "ent", t: `Entretien chez ${ent} : date à fixer`, s: "Note la date, ou dis-moi si tu l'as déjà passé", w: "à fixer" });
     if (isDue(c)) { const n = late(c.prochaineRelance); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n }); }
     if (pc && c.decision !== "pause" && (pc.prochaineAction || "9") <= today) { const n = late(pc.prochaineAction); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent} via ${firstName(pc.nom) || pc.nom}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n, contact: pc.id }); }
@@ -1150,12 +1151,13 @@ function nextOf(c) {
   if (c.reponseMail && !c.reponseMail.envoye) return ["Réponse à envoyer", "hot"];
   if (c.statut === "entretien" && c.dateEntretien >= today) return [`Entretien ${c.dateEntretien === today ? "aujourd'hui" : "le " + fmt(c.dateEntretien)}${c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : ""}`, "ent"];
   if (c.statut === "entretien" && !c.dateEntretien) return ["Date d'entretien à fixer", ""];
-  if (afterInterview(c) && !c.prochaineRelance) return ["Dire comment ça s'est passé", "hot"];
+  if (afterInterview(c) && !c.prochaineRelance) return c.notesEntretien ? ["Et ensuite ? Dis-moi la suite", "hot"] : ["Dire comment ça s'est passé", "hot"];
   if (c.statut === "a_envoyer") return ["À envoyer", ""];
   if (c.statut === "offre") return ["Répondre à l'offre", "hot"];
   const pc = viaContact(c);
   if (pc && pc.prochaineAction) return pc.prochaineAction <= today ? [`Relancer via ${firstName(pc.nom)}`, "hot"] : [`Relance via ${firstName(pc.nom)} le ${fmt(pc.prochaineAction)}`, ""];
   if (c.decision === "pause") return ["En pause", ""];
+  if (c.attente && ownRelance(c) && c.prochaineRelance > today) return [`J'attends leur réponse · relance le ${fmt(c.prochaineRelance)}`, ""];
   if (ownRelance(c)) return c.prochaineRelance <= today ? [`Relance en retard (${Math.max(0, daysBetween(c.prochaineRelance, today))} j)`, "hot"] : [`Relance le ${fmt(c.prochaineRelance)}`, ""];
   return ["", ""];
 }
@@ -2978,17 +2980,18 @@ function suiviHTML(c) {
   const mail = [c.email, c.contact, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
   const msg = c.messageMerci || thanksText(c);
   return `<div class="relance-box"><span class="lbl" style="font-weight:600">Après l'entretien</span>
+    ${c.notesEntretien ? suiteHTML(c, true) : ""}
     <div class="field"><label for="ni-notes">Ce qui s'est dit (questions posées, prochaines étapes, noms)</label><textarea id="ni-notes" rows="4">${esc(c.notesEntretien || "")}</textarea></div>
     ${c.remerciement ? `<p class="muted" style="margin:0">Remerciement envoyé le ${fmt(c.remerciement)}.</p>` : `<span class="lbl">Message de remerciement, à envoyer le jour même</span>
     <textarea id="ni-msg" rows="7">${esc(msg)}</textarea>
     <div class="row">${copyBtn("ni-msg")}${mail ? `<a class="btn primary" data-relance="mail" href="mailto:${esc(mail[0])}?subject=${enc("Merci pour notre échange – " + (c.poste || ""))}&body=${enc(msg)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}
       <button type="button" class="small" data-act="ni-ai">Personnaliser avec mes notes</button><button type="button" data-act="ni-sent">C'est envoyé</button></div>`}
     <div class="row"><button type="button" class="small" data-act="ni-save">Enregistrer mes notes</button></div>
-    ${suiteHTML(c)}</div>`;
+    ${c.notesEntretien ? "" : suiteHTML(c)}</div>`;
 }
 /* ---------- Suite d'une candidature après un entretien, jusqu'au point final ---------- */
 let suiteMode = "";
-const ROUND_TYPES = ["Téléphone", "Visio", "Sur place", "Technique sur place", "Avec le manager", "RH / dernier entretien"];
+const ROUND_TYPES = ["Téléphone", "Visio", "Sur place", "Technique sur place", "Avec le manager", "Avec les dirigeants", "RH / dernier entretien"];
 const roundTxt = (r) => [r.date ? fmt(r.date, { day: "numeric", month: "short" }) : "date ?", r.type].filter(Boolean).join(" · ");
 function archiveRound(c) {
   const n = (c.entretiens || []).length + 1;
@@ -2996,23 +2999,24 @@ function archiveRound(c) {
   Object.assign(c, { dateEntretien: "", heureEntretien: "", typeEntretien: "", lienVisio: "", lieuEntretien: "", notesEntretien: "", remerciement: "", messageMerci: "", prepa: null });
   return n;
 }
-function suiteHTML(c) {
+function suiteHTML(c, top) {
   const opt = [["next", "Un autre entretien"], ["wait", "J'attends leur réponse"], ["offre", "J'ai une offre"], ["refus", "C'est un refus"]];
   const form = {
-    next: `<div class="grid2"><div class="field"><label for="su-type">Type</label><select id="su-type">${opts(ROUND_TYPES, "Technique sur place")}</select></div>
+    next: `<div class="grid2"><div class="field"><label for="su-type">Type</label><select id="su-type">${opts(ROUND_TYPES, ROUND_TYPES.find((x) => c.etapeSuivante && c.etapeSuivante.toLowerCase().endsWith(x.toLowerCase())) || "Technique sur place")}</select></div>
       <div class="field"><label for="su-date">Date (si connue)</label><input id="su-date" type="date"></div>
       <div class="field"><label for="su-heure">Heure</label><input id="su-heure" type="time"></div>
       <div class="field"><label for="su-lieu">Adresse ou lien visio</label><input id="su-lieu" placeholder="ex. leurs locaux, adresse…"></div></div>
       <div class="field"><label for="su-qui">Avec qui (si tu sais)</label><input id="su-qui" placeholder="ex. le responsable du bureau d'études"></div>
       <div class="row"><button type="button" class="primary" data-act="suite-next">Enregistrer le prochain entretien</button></div>`,
-    wait: `<p class="muted" style="margin:0;font-size:.86rem">Je te rappelle de relancer dans 7 jours si tu n'as pas de nouvelles.</p><div class="row"><button type="button" class="primary" data-act="suite-wait">C'est noté</button></div>`,
+    wait: `<div class="field"><label for="su-apres">Si c'est bon pour eux, la suite prévue</label><select id="su-apres">${opts(["Je ne sais pas encore", ...ROUND_TYPES.map((x) => "Entretien " + x.toLowerCase())], c.etapeSuivante || "Je ne sais pas encore")}</select></div>
+      <p class="muted" style="margin:0;font-size:.86rem">Je te rappelle de relancer dans 7 jours si tu n'as pas de nouvelles.</p><div class="row"><button type="button" class="primary" data-act="suite-wait">C'est noté</button></div>`,
     offre: `<div class="grid2"><div class="field"><label for="su-sal">Salaire proposé</label><input id="su-sal" placeholder="ex. 46 k€ brut / an"></div>
       <div class="field"><label for="su-deb">Date de début</label><input id="su-deb" type="date"></div>
       <div class="field"><label for="su-lim">Réponse attendue avant le</label><input id="su-lim" type="date"></div></div>
       <div class="row"><button type="button" class="primary" data-act="suite-offre">Enregistrer l'offre</button></div>`,
     refus: `<div class="field"><label for="su-why">Ce qu'ils ont dit (pour t'améliorer)</label><textarea id="su-why" rows="3"></textarea></div><div class="row"><button type="button" class="primary" data-act="suite-refus">Clôturer la candidature</button></div>`
   };
-  return `<div class="suite"><span class="lbl" style="font-weight:600">Et ensuite ?</span>
+  return `<div class="suite${top ? " top" : ""}"><span class="lbl" style="font-weight:600">Et ensuite ?</span>${top ? `<span class="muted" style="font-size:.86rem">Tes notes sont enregistrées. Choisis ce qui se passe maintenant.</span>` : ""}
     <div class="seg" role="group" aria-label="Suite">${opt.map(([k, l]) => `<button type="button" data-act="suite-mode" data-mode="${k}" aria-pressed="${suiteMode === k}">${l}</button>`).join("")}</div>
     ${suiteMode ? form[suiteMode] : ""}</div>`;
 }
@@ -3580,13 +3584,14 @@ $("#overlay").addEventListener("click", async (e) => {
         const n = archiveRound(c) + 1, lieu = $("#su-lieu").value.trim(), url = /^(https?:\/\/|www\.|teams\.|zoom\.|meet\.)/i.test(lieu) ? extractUrl(lieu) : "";
         Object.assign(c, { statut: "entretien", typeEntretien: $("#su-type").value, dateEntretien: $("#su-date").value, heureEntretien: $("#su-heure").value, lienVisio: url, lieuEntretien: url ? "" : lieu, avecQui: $("#su-qui").value.trim(), prochaineRelance: $("#su-date").value ? "" : addDays(today, 4) });
         c.historique.push({ date: today, texte: `Entretien n° ${n} prévu : ${c.typeEntretien}${c.dateEntretien ? " le " + fmt(c.dateEntretien) : " (date à fixer)"}` }); msg = `Entretien n° ${n} enregistré`;
-      } else if (act === "suite-wait") { c.prochaineRelance = addDays(today, 7); c.historique.push({ date: today, texte: "En attente de leur réponse après l'entretien" }); msg = "Je te rappelle de relancer dans 7 jours";
+      } else if (act === "suite-wait") { const ap = $("#su-apres")?.value || ""; c.etapeSuivante = /^Entretien/.test(ap) ? ap : ""; c.attente = today; c.prochaineRelance = addDays(today, 7); c.historique.push({ date: today, texte: "En attente de leur réponse après l'entretien" + (c.etapeSuivante ? " ; si c'est bon : " + c.etapeSuivante.toLowerCase() : "") }); msg = "Je te rappelle de relancer dans 7 jours";
       } else if (act === "suite-offre") { archiveRound(c); Object.assign(c, { statut: "offre", prochaineRelance: "", offre: { salaire: $("#su-sal").value.trim(), debut: $("#su-deb").value, limite: $("#su-lim").value, date: today } }); c.historique.push({ date: today, texte: "Offre reçue" + (c.offre.salaire ? " : " + c.offre.salaire : "") }); msg = "Bravo ! Offre enregistrée";
       } else if (act === "suite-refus") { archiveRound(c); Object.assign(c, { statut: "refus", prochaineRelance: "", dateReponse: c.dateReponse || today, raisonRefus: $("#su-why").value.trim() }); c.historique.push({ date: today, texte: "Refus après entretien" }); msg = "Candidature clôturée";
       } else if (act === "nr-done") { Object.assign(c, { dateEntretien: today, prochaineRelance: "" }); c.historique.push({ date: today, texte: "Entretien passé" }); msg = "Raconte-moi comment ça s'est passé";
       } else if (act === "nr-save") { const lieu = $("#nr-lieu").value.trim(), url = /^(https?:\/\/|www\.|teams\.|zoom\.|meet\.)/i.test(lieu) ? extractUrl(lieu) : ""; if (!$("#nr-date").value) return toast("Choisis la date"); Object.assign(c, { dateEntretien: $("#nr-date").value, heureEntretien: $("#nr-heure").value, lienVisio: url || c.lienVisio || "", lieuEntretien: url ? "" : lieu, prochaineRelance: "" }); c.historique.push({ date: today, texte: `Entretien fixé le ${fmt(c.dateEntretien)}${c.heureEntretien ? " à " + c.heureEntretien : ""}` }); msg = "Date enregistrée : elle apparaît dans l'agenda";
       } else if (act === "offre-ok") { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer : j'accepte"; return; } Object.assign(c, { issue: "acceptee", decision: "stop", prochaineRelance: "" }); c.historique.push({ date: today, texte: "Poste accepté 🎉" }); msg = "Félicitations !";
       } else if (act === "offre-non") { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer : je décline"; return; } Object.assign(c, { statut: "abandon", issue: "declinee", prochaineRelance: "" }); c.historique.push({ date: today, texte: "Offre déclinée" }); msg = "Offre déclinée, candidature clôturée"; }
+      if (act !== "suite-wait") c.attente = "";
       suiteMode = ""; if (await saveCand(c)) { toast(msg); drawCandSum(); } return;
     }
     if (act === "chrome-copy" || act === "chrome-see") { const txt = chromePrompt(editing, $("#ch-stop")?.checked !== false), ta = $("#ch-prompt"); ta.value = txt; if (act === "chrome-see") { ta.hidden = !ta.hidden; return; } return copyText(txt, ta, t, "Consigne copiée : colle-la dans Claude, dans Chrome"); }
@@ -3598,7 +3603,7 @@ $("#overlay").addEventListener("click", async (e) => {
     if (act === "one-click") return oneClick(t);
     if (act === "ni-copy") return copyText($("#ni-msg").value, $("#ni-msg"), t);
     if (act === "ni-ai") return aiThanks(t);
-    if (act === "ni-save" || act === "ni-sent") { editing.notesEntretien = $("#ni-notes").value; if ($("#ni-msg")) editing.messageMerci = $("#ni-msg").value; if (act === "ni-sent") { editing.remerciement = todayISO(); editing.historique.push({ date: todayISO(), texte: "Remerciement envoyé après l'entretien" }); } if (await saveCand(editing)) { toast(act === "ni-sent" ? "Remerciement noté" : "Notes enregistrées"); drawCandSum(); } return; }
+    if (act === "ni-save" || act === "ni-sent") { editing.notesEntretien = $("#ni-notes").value; if ($("#ni-msg")) editing.messageMerci = $("#ni-msg").value; if (act === "ni-sent") { editing.remerciement = todayISO(); editing.historique.push({ date: todayISO(), texte: "Remerciement envoyé après l'entretien" }); } if (await saveCand(editing)) { toast(act === "ni-sent" ? "Remerciement noté" : "Notes enregistrées. Dis-moi la suite dans « Et ensuite ? »"); drawCandSum(); } return; }
     if (act === "sum-skip") { editing.recruteurSkip = true; if (await saveCand(editing)) { toast("D'accord, je ne te le propose plus pour cette candidature."); drawCandSum(); } return; }
     if (act === "sum-addcontact") { const c = editing; closeSheet(); return openContact(null, { entreprise: c.groupe && /thales|safran/i.test(c.groupe) ? c.groupe : c.entreprise, type: "Recruteur / RH", canal: "LinkedIn", etape: "a_contacter", inviteTexte: candInvite(c), _forCand: c.id, notes: `Pour ma candidature « ${c.poste || ""} » (${c.source || canalLabel(c)}${c.dateEnvoi ? ", envoyée le " + fmt(c.dateEnvoi) : ""}).` }); }
     if (act === "paste-visio") { try { $("#vx-link").value = extractUrl(await navigator.clipboard.readText()); } catch { $("#vx-link").focus(); toast("Appuie longuement dans le champ puis « Coller »"); } return; }
