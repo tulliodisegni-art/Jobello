@@ -2031,7 +2031,9 @@ const HUMAN_STYLE = `STYLE (le texte doit sembler écrit par le candidat lui-mê
 - Écris comme un ingénieur qui écrit lui-même son courrier : simple, direct, à la première personne. Phrases de longueurs variées, certaines courtes. Pas de texte trop lisse ni trop symétrique.
 - Aucun tiret cadratin ou demi-cadratin (— ou –) dans les phrases, aucune liste à puces, aucun gras, aucun titre ni intertitre, aucune annonce suivie de deux-points (« Ce que j'apporte : », « Mes atouts : »).
 - Pas d'énumérations en trois termes à répétition, pas de paragraphes tous de même longueur.
-- Formules interdites : « C'est avec un grand intérêt », « Fort de », « passionné », « dynamique », « rigoureux et motivé », « je suis convaincu que », « véritable », « au cœur de », « levier », « synergie », « valeur ajoutée », « n'hésitez pas », « en somme », « par ailleurs » en début de phrase, « je me permets de ».
+- Ton sobre et humble : jamais de phrase qui se met en avant ou se vante (« je documente mes choix et les défends avec rigueur », « c'est exactement ce que je cherche », « je sais faire »). Les faits parlent d'eux-mêmes.
+- Une syntaxe soignée et élégante, des phrases bien construites et fluides, mais des mots simples : c'est une vraie personne qui écrit, avec chaleur.
+- Formules interdites : « C'est avec un grand intérêt », « Fort de », « dynamique », « rigoureux et motivé », « je suis convaincu que », « véritable », « au cœur de », « levier », « synergie », « valeur ajoutée », « n'hésitez pas », « en somme », « par ailleurs » en début de phrase, « je me permets de ».
 - Un fait précis et réel du CV (une entreprise, un produit, un essai, un outil) vaut mieux que trois qualités générales.
 - Les mots-clés de l'offre : glisses-en quelques-uns naturellement dans les phrases, jamais en liste ni recopiés à la suite.`;
 /* CV adapté à une offre : on remplace la ligne de titre et le paragraphe PROFIL, le reste du CV ne bouge pas */
@@ -2062,7 +2064,7 @@ function letterRules(c) {
   return `RÈGLES DE LA LETTRE :
 - Pas d'en-tête : ni coordonnées, ni date, ni destinataire, ni objet. La mise en page les ajoute.
 - Commence par « Madame, Monsieur, » (ou « Madame X, » / « Monsieur X, » si le recruteur est nommé).
-- 3 ou 4 paragraphes de longueurs différentes, séparés par une ligne vide, 220 à 300 mots en tout. Dans l'ordre, sans le signaler : pourquoi ce poste et cette société (un point précis de l'offre ou de leurs produits), ce qu'il a fait de plus proche (missions et outils réels du CV), une autre force utile au poste si elle existe, puis sa disponibilité (${dispo()}) et la proposition d'en parler de vive voix.
+- 3 ou 4 paragraphes de longueurs différentes, séparés par une ligne vide, 220 à 300 mots en tout. Dans l'ordre, sans le signaler : un premier paragraphe qui parle de la société elle-même (ce qu'elle fait, son produit ou son projet, ce qui la rend belle ou admirable), avec sobriété et sans flatterie appuyée, et qui dit simplement qu'il est passionné par ce domaine ou par ce qu'ils construisent (une seule fois, sans en faire trop) et pourquoi ce poste l'attire ; puis ce qu'il a fait de plus proche (missions et outils réels du CV), une autre force utile au poste si elle existe, puis sa disponibilité (${dispo()}) et la proposition d'en parler de vive voix.
 - Puis une seule ligne de formule de politesse classique, puis le nom du candidat seul. Pas de téléphone ni d'e-mail.
 - Mots-clés de l'offre à placer naturellement quand le CV les justifie : ${kw.length ? kw.join(", ") : KW_FALLBACK}.
 - Vouvoiement. N'invente aucune expérience, diplôme, chiffre ou compétence absente du profil.
@@ -3282,7 +3284,7 @@ ${letterRules({ motsCles: [] }).replace(KW_FALLBACK, "les mots-clés que tu list
 - "message" : sépare les lignes par \\n.
 ${messageRules({ motsCles: [] }).replace("les mots-clés techniques de l'offre", "ceux que tu listes dans \"motsCles\"")}
 - "invitation" : 280 caractères maximum, pour une invitation LinkedIn à la personne qui recrute pour ce poste : poste visé, 1 atout, proposition d'échange.
-- "cvTitre" et "cvProfil" : adaptent le CV choisi à cette offre. Titre sur une ligne qui reprend l'intitulé du poste quand le parcours le justifie. Profil en 2 ou 3 phrases, à la première personne ou sans sujet comme sur un CV, uniquement avec des faits du CV choisi, en mettant en avant ce qui sert ce poste. Pas de tiret long, pas de liste.
+- "cvTitre" et "cvProfil" : adaptent le CV choisi à cette offre. Titre sur une ligne qui reprend l'intitulé du poste quand le parcours le justifie. Profil en 2 ou 3 phrases sobres, sans sujet comme sur un CV, uniquement avec des faits du CV choisi, en mettant en avant ce qui sert ce poste. Aucune phrase qui se vante ou juge ses propres qualités. Pas de tiret long, pas de liste.
 - "competences" : 6 à 10 exigences de l'offre ; juge "niveau" d'après les compétences déclarées ci-dessous quand elles existent.
 ${compText()}
 CV DISPONIBLES :
@@ -3359,7 +3361,7 @@ async function adaptCV(btn) {
   try {
     const r = await state.sample.json(`Adapte le haut de ce CV à l'offre ci-dessous, en français. Réponds uniquement en JSON : {"cvTitre":"","cvProfil":""}
 - "cvTitre" : titre du CV sur une ligne, qui reprend l'intitulé du poste quand le parcours le justifie.
-- "cvProfil" : le paragraphe PROFIL réécrit pour ce poste, 2 ou 3 phrases, uniquement avec des faits de ce CV, en mettant en avant ce qui sert ce poste. Pas de tiret long, pas de liste, pas de formule creuse.
+- "cvProfil" : le paragraphe PROFIL réécrit pour ce poste, 2 ou 3 phrases sobres, uniquement avec des faits de ce CV, en mettant en avant ce qui sert ce poste. Aucune phrase qui se vante ou juge ses propres qualités. Pas de tiret long, pas de liste, pas de formule creuse.
 ${compText()}
 
 OFFRE : ${c.poste || ""} chez ${c.entreprise || ""}, ${c.ville || ""}.
