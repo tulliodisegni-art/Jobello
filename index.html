@@ -1002,6 +1002,13 @@ document.addEventListener("click", async (e) => {
     meta.textContent = `Fichier prêt : ${Object.keys(out.docs).length} fiches et ${Object.keys(out.blobs).length} PDF. Dans Jobello, ouvre ⚙︎ puis Importer.`;
   } catch (x) { meta.textContent = "Export impossible : " + (x.message || x); }
 });
+document.addEventListener("change", async (e) => {
+  if (e.target.id !== "cv-photo" || !e.target.files?.[0]) return;
+  const file = e.target.files[0];
+  if (!/^image\/(png|jpe?g)$/i.test(file.type)) { toast("Choisis une photo en JPG ou PNG"); return; }
+  if (!state.assets) { toast("Envoi de photo indisponible ici"); return; }
+  try { const up = await state.assets.upload(file); if (await saveProfil({ photoAssetId: up.id }, "Photo enregistrée : elle sera sur tes CV")) renderDocs(); } catch { toast("La photo n'a pas pu être envoyée, réessaie."); }
+});
 document.addEventListener("click", (e) => { const w = e.target.closest("[data-plweek]"); if (!w) return; const n = +w.dataset.plweek; plWeek = n ? addDays(plWeek || mondayOf(todayISO()), 7 * n) : mondayOf(todayISO()); renderAgenda(); });
 document.addEventListener("click", (e) => { const w = e.target.closest("[data-wk]"); if (!w) return; homeDay = w.dataset.wk; document.querySelectorAll("#home-week .wk-day").forEach((b) => b.classList.toggle("sel", b === w)); renderHomeDay(); });
 document.addEventListener("click", (e) => { const a = e.target.closest("a.rap-ag"); if (a && location.hash === a.getAttribute("href")) { e.preventDefault(); showTab(location.hash.slice(1)); } });
@@ -1472,8 +1479,8 @@ function openBulk() {
 function renderDocs() {
   const p = state.profil;
   $("#fs-profil").textContent = p ? [p.nom, (p.postes || [])[0]].filter(Boolean).join(" · ") : "À remplir";
-  $("#profile-card").innerHTML = p ? `<div class="profile"><div class="avatar">${initials(p.nom)}</div>
-      <div style="min-width:0"><h2>${esc(p.nom)}</h2><p class="muted">${esc(p.titre || "")}</p></div>
+  $("#profile-card").innerHTML = p ? `<div class="profile"><label class="avatar" for="cv-photo" title="Photo de tes CV" style="cursor:pointer;overflow:hidden">${p.photoAssetId ? `<img src="/_blob/${esc(p.photoAssetId)}" alt="" style="width:100%;height:100%;object-fit:cover">` : initials(p.nom)}</label><input type="file" id="cv-photo" accept="image/png,image/jpeg" hidden>
+      <div style="min-width:0"><h2>${esc(p.nom)}</h2><p class="muted">${esc(p.titre || "")}</p><label for="cv-photo" class="muted" style="font-size:.8rem;cursor:pointer;text-decoration:underline">${p.photoAssetId ? "Changer la photo de mes CV" : "Ajouter ma photo pour les CV"}</label></div>
       <button type="button" class="small" data-action="edit-profil">Modifier</button></div>
       <div class="tags">${(p.postes || []).map((x) => `<span class="tag">${esc(x)}</span>`).join("")}${p.salaire ? `<span class="tag">À partir de ${esc(p.salaire)}</span>` : ""}${p.linkedin ? `<a class="tag" href="${esc(safeUrl(p.linkedin))}" target="_blank" rel="noopener">Mon LinkedIn</a>` : ""}${p.mobilite ? `<span class="tag">${esc(p.mobilite)}</span>` : ""}</div>`
     : `<div class="row between"><div><h2>Mon profil</h2><p class="muted">Ton nom, les postes que tu vises et tes coordonnées servent aux lettres et aux relances.</p></div><button type="button" class="primary small" data-action="edit-profil">Remplir</button></div>`;
@@ -2219,6 +2226,7 @@ async function buildPdf(d) {
   const letter = d.type !== "cv";
   pdf.setProperties({ title: pdfSafe(d.nom || "Document"), author: pdfSafe(state.profil?.nom || "") });
   if (letter) { drawLetter(pdf, d, { ACC, INK, GRAY }); return pdf.output("blob"); }
+  if (!d.cvSimple) { await drawCV(pdf, d); return pdf.output("blob"); }
   for (const b of docBlocks(d.contenu, d.type)) {
     if (b.k === "gap") { y += letter ? 4.5 : 2; continue; }
     if (letter) { write(b.t, M, W, font("normal", 11, INK) * 1.45); continue; }
@@ -2239,6 +2247,52 @@ async function buildPdf(d) {
     else write(b.t, M, W, font("normal", b.k === "p" ? 10 : 9.5, INK) * 1.4);
   }
   return pdf.output("blob");
+}
+// CV mis en page comme le CV d'origine : bandeau bleu nuit avec photo, rubriques à carré bleu, une seule page (la taille du texte s'ajuste)
+async function cvPhoto() {
+  const id = state.profil?.photoAssetId; if (!id) return null;
+  if (cvPhoto.c?.id === id) return cvPhoto.c.img;
+  try { const b = await fetch("/_blob/" + id).then((r) => r.ok ? r.blob() : null); if (!b) return null;
+    const url = await new Promise((ok, ko) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = ko; fr.readAsDataURL(b); });
+    cvPhoto.c = { id, img: { url, fmt: /png/i.test(b.type) ? "PNG" : "JPEG" } }; return cvPhoto.c.img; } catch { return null; }
+}
+async function drawCV(pdf, d) {
+  const photo = await cvPhoto(), bl = docBlocks(d.contenu, "cv");
+  const NAVY = [19, 33, 63], BLUE = [47, 95, 179], LIGHT = [169, 196, 245], WHITE = [255, 255, 255], INK = [17, 17, 17], GRAY = [70, 76, 86], M = 12, W = 210 - 2 * M, BOTTOM = 297 - 9;
+  const firstH = bl.findIndex((b) => b.k === "h"), headB = (firstH < 0 ? bl : bl.slice(0, firstH)).filter((b) => b.k !== "gap" && String(b.t || "").trim());
+  const name = headB.find((b) => b.k === "name")?.t || state.profil?.nom || "", others = headB.filter((b) => b.k !== "name").map((b) => b.t), title = others[0] || "", contact = others.slice(1);
+  const body = firstH < 0 ? [] : bl.slice(firstH);
+  const f = (st, size, col) => { pdf.setFont("helvetica", st); pdf.setFontSize(size); pdf.setTextColor(...col); return size * 0.3528; };
+  const split = (t, w) => pdf.splitTextToSize(pdfSafe(t), w);
+  const roleParts = (t) => { const i = t.lastIndexOf(" · "); return i > 0 && /(19|20)\d{2}|aujourd/i.test(t.slice(i)) ? [t.slice(0, i), t.slice(i + 3)] : [t, ""]; };
+  const LW = (s) => { f("bold", s, BLUE); return Math.min(60, Math.max(30, ...body.filter((b) => b.k === "kv").map((b) => pdf.getTextWidth(pdfSafe(b.a)) + 4))); };
+  const run = (s, draw, H0) => {
+    const T = (txt, x, y, opt) => { if (draw) pdf.text(txt, x, y, opt); };
+    if (draw) { pdf.setFillColor(...NAVY); pdf.rect(0, 0, 210, H0, "F");
+      if (photo) { pdf.setFillColor(...WHITE); pdf.rect(M - 0.6, 8.4, 28.2, 37.2, "F"); try { pdf.addImage(photo.url, photo.fmt, M, 9, 27, 36); } catch {} } }
+    // Bandeau
+    const hx = photo ? M + 33 : M, hw = 210 - hx - M; let y = 9, h;
+    h = f("bold", s * 2.7, WHITE); const [first, ...rest] = pdfSafe(name).split(" "); T(first, hx, y + h * 0.8);
+    const fw = pdf.getTextWidth(first + " "); f("normal", s * 2.7, WHITE); T(rest.join(" "), hx + fw, y + h * 0.8); y += h * 1.1;
+    if (title) { h = f("bold", s * 1.25, LIGHT); split(title, hw).forEach((l) => { T(l, hx, y + h * 0.8); y += h * 1.25; }); y += 0.8; }
+    h = f("normal", s * 0.98, WHITE); contact.forEach((c) => split(c, hw).forEach((l) => { T(l, hx, y + h * 0.8); y += h * 1.4; }));
+    const H = Math.max(y + 5, photo ? 51 : 0); y = H + 4;
+    // Corps
+    for (const b of body) {
+      if (b.k === "gap" || !String(b.t || "").trim()) continue;
+      if (b.k === "h") { y += s * 0.5; h = f("bold", s * 1.15, INK);
+        if (draw) { pdf.setFillColor(...BLUE); pdf.rect(M, y + h * 0.18, h * 0.62, h * 0.62, "F"); pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.3); pdf.line(M, y + h * 1.3, M + W, y + h * 1.3); }
+        pdf.setCharSpace(0.9); T(pdfSafe(b.t), M + h * 1.05, y + h * 0.8); pdf.setCharSpace(0); y += h * 1.3 + s * 0.3; continue; }
+      if (b.k === "kv") { const lw = LW(s); h = f("normal", s, INK) * 1.32; const vl = split(b.t, W - lw); vl.forEach((l, k) => T(l, M + lw, y + h * 0.75 + k * h)); f("bold", s, BLUE); T(pdfSafe(b.a), M, y + h * 0.75); y += h * vl.length + 0.3; continue; }
+      if (b.k === "role") { y += s * 0.28; const [r, dt] = roleParts(b.t); h = f("bold", s * 1.08, INK); T(pdfSafe(r), M, y + h * 0.8); if (dt) { f("normal", s * 0.95, GRAY); T(pdfSafe(dt), M + W, y + h * 0.8, { align: "right" }); } y += h * 1.3; continue; }
+      if (b.k === "org") { h = f("bold", s * 0.98, BLUE) * 1.32; split(b.t, W).forEach((l) => { T(l, M, y + h * 0.75); y += h; }); continue; }
+      if (b.k === "li") { h = f("normal", s, INK) * 1.3; if (draw) { pdf.setFillColor(...BLUE); pdf.circle(M + 1.3, y + h * 0.5, 0.55, "F"); } split(b.t, W - 4.5).forEach((l) => { T(l, M + 4.5, y + h * 0.75); y += h; }); y += 0.15; continue; }
+      h = f("normal", s, INK) * 1.36; split(b.t, W).forEach((l) => { T(l, M, y + h * 0.75); y += h; });
+    }
+    return { y, H };
+  };
+  let s = 9.4; for (; s > 7; s -= 0.15) if (run(s, false).y <= BOTTOM) break;
+  run(s, true, run(s, false).H);
 }
 function drawLetter(pdf, d, { ACC, INK, GRAY }) {
   const p = state.profil || {}, L = letterParts(d), M = 20, W = 210 - 2 * M, BOTTOM = 297 - 18;
