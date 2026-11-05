@@ -35,4 +35,5 @@ head = '''<!doctype html>
 </head>
 <body>
 '''
+src = src.replace('<script>if ("serviceWorker" in navigator)', '<script src="notifs.js"></script>\n<script>if ("serviceWorker" in navigator)', 1) if "notifs.js" not in src else src
 open("index.html", "w").write(head + src + "\n</body>\n</html>\n")

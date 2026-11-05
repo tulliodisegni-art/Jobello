@@ -84,6 +84,7 @@
     const d = ov(`<h1 style="font-size:1.3rem">Réglages</h1>
       <h2>Apparence</h2><div class="row jb-theme">${[["auto","Auto"],["light","Clair"],["dark","Sombre"]].map(([v,l])=>`<button class="${ls.get("theme","auto")===v?"":"ghost"}" data-theme-set="${v}">${l}</button>`).join("")}</div>
       ${window.jobelloIsOwner() ? `<h2>Partager Jobello</h2><p style="text-align:left">Envoie le lien à un proche : il crée son compte et a son propre carnet, séparé du tien. Toi seul peux partager l'appli.</p><div class="row"><button class="ghost" id="jb-shr">Envoyer le lien</button></div>` : ""}
+      <h2>Notifications</h2><p style="text-align:left">Rappels d'envoi, de relance, d'entretien, nouvelles offres : choisis ce que tu veux recevoir.</p><div class="row"><button class="ghost" id="jb-notif">Choisir mes notifications</button></div>
       <h2>Claude</h2><p style="text-align:left">Facultatif. Sans clé, Claude fait ce travail depuis ton projet et le range ici. Avec une clé Anthropic (payante), les boutons Claude marchent aussi dans l'appli.</p>
       <input id="jb-key" type="password" placeholder="${k ? "Clé enregistrée" : "sk-ant-…"}" autocomplete="off">
       <h2>Mes données</h2><p style="text-align:left">${user ? "Connecté : " + user.email + ". Tes données sont synchronisées entre tes appareils." : "Tes données sont rangées sur cet appareil."}</p>
@@ -96,6 +97,7 @@
     $(d, "#jb-close").onclick = () => d.remove();
     $(d, "#jb-ok").onclick = () => { const v = $(d, "#jb-key").value.trim(); if (v) ls.set("aiKey", v); d.remove(); };
     if (user) $(d, "#jb-out").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+    $(d, "#jb-notif").onclick = () => { d.remove(); window.jobelloNotifs && window.jobelloNotifs(); };
     if ($(d, "#jb-shr")) $(d, "#jb-shr").onclick = () => window.jobelloShare();
     if ($(d, "#jb-own") && window.Gate) $(d, "#jb-own").onclick = async () => { if (await window.Gate.ownerLogin()) { applyOwner(); d.remove(); window.jobelloSettings(); } };
     else if ($(d, "#jb-own")) $(d, "#jb-own").onclick = async () => { const c = prompt("Code propriétaire"); if (!c) return; if (await window.jobelloOwnerCode(c)) { d.remove(); window.jobelloSettings(); } else alert("Code incorrect"); };
@@ -121,6 +123,7 @@
     return out;
   }
   window.jobelloRemote = () => (user ? remote : null);
+  window.jobelloSupa = () => (sb && user ? { sb, user } : null); // pour les notifications (notifs.js)
   window.jobelloShare = async () => {
     if (!window.jobelloIsOwner()) return;
     if (window.Gate) { window.Gate.invite(); return; } // une invitation à usage unique par personne

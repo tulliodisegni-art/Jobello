@@ -7,3 +7,4 @@ Installer : ouvrir https://tulliodisegni-art.github.io/Jobello/ dans Safari, pui
 - Claude (dossiers, lettres, relances, lecture des mails) marche avec une clé Anthropic enregistrée sur l'appareil (⚙︎ Réglages).
 - Les données sont rangées dans Supabase (`config.js`, tables créées par `supabase.sql`) et synchronisées entre appareils ; sans configuration elles restent sur l'appareil.
 - `index.html` est assemblé par `python3 build.py carnet.html` à partir de la page de l'appli.
+- Notifications (rappels, entretiens, nouvelles offres) et « Ajouter au calendrier » : voir [NOTIFICATIONS.md](NOTIFICATIONS.md).
