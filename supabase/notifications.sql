@@ -178,10 +178,12 @@ select cron.schedule('notifications', '* * * * *', $cron$
     url := 'https://vvxkkqcmjrwytagbxdfg.supabase.co/functions/v1/notifications',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron', (select cron_secret from public.push_config where id = 1)),
     body := '{}'::jsonb)
-  where exists (select 1 from public.push_queue where sent_at is null and send_at <= now());
+  where exists (select 1 from public.push_queue where sent_at is null and send_at <= now())
+     or (select vapid_public from public.push_config where id = 1) is null; -- crée les clés d'envoi au premier passage
 $cron$);
 
--- premier appel tout de suite : la fonction crée ses clés d'envoi
+-- premier appel tout de suite : la fonction crée ses clés d'envoi (sinon le réveil s'en charge dans la minute)
+notify pgrst, 'reload schema';
 select net.http_post(
   url := 'https://vvxkkqcmjrwytagbxdfg.supabase.co/functions/v1/notifications',
   headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron', (select cron_secret from public.push_config where id = 1)),
