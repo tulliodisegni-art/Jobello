@@ -529,6 +529,9 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .home-foot { display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--muted); font-size: .85rem; text-decoration: none; padding: 6px 0 4px; }
 .home-foot:empty { display: none; }
 @media (min-width: 1024px) { #v-accueil { max-width: 760px; margin: 0 auto; width: 100%; } }
+.fav-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--accent-soft); }
+.fav-box .fav-drag { background: var(--accent); color: var(--accent-ink); }
+.id-chips { gap: 6px; }
 .kit-step { font-weight: 700; font-family: var(--display); margin-top: 6px; }
 .kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .kit-item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -1596,6 +1599,98 @@ ${profileText().slice(0, 6000)}`, { cache: false });
   } catch (e) { toast(e?.code ? aiError(e) : "Je n'ai pas pu préparer les questions. Réessaie."); btn.disabled = false; btn.textContent = "Préparer les 5 questions"; }
 }
 
+/* Favori « Remplir avec Jobello » : s'exécute sur la page du formulaire (site carrière, plateforme, LinkedIn).
+   Il remplit les champs vides reconnus avec le profil, et colle le message copié dans Jobello s'il trouve le champ. */
+function jobelloFill(D) {
+  var n = 0, msgEl = null, docs = [document];
+  [].forEach.call(document.querySelectorAll("iframe"), function (f) { try { if (f.contentDocument) docs.push(f.contentDocument); } catch (e) {} });
+  var norm = function (s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); };
+  var keyOf = function (el, d) {
+    var t = [el.name, el.id, el.getAttribute("autocomplete"), el.placeholder, el.getAttribute("aria-label"), el.getAttribute("data-automation-id"), el.getAttribute("formcontrolname")];
+    if (el.id) { var l = d.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(el.id) : el.id) + '"]'); if (l) t.push(l.textContent); }
+    var p = el.closest("label"); if (p) t.push(p.textContent);
+    var lb = el.getAttribute("aria-labelledby"); if (lb) lb.split(" ").forEach(function (i) { var x = d.getElementById(i); if (x) t.push(x.textContent); });
+    if (!p && !el.id) { var w = el.parentElement; for (var k = 0; k < 2 && w; k++, w = w.parentElement) { var q = w.querySelector("label,legend"); if (q) { t.push(q.textContent); break; } } }
+    return norm(t.filter(Boolean).join(" | "));
+  };
+  var R = [
+    [/confirm.*(mail|courriel)|e-?mail|courriel/, "email"], [/linkedin/, "linkedin"],
+    [/phone|telephone|\btel\b|mobile|portable/, "tel"],
+    [/prenom|first.?name|given.?name|fname/, "prenom"],
+    [/nom complet|nom et prenom|full.?name|^name$/, "complet"],
+    [/(^|[^a-z])nom([^a-z]|$)|last.?name|family.?name|surname|lname/, "nom"],
+    [/code.?postal|zip|postal/, "cp"], [/ville|city|localite|town/, "ville"], [/pays|country/, "pays"],
+    [/salaire|salary|pretention|remuneration/, "salaire"], [/disponib|availability|notice|preavis/, "dispo"]
+  ];
+  var setVal = function (el, v) {
+    var proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    try { Object.getOwnPropertyDescriptor(proto, "value").set.call(el, v); } catch (e) { el.value = v; }
+    ["input", "change", "blur"].forEach(function (ev) { el.dispatchEvent(new Event(ev, { bubbles: true })); });
+    el.style.outline = "2px solid #2f8f6b"; el.style.backgroundColor = "#e8f5ef"; n++;
+  };
+  var vis = function (el) { var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden"; };
+  docs.forEach(function (d) {
+    [].forEach.call(d.querySelectorAll("input,textarea"), function (el) {
+      var ty = (el.type || "text").toLowerCase();
+      if (el.disabled || el.readOnly || el.value || !vis(el) || !/^(text|email|tel|url|number|textarea)$/.test(ty)) return;
+      var k = keyOf(el, d);
+      if (/search|recherche|captcha|password|mot de passe|code promo/.test(k)) return;
+      if (el.tagName === "TEXTAREA") { if (!msgEl || /message|lettre|motivation|cover|presentation|comment/.test(k)) msgEl = el; return; }
+      var f = ty === "email" ? "email" : ty === "tel" ? "tel" : null;
+      if (!f) for (var i = 0; i < R.length; i++) if (R[i][0].test(k)) { f = R[i][1]; break; }
+      if ((f === "nom" || f === "complet") && /entreprise|societe|company|employeur|ecole|school|universit|poste|job/.test(k)) f = null;
+      var v = f === "complet" ? (D.prenom + " " + D.nom).trim() : f === "pays" ? "France" : f ? D[f] : "";
+      if (v) setVal(el, v);
+    });
+  });
+  var box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:12px;right:12px;bottom:16px;z-index:2147483647;background:#123a4a;color:#fff;font:15px/1.4 -apple-system,system-ui,sans-serif;padding:14px 16px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35);max-width:520px;margin:0 auto";
+  var say = function (t) { box.textContent = t; if (!box.parentNode) document.body.appendChild(box); clearTimeout(box._t); box._t = setTimeout(function () { box.remove(); }, 9000); };
+  var li = /linkedin\.com$/.test(location.hostname) && document.querySelector('.msg-form__contenteditable[contenteditable="true"],div[role="textbox"][contenteditable="true"]');
+  var end = function (pasted) {
+    if (li) return say(pasted ? "Message collé dans LinkedIn. Relis-le puis envoie." : "Copie d'abord le message dans Jobello, puis touche à nouveau le favori.");
+    if (!n && !pasted) return say(msgEl ? "Je n'ai rien reconnu ici. Le champ message est sélectionné : colle ton message." : "Aucun champ reconnu. Ouvre d'abord le formulaire (bouton « Postuler »), puis touche à nouveau le favori.");
+    say("Jobello a rempli " + n + " champ" + (n > 1 ? "s" : "") + (pasted ? " et collé ton message" : "") + ". Vérifie, joins ton CV, puis envoie toi-même." + (msgEl && !pasted ? " Pour le message : appuie dans le champ sélectionné et colle." : ""));
+  };
+  var target = li || msgEl;
+  if (!target) return end(false);
+  if (target.focus) target.focus();
+  var done = false, t = setTimeout(function () { if (!done) { done = true; end(false); } }, 2500);
+  var put = function (txt) {
+    if (done) return; done = true; clearTimeout(t);
+    if (!txt || String(txt).trim().length < 40) return end(false);
+    if (li) { li.focus(); var ok = document.execCommand && document.execCommand("insertText", false, txt); if (!ok) { li.textContent = txt; li.dispatchEvent(new InputEvent("input", { bubbles: true })); } n++; return end(true); }
+    setVal(msgEl, txt); end(true);
+  };
+  try { navigator.clipboard.readText().then(put, function () { put(""); }); } catch (e) { put(""); }
+}
+const favData = () => {
+  const p = state.profil || {}, k = p.kit || {}, [prenom, ...nom] = String(p.nom || "").trim().split(/\s+/);
+  return { prenom: prenom || "", nom: nom.join(" "), email: p.email || "", tel: p.telephone || "", linkedin: liUrl(),
+    ville: p.ville || String(p.mobilite || "").split(/[(·,]/)[0].trim(), cp: p.codePostal || "",
+    salaire: k.pretentions || p.salaire || "", dispo: dispo() };
+};
+const favUrl = () => "javascript:" + encodeURIComponent("(" + jobelloFill.toString().replace(/\n\s*/g, " ") + ")(" + JSON.stringify(favData()) + ")");
+/* Les infos à copier une par une, pour un formulaire sans le favori */
+function idChips(sfx) {
+  const d = favData(), L = [["Prénom", d.prenom], ["Nom", d.nom], ["E-mail", d.email], ["Téléphone", d.tel], ["Ville", d.ville], ["LinkedIn", d.linkedin], ["Prétentions", d.salaire], ["Disponibilité", d.dispo]];
+  return `<div class="row id-chips">${L.filter((x) => x[1]).map(([l, v], i) => `<span id="idc-${sfx}-${i}" hidden>${esc(v)}</span><button type="button" class="small" data-copy="idc-${sfx}-${i}">${esc(l)}</button>`).join("")}</div>`;
+}
+function favBoxHTML() {
+  return `<div class="fav-box">
+    <p style="margin:0">Un favori à installer une fois dans Safari (ou Chrome). Sur la page du formulaire, tu le touches : il remplit prénom, nom, e-mail, téléphone, ville, LinkedIn, prétentions et disponibilité, et colle le message de candidature que tu viens de copier dans Jobello. Il marche aussi dans une conversation LinkedIn ouverte. Toi, tu joins le CV, tu relis et tu envoies.</p>
+    <details class="sec"><summary>Installer sur iPhone (Safari)</summary><div class="body"><ol class="chrome-steps">
+      <li>Touche <b>« Copier le code du favori »</b> ci-dessous.</li>
+      <li>Dans Safari, ouvre n'importe quelle page, touche <b>Partager</b> puis <b>« Ajouter un signet »</b>. Nomme-le <b>Remplir avec Jobello</b> et enregistre.</li>
+      <li>Ouvre tes signets, touche <b>Modifier</b>, puis ce signet. Efface son adresse, colle le code copié et touche <b>OK</b>.</li>
+    </ol></div></details>
+    <details class="sec"><summary>Installer sur ordinateur</summary><div class="body"><p style="margin:0;font-size:.88rem">Affiche la barre des favoris, puis fais glisser le bouton vert « Remplir avec Jobello » dedans. Ou crée un favori et colle le code comme adresse.</p></div></details>
+    <span id="fav-code" hidden>${esc(favUrl())}</span>
+    <div class="row"><button type="button" class="small primary" data-copy="fav-code">Copier le code du favori</button><a class="btn small fav-drag" href="${esc(favUrl())}" data-fav>Remplir avec Jobello</a></div>
+    <p class="muted" style="margin:0;font-size:.8rem">Il ne remplit que les champs vides qu'il reconnaît, et n'envoie jamais rien. Certains sites (Workday, Taleo…) cachent leur formulaire : il en remplit alors une partie, ou rien. Si tu changes ton téléphone ou ton e-mail, réinstalle le favori.</p>
+  </div>`;
+}
+document.addEventListener("click", (e) => { if (e.target.closest("a[data-fav]")) { e.preventDefault(); toast("Fais glisser ce bouton dans ta barre de favoris, ou copie le code"); } });
 /* Kit d'inscription : chaque texte se modifie sur place (clé = où il est rangé dans profil/main) */
 /* ---------- Mes compétences : niveaux 0-3, servent à noter les offres ---------- */
 const COMP_LV = ["Jamais fait", "Notions", "Pratiqué", "Maîtrisé"];
@@ -1728,7 +1823,7 @@ function renderKit() {
       ${dir.map(site).join("")}</div></details>
     ${pre.length ? `<details class="sec"><summary>Prestataires, 2e choix <small>${cnt(kx)} / ${kx.length} inscrit</small></summary><div class="body">${pre.map(site).join("")}</div></details>` : ""}`;
   $("#kit-count").textContent = `${cnt(kp.concat(kd, kx))} / ${kp.length + kd.length + kx.length} sites`;
-  el.innerHTML = `<p class="archive-note" style="margin:0">Je ne peux pas créer les comptes à ta place (mot de passe, code reçu par mail, conditions à accepter). Ouvre chaque site, colle les textes ci-dessous, puis coche « Inscrit ».</p>${texts}${sites}`;
+  el.innerHTML = `<p class="archive-note" style="margin:0">Je ne peux pas créer les comptes à ta place (mot de passe, code reçu par mail, conditions à accepter). Ouvre chaque site, colle les textes ci-dessous, puis coche « Inscrit ».</p>${texts}<div class="kit-step">Remplir les formulaires en un geste</div>${favBoxHTML()}${sites}`;
 }
 function renderCareers(q) {
   const acc = state.profil?.comptes || {}, li = PLATS.find((p) => p.id === "linkedin");
@@ -3470,6 +3565,7 @@ function applyBoxHTML(c) {
     <details class="sec"><summary>Ou postuler toi-même (iPhone, sans Claude)</summary><div class="body"><ol class="apply-steps">
       <li><b>Ta lettre</b> ${lt ? `<span id="ap-lettre" hidden>${esc(lt.contenu || "")}</span><div class="row">${dlBtn(lt, "small primary")}<button type="button" class="small copy-btn" data-copy="ap-lettre">Copier la lettre</button><button type="button" class="small" data-doc="${esc(lt.id)}">Voir</button></div>` : `<div class="row"><button type="button" class="small primary" data-act="one-click">Écrire la lettre</button></div>`}</li>
       ${msg ? `<li><b>Message au recruteur</b> <span class="muted" style="font-size:.82rem">pour le champ « message » de la plateforme ou un e-mail</span><textarea id="ap-msg" rows="14">${esc(msg)}</textarea><div class="row">${copyBtn("ap-msg")}<button type="button" class="small" data-act="ap-msg-ai">Réécrire avec Claude pour cette offre</button></div></li>` : ""}
+      <li><b>Remplis le formulaire</b> <span class="muted" style="font-size:.82rem">Copie le message ci-dessus, ouvre l'offre puis touche ton favori <b>« Remplir avec Jobello »</b> : il remplit tes coordonnées et colle le message. Pas encore installé ? C'est dans Offres, Kit d'inscription. Sinon, copie chaque info :</span>${idChips("ap")}</li>
       <li><b>Envoie</b>${isIndeed(c.lien) ? `<span class="muted" style="font-size:.82rem" id="ap-go-hint">J'ouvre la recherche Indeed sur ce poste : touche l'offre ${esc(c.groupe || c.entreprise || "")}.</span>
         <ol class="indeed-steps">
           <li>Sur l'annonce, appuie sur <b>« Postuler »</b> et connecte-toi si Indeed le demande.</li>
