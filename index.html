@@ -1645,11 +1645,35 @@ function jobelloFill(D) {
   });
   var box = document.createElement("div");
   box.style.cssText = "position:fixed;left:12px;right:12px;bottom:16px;z-index:2147483647;background:#123a4a;color:#fff;font:15px/1.4 -apple-system,system-ui,sans-serif;padding:14px 16px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35);max-width:520px;margin:0 auto";
-  var say = function (t) { box.textContent = t; if (!box.parentNode) document.body.appendChild(box); clearTimeout(box._t); box._t = setTimeout(function () { box.remove(); }, 9000); };
+  var say = function (t, add) {
+    box.textContent = t; if (!box.parentNode) document.body.appendChild(box); clearTimeout(box._t);
+    if (add && D.app) {
+      var b = document.createElement("button"); b.type = "button"; b.textContent = "+ Ajouter cette offre à Jobello";
+      b.style.cssText = "display:block;margin-top:10px;width:100%;padding:11px;border:0;border-radius:10px;background:#b8f28a;color:#0b2e1f;font:600 15px -apple-system,system-ui,sans-serif";
+      b.onclick = function () {
+        var o = { u: location.href, t: "", e: "", v: "", d: "", dp: "" };
+        [].forEach.call(document.querySelectorAll('script[type="application/ld+json"]'), function (sc) {
+          try { var j = JSON.parse(sc.textContent); [].concat(j["@graph"] || j).forEach(function (x) { if (x && /JobPosting/.test(x["@type"])) {
+            o.t = o.t || x.title || ""; var h = x.hiringOrganization; o.e = o.e || (h && (h.name || h)) || "";
+            var l = [].concat(x.jobLocation || [])[0], a = l && l.address; o.v = o.v || (a && (a.addressLocality || a)) || "";
+            var dv = document.createElement("div"); dv.innerHTML = String(x.description || ""); o.d = o.d || dv.textContent.replace(/\s+/g, " ").trim(); o.dp = o.dp || x.datePosted || "";
+          } }); } catch (er) {}
+        });
+        var mt = function (n) { var m = document.querySelector('meta[property="' + n + '"],meta[name="' + n + '"]'); return m ? m.content : ""; };
+        var h1 = document.querySelector("h1");
+        if (!o.t) o.t = (h1 && h1.textContent.trim()) || mt("og:title") || document.title;
+        if (!o.e) o.e = mt("og:site_name");
+        if (!o.d) { var mn = document.querySelector("main,article,[role=main]") || document.body; o.d = (mn.innerText || "").replace(/\s+/g, " ").trim(); }
+        o.t = String(o.t).slice(0, 160); o.e = typeof o.e === "string" ? o.e.slice(0, 120) : ""; o.v = typeof o.v === "string" ? o.v.slice(0, 80) : ""; o.d = o.d.slice(0, 2500);
+        window.open(D.app + "?ajout=" + encodeURIComponent(JSON.stringify(o)), "_blank"); box.remove();
+      };
+      box.appendChild(b); box._t = setTimeout(function () { box.remove(); }, 20000);
+    } else box._t = setTimeout(function () { box.remove(); }, 9000);
+  };
   var li = /linkedin\.com$/.test(location.hostname) && document.querySelector('.msg-form__contenteditable[contenteditable="true"],div[role="textbox"][contenteditable="true"]');
   var end = function (pasted) {
     if (li) return say(pasted ? "Message collé dans LinkedIn. Relis-le puis envoie." : "Copie d'abord le message dans Jobello, puis touche à nouveau le favori.");
-    if (!n && !pasted) return say(msgEl ? "Je n'ai rien reconnu ici. Le champ message est sélectionné : colle ton message." : "Aucun champ reconnu. Ouvre d'abord le formulaire (bouton « Postuler »), puis touche à nouveau le favori.");
+    if (!n && !pasted) return say(msgEl ? "Je n'ai rien reconnu ici. Le champ message est sélectionné : colle ton message." : "Pas de formulaire ici. Pour postuler, ouvre le formulaire (bouton « Postuler ») puis touche à nouveau le favori. Ou garde cette offre :", !msgEl);
     say("Jobello a rempli " + n + " champ" + (n > 1 ? "s" : "") + (pasted ? " et collé ton message" : "") + ". Vérifie, joins ton CV, puis envoie toi-même." + (msgEl && !pasted ? " Pour le message : appuie dans le champ sélectionné et colle." : ""));
   };
   var target = li || msgEl;
@@ -1668,7 +1692,7 @@ const favData = () => {
   const p = state.profil || {}, k = p.kit || {}, [prenom, ...nom] = String(p.nom || "").trim().split(/\s+/);
   return { prenom: prenom || "", nom: nom.join(" "), email: p.email || "", tel: p.telephone || "", linkedin: liUrl(),
     ville: p.ville || String(p.mobilite || "").split(/[(·,]/)[0].trim(), cp: p.codePostal || "",
-    salaire: k.pretentions || p.salaire || "", dispo: dispo() };
+    salaire: k.pretentions || p.salaire || "", dispo: dispo(), app: location.origin + location.pathname.replace(/[^/]*$/, "") };
 };
 const favUrl = () => "javascript:" + encodeURIComponent("(" + jobelloFill.toString().replace(/\n\s*/g, " ") + ")(" + JSON.stringify(favData()) + ")");
 /* Les infos à copier une par une, pour un formulaire sans le favori */
@@ -1679,6 +1703,7 @@ function idChips(sfx) {
 function favBoxHTML() {
   return `<div class="fav-box">
     <p style="margin:0">Un favori à installer une fois dans Safari (ou Chrome). Sur la page du formulaire, tu le touches : il remplit prénom, nom, e-mail, téléphone, ville, LinkedIn, prétentions et disponibilité, et colle le message de candidature que tu viens de copier dans Jobello. Il marche aussi dans une conversation LinkedIn ouverte. Toi, tu joins le CV, tu relis et tu envoies.</p>
+    <p style="margin:0">Sur la page d'une offre (sans formulaire), le même favori propose <b>« Ajouter cette offre à Jobello »</b> : la candidature est créée avec le poste, la société, la ville et le texte de l'offre.</p>
     <details class="sec"><summary>Installer sur iPhone (Safari)</summary><div class="body"><ol class="chrome-steps">
       <li>Touche <b>« Copier le code du favori »</b> ci-dessous.</li>
       <li>Dans Safari, ouvre n'importe quelle page, touche <b>Partager</b> puis <b>« Ajouter un signet »</b>. Nomme-le <b>Remplir avec Jobello</b> et enregistre.</li>
@@ -3926,6 +3951,7 @@ render();
 </script>
 
 <script src="notifs.js"></script>
+<script src="plus.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>

@@ -18,9 +18,10 @@
     { k: "apres", g: "Entretiens", ic: "💬", c: "#e0559b", t: "Après l'entretien", d: "Une heure après un entretien au téléphone, en visio ou sur place : comment ça s'est passé ?" },
     { k: "merci", g: "Entretiens", ic: "🙏", c: "var(--s-offer)", t: "Remerciement", d: "Le lendemain matin, si le mail de remerciement n'est pas encore parti." },
     { k: "offres", g: "Offres", ic: "✨", c: "var(--accent)", t: "Nouveaux postes", d: "Dès que de nouvelles offres qui te correspondent sont repérées (jamais la nuit)." },
+    { k: "bilan", g: "Candidatures", ic: "📊", c: "var(--accent)", t: "Bilan du lundi", d: "Le lundi matin : ce que tu as fait la semaine passée et ce qui t'attend cette semaine." },
     { k: "reseau", g: "Réseau", ic: "🤝", c: "#0a66c2", t: "Messages LinkedIn", d: "Le matin, quand des messages à ton réseau sont prévus.", off: true },
   ];
-  const CLIENT_KINDS = ["envoi", "dossier", "relance", "entretien", "apres", "merci", "reseau"]; // "offres" vient du serveur
+  const CLIENT_KINDS = ["envoi", "dossier", "relance", "entretien", "apres", "merci", "bilan", "reseau"]; // "offres" vient du serveur
   const prefs = () => { const p = ls.get("notifPrefs", {}), o = {}; KINDS.forEach((x) => (o[x.k] = p[x.k] ?? !x.off)); return o; };
   const heure = () => ls.get("notifHeure", "09:00");
 
@@ -70,14 +71,30 @@
       const deja = (c.entretiens || []).some((x) => x.date === d);
       const ou = c.lieuEntretien ? `📍 ${c.lieuEntretien}` : c.lienVisio ? "Le lien de la visio est dans Jobello." : "";
       add("entretien", "ent-veille:" + id, at(addDays(d, -1), "19:00"), `Demain : entretien ${ty.adj ? ty.adj + " " : ""}chez ${e}`,
-        [`${h ? "À " + hh(h) : "Heure à confirmer"}${c.avecQui ? " avec " + c.avecQui : ""}.`, ou, "Ta préparation t'attend dans Jobello."].filter(Boolean).join("\n"), link(c));
+        [`${h ? "À " + hh(h) : "Heure à confirmer"}${c.avecQui ? " avec " + c.avecQui : ""}.`, ou, "Ton antisèche t'attend dans Jobello."].filter(Boolean).join("\n"), link(c, "antiseche"));
       add("entretien", "ent-avant:" + id, h ? at(d, h, -60) : at(d, "08:00"), `Entretien ${ty.adj ? ty.adj + " " : ""}chez ${e} ${h ? "à " + hh(h) : "aujourd'hui"}`,
-        [c.poste, ou || "Bonne chance !"].filter(Boolean).join("\n"), link(c));
+        [c.poste, ou || "Bonne chance !"].filter(Boolean).join("\n"), link(c, "antiseche"));
+      // le matin même, l'antisèche, si l'entretien est assez tard dans la journée
+      if (h && at(d, h).getTime() - at(d, H).getTime() >= 3 * 3600000) add("entretien", "ent-matin:" + id, at(d, H), `Ton antisèche pour ${e}`,
+        `Entretien ${ty.adj ? ty.adj + " " : ""}à ${hh(h)}. L'essentiel à relire en 2 minutes.`, link(c, "antiseche"));
       if (!deja) add("apres", "apres:" + id, h ? at(d, h, 120) : at(d, "18:30"), `Alors, ${ty.nom} chez ${e} ?`,
         "Note comment ça s'est passé et ce qui suit, tant que c'est frais.", link(c, "suite"));
       if (!c.remerciement) add("merci", "merci:" + id, at(addDays(d, 1), H, 3), `Remercie ${e} pour l'entretien`,
         "Un mail de remerciement court fait la différence. Il est prêt dans Jobello.", link(c));
     });
+    // Bilan du lundi : la semaine passée et celle qui commence
+    const lundi = mornings(8).find((d) => new Date(d + "T12:00:00").getDay() === 1);
+    if (lundi) {
+      const avant = addDays(lundi, -7), dans = (x) => x && x >= avant && x < lundi, sem = (x) => x && x >= lundi && x <= addDays(lundi, 6);
+      const tous = state.cands || [], pl = (n, a, b) => `${n} ${n > 1 ? b || a + "s" : a}`;
+      const env = tous.filter((c) => dans(c.dateEnvoi)).length, rep = tous.filter((c) => dans(c.dateReponse)).length;
+      const entP = tous.filter((c) => (c.entretiens || []).some((x) => dans(x.date)) || dans(c.dateEntretien)).length;
+      const rel = cands.filter((c) => { const pc = viaContact(c), due = pc ? actif(c) && pc.prochaineAction : ownRelance(c) ? c.prochaineRelance : ""; return due && due <= addDays(lundi, 6); }).length;
+      const entS = cands.filter((c) => sem(c.dateEntretien)).length, aEnv = cands.filter((c) => c.statut === "a_envoyer" && actif(c)).length;
+      const passe = env || rep || entP ? `La semaine dernière : ${[env && pl(env, "envoyée"), rep && pl(rep, "réponse"), entP && pl(entP, "entretien")].filter(Boolean).join(", ")}.` : "La semaine dernière a été calme côté candidatures.";
+      const futur = rel || entS || aEnv ? `Cette semaine : ${[entS && pl(entS, "entretien"), rel && pl(rel, "relance"), aEnv && pl(aEnv, "dossier") + " à envoyer"].filter(Boolean).join(", ")}.` : "Cette semaine : rien d'urgent, c'est le moment de repérer de nouvelles offres.";
+      add("bilan", "bilan:" + lundi, at(lundi, H, 5), env >= 3 ? "Belle semaine, on continue ?" : "Ta semaine en bref", passe + "\n" + futur, "./#accueil");
+    }
     // Réseau LinkedIn
     for (let i = 0; i < 7; i++) {
       const d = addDays(first, i), l = (state.contacts || []).filter((p) => p.prochaineAction && (i === 0 ? p.prochaineAction <= d : p.prochaineAction === d) && contactDue({ ...p, prochaineAction: "0000-00-00" }));
@@ -153,14 +170,14 @@
   @keyframes nt-f{from{opacity:0}}@keyframes nt-u{from{transform:translateY(30px);opacity:.5}}
   .nt{background:var(--bg);color:var(--fg);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:26px 26px 0 0;padding:0 0 calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(14,31,43,.25);animation:nt-u .25s ease;font-family:var(--body)}
   @media (min-width:700px){.nt{border-radius:26px}}
-  .nt-hd{background:linear-gradient(135deg,#ffb35c 0%,#ff6f91 50%,#8e4fd8 100%);color:#fff;padding:22px 20px 18px;border-radius:26px 26px 0 0;position:relative}
+  .nt-hd{background:var(--hero);color:var(--hero-fg,#fff);padding:22px 20px 18px;border-radius:26px 26px 0 0;position:relative}
   .nt-hd h2{margin:0;font-family:var(--display);font-size:1.5rem}.nt-hd p{margin:4px 0 0;opacity:.92;font-size:.92rem}
   .nt-x{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.25);color:#fff;font-size:1.1rem;padding:0}
   .nt-bd{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
   .nt-st{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}
   .nt-st p{margin:0;font-size:.92rem}.nt-st.on{border-color:color-mix(in srgb,var(--s-offer) 45%,var(--line));background:color-mix(in srgb,var(--s-offer) 9%,var(--surface))}
   .nt-st.warn{background:var(--warn-bg);color:var(--warn-fg);border-color:transparent}
-  .nt-big{font-weight:700;padding:13px;border-radius:999px;border:0;background:linear-gradient(135deg,#ff8a5c,#ff5c8a);color:#fff;width:100%;font-size:1rem}
+  .nt-big{font-weight:700;padding:13px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink);width:100%;font-size:1rem}
   .nt-row2{display:flex;gap:8px;flex-wrap:wrap}.nt-row2 button{flex:1}
   .nt-g{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:6px 4px -4px}
   .nt-list{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
@@ -173,7 +190,7 @@
   .nt-hr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}.nt-hr select{width:auto;flex:none;font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg)}
   .nt-nx{display:flex;flex-direction:column;gap:2px;padding:10px 14px}.nt-nx+.nt-nx{border-top:1px solid var(--line)}.nt-nx small{color:var(--muted)}
   .nt-msg{font-size:.86rem;min-height:1.1em;text-align:center;color:var(--muted)}
-  .nt-bell{position:relative}.nt-bell .nt-dot{position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:#ff5c8a;box-shadow:0 0 0 2px rgba(255,255,255,.6)}
+  .nt-bell{position:relative}.nt-bell .nt-dot{position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--sun,#b8f28a);box-shadow:0 0 0 2px rgba(255,255,255,.6)}
   .visio-box .nt-cal{align-self:flex-start}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);

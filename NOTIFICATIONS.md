@@ -7,14 +7,17 @@ Jobello prévient au bon moment, même quand l'appli est fermée :
 | Candidatures à envoyer | le matin, quand un dossier est prêt mais pas envoyé (ou une réponse à un mail en attente) |
 | Dossiers à finir | le matin, quand une candidature n'a ni CV ni lettre |
 | Relances | le matin du jour de la relance (par toi ou via un contact) |
-| Rappels d'entretien | la veille à 19 h, puis 1 h avant |
+| Rappels d'entretien | la veille à 19 h, le matin même (antisèche à relire), puis 1 h avant ; ils ouvrent l'antisèche |
 | Après l'entretien | 1 h après la fin d'un entretien (téléphone, visio, sur place) : comment ça s'est passé ? |
 | Remerciement | le lendemain matin si le mail de remerciement n'est pas parti |
 | Nouveaux postes | dès que de nouvelles offres sont repérées (jamais entre 22 h et 8 h) |
+| Bilan du lundi | le lundi matin : la semaine passée (envoyées, réponses, entretiens) et celle qui commence |
+| Mails des recruteurs | quand Claude lit un mail important (entretien, refus, demande, offre), à midi |
 | Messages LinkedIn | le matin, quand des messages au réseau sont prévus (coupé au départ) |
 
 Chaque appareil choisit ce qu'il reçoit : cloche 🔔 de l'accueil, ou ⚙︎ Réglages › Notifications.
 Dans une candidature, l'encadré de l'entretien a un bouton « 📅 Ajouter au calendrier ».
+L'icône de Jobello affiche une pastille avec le nombre de choses urgentes (iPhone : notifications activées).
 
 Sur iPhone : Jobello doit être installée sur l'écran d'accueil (Safari › Partager › « Sur l'écran d'accueil »), iOS 16.4 ou plus.
 
