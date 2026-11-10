@@ -2164,7 +2164,7 @@ function openProfil() {
 /* ---------- Claude : lettres ---------- */
 let aiCtl = null;
 function aiError(e) {
-  return ({ not_granted: "Tu n'as pas autorisé l'appli à utiliser Claude. Tu peux le réactiver dans le menu Autorisations de l'appli.", rate_limited: "Trop de demandes pour le moment. Réessaie un peu plus tard.",
+  return ({ not_granted: window.jobelloStore ? "Ce bouton a besoin d'une clé Anthropic (payante), que tu n'as pas mise : demande-le plutôt à Claude dans ton projet Jobello." : "Tu n'as pas autorisé l'appli à utiliser Claude. Tu peux le réactiver dans le menu Autorisations de l'appli.", rate_limited: "Trop de demandes pour le moment. Réessaie un peu plus tard.",
     session_expired: "Demande-le à Claude dans ton projet Jobello.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", refused: "Claude n'a pas pu traiter cette demande. Reformule-la." }[e?.code]) || "La rédaction a été interrompue. Réessaie.";
 }
 const dispo = () => state.profil?.disponibilite || "Disponible sous 1 mois (préavis)";
@@ -3246,7 +3246,7 @@ function renderAlerts() {
   el.innerHTML = (list.length ? list.map((o) => `<div class="offer"><a class="title" href="${esc(offerHref(o))}" target="_blank" rel="noopener">${esc(o.titre)}</a>
       <span>${esc(o.entreprise)} <span class="muted">· ${esc(o.ville)}</span> ${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? ` <span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score}% adapté</span>` : ""}</span>
       ${o.pourquoi ? `<span class="muted" style="font-size:.85rem">${esc(o.pourquoi)}</span>` : ""}
-      <span class="muted" style="font-size:.78rem">${ageTag(o)}${o.source ? " · " + esc(o.source) : ""}</span><div class="row"><button type="button" class="small primary" data-prep="${esc(o.url)}">Préparer mon dossier</button><button type="button" class="small" data-alert-keep="${esc(o.url)}">Garder</button><button type="button" class="small ghost" data-alert-skip="${esc(o.url)}">Ignorer</button></div></div>`).join("")
+      <span class="muted" style="font-size:.78rem">${ageTag(o)}${o.source ? " · " + esc(o.source) : ""}</span><div class="row">${prepBtn(o)}<button type="button" class="small" data-alert-keep="${esc(o.url)}">Garder</button><button type="button" class="small ghost" data-alert-skip="${esc(o.url)}">Ignorer</button></div></div>`).join("")
     : `<p class="muted" style="margin:0">${a.date === todayISO() ? "Aucune nouvelle offre pertinente aujourd'hui." : "Lance la recherche du jour : je cherche sur Indeed les postes de ton profil et je note chaque offre."}</p>`)
     + `<div class="row"><button type="button" class="small" data-action="alerts-run" ${alertBusy ? "disabled" : ""}>${alertBusy ? "Recherche en cours…" : a.date === todayISO() ? "Relancer la recherche" : "Chercher les offres du jour"}</button><span class="muted" id="alerts-st" style="font-size:.8rem"></span></div>`;
 }
@@ -3313,9 +3313,29 @@ function renderPicks() {
       <a class="title" href="${esc(offerHref(o))}" target="_blank" rel="noopener">${esc(o.titre)}</a>
       <span class="muted" style="font-size:.82rem">${ageTag(o)} ${esc([o.ville, o.salaire && o.salaire !== "N/A" ? o.salaire : ""].filter(Boolean).join(" · "))}</span>
       ${o.pourquoi ? `<span style="font-size:.86rem">${esc(o.pourquoi)}</span>` : ""}
-      <div class="row"><button type="button" class="small primary" data-prep="${esc(o.url)}">Préparer mon dossier</button><button type="button" class="small ghost" data-alert-skip="${esc(o.url)}">Pas pour moi</button></div></div>`).join("");
+      <div class="row">${prepBtn(o)}<button type="button" class="small ghost" data-alert-skip="${esc(o.url)}">Pas pour moi</button></div></div>`).join("");
 }
 let prepBusy = false;
+/* Sans clé Anthropic (cas de Tullio), « Préparer mon dossier » envoie la demande à Claude du projet :
+   elle est rangée dans demandes/dossiers et la tâche planifiée prépare le dossier puis le range dans l'appli. */
+const sansCle = () => !!window.jobelloStore && !window.jobelloStore.get("aiKey", "");
+const demandeOf = (o) => (state.demandes?.liste || []).find((d) => d.url === o.url || d.cle === offerKey(o));
+function prepBtn(o) {
+  const d = demandeOf(o);
+  if (d && d.statut !== "fait" && d.statut !== "erreur") return `<button type="button" class="small" disabled title="Claude prépare ce dossier depuis ton projet : il apparaîtra dans Suivi">Demandé à Claude ⏳</button>`;
+  return `<button type="button" class="small primary" data-prep="${esc(o.url)}">Préparer mon dossier</button>`;
+}
+async function demanderDossier(o) {
+  if (!state.db) return toast("Demande-le à Claude dans ton projet Jobello");
+  if (demandeOf(o) && demandeOf(o).statut !== "erreur") return toast("C'est déjà demandé : Claude s'en occupe.");
+  const cur = state.demandes || { liste: [] };
+  const offre = { titre: o.titre || "", entreprise: o.entreprise || "", ville: o.ville || "", url: o.url || "", jobId: o.jobId || "", type: o.type || "", salaire: o.salaire || "", source: o.source || "", description: String(o.description || "").slice(0, 8000), score: o.score ?? null, pourquoi: o.pourquoi || "", mode: o.mode || "" };
+  const liste = (cur.liste || []).filter((d) => !(d.url === o.url && d.statut === "erreur")).concat({ url: o.url, cle: offerKey(o), offre, statut: "en_attente", demandeLe: new Date().toISOString() }).slice(-50);
+  try { await state.db.doc("demandes/dossiers").set({ ...cur, liste }); state.demandes = { ...cur, liste }; }
+  catch { return toast("La demande n'a pas pu être envoyée. Réessaie."); }
+  renderAlerts(); renderPicks(); if (typeof renderOffers === "function") try { renderOffers(); } catch {}
+  toast("C'est envoyé à Claude : ton dossier arrivera dans Suivi, avec CV, lettre et message.");
+}
 /* Déroulé en direct de « Préparer mon dossier » */
 const LIVE_STEPS = [["read", "Lire l'offre", "Je lis l'offre"], ["poste", "Analyser le poste", "J'analyse le poste", ["resume", "motsCles"]],
   ["fit", "Évaluer ton adéquation", "J'évalue ton adéquation", ["ville", "contrat", "salaire", "domaine", "employeur", "score", "verdict", "adequation", "competences"]],
@@ -3410,7 +3430,8 @@ async function prepDossier(url, btn) {
   const o = offerByUrl(url); if (!o) return toast("Offre introuvable, relance la recherche.");
   const dup = state.cands.find((c) => c.lien === o.url || offerKey(c) === offerKey(o));
   if (dup) { toast("Tu as déjà un dossier pour cette offre : je l'ouvre."); return openCand(dup.id); }
-  if (!state.sample?.json || !state.db) return toast("Demande-le à Claude dans ton projet Jobello");
+  if (sansCle() || !state.sample?.json) return demanderDossier(o);
+  if (!state.db) return toast("Demande-le à Claude dans ton projet Jobello");
   if (prepBusy) return toast("Un dossier est déjà en préparation…");
   prepBusy = true; const lbl = btn.textContent; btn.disabled = true;
   const ctl = new AbortController(); liveStart(o, ctl);
@@ -3892,7 +3913,7 @@ function renderOffers() {
     return `<div class="offer"><a class="title" href="${esc(offerHref(o))}" target="_blank" rel="noopener">${esc(o.titre)}</a>
       <span>${esc(o.entreprise)} <span class="muted">· ${esc(o.ville)}</span> ${modeTag(o.mode)}</span>
       <span class="muted" style="font-size:.85rem">${ageTag(o)} ${[o.type, o.salaire && o.salaire !== "N/A" ? o.salaire : ""].filter(Boolean).map(esc).join(" · ")}</span>
-      <div class="row">${already ? "" : `<button type="button" class="small primary" data-prep="${esc(o.url)}">Préparer mon dossier</button>`}<button type="button" class="small" ${already ? "disabled" : ""} data-addoffer="${i}">${already ? "Dans mes candidatures" : "Ajouter seulement"}</button>
+      <div class="row">${already ? "" : `${prepBtn(o)}`}<button type="button" class="small" ${already ? "disabled" : ""} data-addoffer="${i}">${already ? "Dans mes candidatures" : "Ajouter seulement"}</button>
       <a class="btn small" href="${esc(offerHref(o))}" target="_blank" rel="noopener">Voir l'offre</a></div></div>`;
   }).join("");
 }
@@ -3943,6 +3964,7 @@ render();
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("societes").onSnapshot((snap) => { state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); }, () => {});
   db.doc("alertes/jour").onSnapshot((snap) => { if (!alertBusy) { state.alertes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); } }, () => {});
+  db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
   db.doc("alertes/sites").onSnapshot((snap) => { state.sites = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); }, () => {});
   setTimeout(autoAlerts, 2500);
   db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; render(); }, () => {});
