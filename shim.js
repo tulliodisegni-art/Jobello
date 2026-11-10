@@ -116,5 +116,8 @@
   window.claude = { use: async (n) => { await (window.jobelloReady || Promise.resolve()); return caps[n] || null; } };
   // un lien "/_blob/<id>" ouvert au toucher : on ouvre le fichier rangé
   document.addEventListener("click", async (e) => { const a = e.target.closest && e.target.closest('a[href^="/_blob/"]'); if (!a) return; e.preventDefault(); const w = window.open("", "_blank"); const u = await window.jobelloBlob(a.getAttribute("href").slice(7)); if (u) { if (w) w.location = u; else location.href = u; } else { w && w.close(); alert("Fichier introuvable"); } }, true);
+  // les images "/_blob/<id>" (photo du CV) : on charge le fichier rangé
+  const fixImgs = (root) => (root.querySelectorAll ? root.querySelectorAll('img[src^="/_blob/"]') : []).forEach(async (im) => { const id = im.getAttribute("src").slice(7); im.removeAttribute("src"); const u = await window.jobelloBlob(id); if (u) im.src = u; });
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && (n.matches?.('img[src^="/_blob/"]') ? fixImgs(n.parentNode || n) : fixImgs(n))))).observe(document.documentElement, { childList: true, subtree: true });
   window.jobelloLocal = local;
 })();
