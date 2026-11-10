@@ -79,7 +79,9 @@
   };
   const remoteB = () => window.jobelloRemote && window.jobelloRemote();
   async function putBlob(id, blob) { await tx("blobs", "readwrite", (s) => s.put(blob, id)); const r = remoteB(); if (r) await r.putBlob(id, blob); }
-  async function getBlob(id) { let b = await tx("blobs", "readonly", (s) => s.get(id)); if (!b) { const r = remoteB(); if (r) { b = await r.getBlob(id); if (b) await tx("blobs", "readwrite", (s) => s.put(b, id)); } } return b || null; }
+  async function getBlob(id) { let b = await tx("blobs", "readonly", (s) => s.get(id)); if (!b) { const r = remoteB(); if (r) { b = await r.getBlob(id); if (b) await tx("blobs", "readwrite", (s) => s.put(b, id)); } } if (!b && id.startsWith("doc-")) b = await docBlob(id); return b || null; }
+  // petit fichier rangé dans la base par Claude (ex. la photo du CV) : document fichiers/<id> = { type, b64 }
+  async function docBlob(id) { try { const v = await backend.get("fichiers/" + id); if (!v || !v.b64) return null; const bin = atob(v.b64), u = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k); return new Blob([u], { type: v.type || "image/jpeg" }); } catch { return null; } }
   window.jobelloPutBlob = putBlob;
   // les liens "/_blob/<id>" de l'appli pointent vers les fichiers de ce téléphone
   window.jobelloBlob = async (id) => { if (blobUrls[id]) return blobUrls[id]; const b = await getBlob(id); if (!b) return null; return (blobUrls[id] = URL.createObjectURL(b)); };
