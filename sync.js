@@ -15,12 +15,27 @@
   .jb-card .err{color:#c0392b;font-size:.86rem;text-align:center;min-height:1.2em}
   .jb-card .row{display:flex;gap:8px}.jb-card .row>*{flex:1}
   .jb-card h2{margin:6px 0 0;font-size:1rem}
+  .jb-card button.soc{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#0e1f2b;border:1px solid #d5e5df}
+  .jb-or{display:flex;align-items:center;gap:10px;color:#56697a;font-size:.8rem}.jb-or::before,.jb-or::after{content:"";flex:1;height:1px;background:#d5e5df}
   @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .jb-card{background:#15232a;color:#e6f1ef}:root:not([data-theme=light]) .jb-card input{background:#1b2d35;border-color:#29414a;color:#e6f1ef}:root:not([data-theme=light]) .jb-card p,:root:not([data-theme=light]) .jb-card label{color:#9db4b1}}:root[data-theme=dark] .jb-card{background:#15232a;color:#e6f1ef}:root[data-theme=dark] .jb-card input{background:#1b2d35;border-color:#29414a;color:#e6f1ef}:root[data-theme=dark] .jb-card p,:root[data-theme=dark] .jb-card label{color:#9db4b1}
   .jb-gear{position:absolute;right:12px;bottom:10px;z-index:2;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:transparent;color:rgba(255,255,255,.6);display:grid;place-items:center;cursor:pointer}.jb-gear:hover{color:#fff;background:rgba(255,255,255,.15)}
 `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const ov = (html) => { const d = document.createElement("div"); d.className = "jb-ov"; d.innerHTML = `<div class="jb-card">${html}</div>`; document.body.appendChild(d); return d; };
   const $ = (r, s) => r.querySelector(s);
+
+  /* ---------- connexion avec Google / Apple ----------
+     Les boutons n'apparaissent que si le fournisseur est activé dans Supabase (Authentication › Providers) :
+     rien à republier le jour où on l'active. Pas dans l'appli iPhone / Android (Google refuse les connexions dans une appli emballée). */
+  const SOC_ICON = {
+    google: '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>',
+    apple: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.3-.1 1.7-.8 3.3-.8 1.5 0 1.9.8 3.3.8 1.4 0 2.2-1.2 3-2.4 1-1.4 1.3-2.7 1.4-2.8-.1 0-2.6-1-2.4-4.2zM13.9 5c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>',
+  };
+  const SOC_NAME = { google: "Google", apple: "Apple" };
+  async function socialProviders(url, key) {
+    try { if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return []; } catch (e) {}
+    try { const r = await fetch(url + "/auth/v1/settings", { headers: { apikey: key } }); const j = await r.json(); return ["apple", "google"].filter((p) => j && j.external && j.external[p]); } catch (e) { return []; }
+  }
 
   let sb = null, user = null;
   /* ---------- Partage réservé au propriétaire ----------
@@ -60,6 +75,7 @@
   function login() {
     return new Promise((res) => {
       const d = ov(`<img src="icons/icon-192.png" alt=""><h1>Jobello</h1><p>Tes candidatures, tes relances et ton planning, au même endroit.</p>
+        <div id="jb-soc" style="display:grid;gap:8px"></div>
         <label>E-mail<input id="jb-mail" type="email" autocomplete="username" inputmode="email"></label>
         <label>Mot de passe<input id="jb-pass" type="password" autocomplete="current-password"></label>
         <div class="err" id="jb-err"></div>
@@ -73,6 +89,16 @@
         d.remove(); res(r.data.user);
       };
       $(d, "#jb-in").onclick = () => go(false); $(d, "#jb-up").onclick = () => go(true);
+      socialProviders(C.url, C.key).then((ps) => {
+        if (!ps.length) return;
+        const box = $(d, "#jb-soc");
+        box.innerHTML = ps.map((p) => `<button class="soc" data-p="${p}">${SOC_ICON[p]}Continuer avec ${SOC_NAME[p]}</button>`).join("") + '<div class="jb-or">ou avec ton e-mail</div>';
+        box.querySelectorAll("[data-p]").forEach((b) => (b.onclick = async () => {
+          $(d, "#jb-err").textContent = "";
+          const r = await sb.auth.signInWithOAuth({ provider: b.dataset.p, options: { redirectTo: location.origin + location.pathname } });
+          if (r.error) $(d, "#jb-err").textContent = "Connexion avec " + SOC_NAME[b.dataset.p] + " impossible pour l'instant.";
+        }));
+      });
     });
   }
   let ready; window.jobelloReady = new Promise((r) => (ready = r));
