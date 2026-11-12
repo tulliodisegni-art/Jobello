@@ -115,10 +115,32 @@
     const doc = state.docs.find((d) => d.id === c.cvAdapte) || state.docs.find((d) => d.id === c.cv);
     if (!doc || !doc.contenu) return "";
     const txt = nt(doc.contenu), ok = kws.filter((k) => has(txt, { mot: k })), no = kws.filter((k) => !has(txt, { mot: k }));
-    const pct = Math.round(ok.length * 100 / kws.length), cls = pct >= 95 ? "v-fonce" : pct >= 75 ? "v-tente" : "v-bof";
-    return `<div class="cb-ats"><span class="lbl">Correspondance avec l'offre : <b class="cb-st ${cls}">${pct} %</b> <span class="muted" style="font-size:.84rem">(objectif 95 %)</span></span>
-      <span class="muted" style="font-size:.84rem">Logiciels de tri : ${ok.length} mot${ok.length > 1 ? "s" : ""}-clé${ok.length > 1 ? "s" : ""} de l'offre sur ${kws.length} dans ${doc.adapte ? "ton CV adapté" : "ton CV"}.</span>
-      ${no.length ? `<span class="muted" style="font-size:.84rem">Pas encore dans le CV : à glisser tel quel seulement si tu l'as vraiment fait.</span><div class="cb-chips">${no.map((k) => `<i class="cb-n">${esc(k)}</i>`).join("")}</div>` : `<span class="muted" style="font-size:.84rem">Tous y sont : ton CV passera le premier tri.</span>`}</div>`;
+    const pct = Math.round(ok.length * 100 / kws.length), cls = pct >= 80 ? "v-fonce" : pct >= 50 ? "v-tente" : "v-bof";
+    const f = formatCV(doc.contenu), fcls = f.pct >= 95 ? "v-fonce" : f.pct >= 75 ? "v-tente" : "v-bof";
+    return `<div class="cb-ats"><span class="lbl">Format lisible par les robots de tri : <b class="cb-st ${fcls}">${f.pct} %</b> <span class="muted" style="font-size:.84rem">(objectif 95 %)</span></span>
+      ${f.ko.length ? `<span class="muted" style="font-size:.84rem">À revoir : ${f.ko.map(esc).join(" ; ")}.</span>` : `<span class="muted" style="font-size:.84rem">Rubriques, coordonnées, dates et mise en forme passent les logiciels de tri.</span>`}
+      <span class="lbl" style="margin-top:6px">Correspondance avec le poste : <b class="cb-st ${cls}">${pct} %</b></span>
+      <span class="muted" style="font-size:.84rem">${ok.length} mot${ok.length > 1 ? "s" : ""}-clé${ok.length > 1 ? "s" : ""} de l'offre sur ${kws.length} dans ${doc.adapte ? "ton CV adapté" : "ton CV"}. Ce chiffre reste honnête : on n'ajoute jamais ce que tu n'as pas fait, et 50 à 70 % suffit souvent pour postuler.</span>
+      ${no.length ? `<span class="muted" style="font-size:.84rem">Pas dans le CV : à glisser tel quel seulement si tu l'as vraiment fait.</span><div class="cb-chips">${no.map((k) => `<i class="cb-n">${esc(k)}</i>`).join("")}</div>` : ""}</div>`;
+  }
+
+  /* Format du CV pour les logiciels de tri (ATS), indépendant du poste */
+  function formatCV(contenu) {
+    const t = String(contenu || ""), u = normTxt(t).toUpperCase(), tests = [
+      [/\bPROFIL\b|\bRESUME\b|\bA PROPOS\b/.test(u), "rubrique PROFIL"],
+      [/\bEXPERIENCES?\b/.test(u), "rubrique EXPÉRIENCE PROFESSIONNELLE"],
+      [/\bFORMATIONS?\b/.test(u), "rubrique FORMATION"],
+      [/\bCOMPETENCES?\b/.test(u), "rubrique COMPÉTENCES"],
+      [/\bLANGUES?\b/.test(u), "rubrique LANGUES"],
+      [/[\w.+-]+@[\w-]+\.[\w.]+/.test(t), "adresse e-mail en texte"],
+      [/(\+33|0)\s?[1-9]([\s.]?\d{2}){4}/.test(t), "téléphone en texte"],
+      [/recherche|poste d|ing[ée]nieur/i.test(t.split("\n").slice(0, 4).join(" ")), "intitulé de poste en haut du CV"],
+      [!/[→⇒➜►▶★☆✓✔●◆■▪❖➤]/.test(t), "symboles décoratifs ou flèches (mal lus par les robots)"],
+      [(t.match(/\b(19|20)\d{2}\b/g) || []).length >= 3, "dates de chaque expérience"],
+      [t.length <= 6000, "CV trop long pour une page"],
+    ];
+    const ko = tests.filter(([okk]) => !okk).map(([, l]) => l);
+    return { pct: Math.round((tests.length - ko.length) * 100 / tests.length), ko };
   }
 
   /* ---------- Offres : tableau, 7 derniers jours, préparer les 3 meilleures ---------- */
