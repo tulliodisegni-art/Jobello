@@ -115,7 +115,9 @@
     const doc = state.docs.find((d) => d.id === c.cvAdapte) || state.docs.find((d) => d.id === c.cv);
     if (!doc || !doc.contenu) return "";
     const txt = nt(doc.contenu), ok = kws.filter((k) => has(txt, { mot: k })), no = kws.filter((k) => !has(txt, { mot: k }));
-    return `<div class="cb-ats"><span class="lbl">Logiciels de tri : ${ok.length} mot${ok.length > 1 ? "s" : ""}-clé${ok.length > 1 ? "s" : ""} de l'offre sur ${kws.length} dans ${doc.adapte ? "ton CV adapté" : "ton CV"}</span>
+    const pct = Math.round(ok.length * 100 / kws.length), cls = pct >= 95 ? "v-fonce" : pct >= 75 ? "v-tente" : "v-bof";
+    return `<div class="cb-ats"><span class="lbl">Correspondance avec l'offre : <b class="cb-st ${cls}">${pct} %</b> <span class="muted" style="font-size:.84rem">(objectif 95 %)</span></span>
+      <span class="muted" style="font-size:.84rem">Logiciels de tri : ${ok.length} mot${ok.length > 1 ? "s" : ""}-clé${ok.length > 1 ? "s" : ""} de l'offre sur ${kws.length} dans ${doc.adapte ? "ton CV adapté" : "ton CV"}.</span>
       ${no.length ? `<span class="muted" style="font-size:.84rem">Pas encore dans le CV : à glisser tel quel seulement si tu l'as vraiment fait.</span><div class="cb-chips">${no.map((k) => `<i class="cb-n">${esc(k)}</i>`).join("")}</div>` : `<span class="muted" style="font-size:.84rem">Tous y sont : ton CV passera le premier tri.</span>`}</div>`;
   }
 
