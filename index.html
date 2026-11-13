@@ -2338,7 +2338,7 @@ function docBlocks(text, type) {
     if (/^[a-zà-ÿ(]/.test(l) && last && ["li", "org", "p", "line"].includes(last.k)) { last.t += " " + l; return; }
     const b = l.replace(/^[-•*–]\s*/, "");
     if (exp || b !== l) return out.push({ k: "li", t: b });
-    if (/COMP[ÉE]TENCE/.test(sec)) { const m = l.match(/^(.{3,42}?)(?: · |: )(.+)$/); if (m) return out.push({ k: "kv", a: m[1], t: m[2] }); }
+    if (/COMP[ÉE]TENCE/.test(sec)) { const m = l.match(/^(.{3,42}?)(?: · |: )(.+)$/); if (m) return out.push({ k: "kv", a: m[1], t: m[2] }); const m2 = l.match(/^(\S+ & \S+) (.+)$/); if (m2) return out.push({ k: "kv", a: m2[1], t: m2[2] }); }
     if (/PROFIL|R[ÉE]SUM|PROPOS/.test(sec) && last?.k === "p" && !/[.!?]$/.test(last.t)) { last.t += " " + l; return; }
     out.push({ k: /PROFIL|R[ÉE]SUM|PROPOS/.test(sec) ? "p" : "line", t: l });
   });
@@ -2425,28 +2425,48 @@ async function drawCV(pdf, d) {
   const body = firstH < 0 ? [] : bl.slice(firstH);
   const f = (st, size, col) => { pdf.setFont("helvetica", st); pdf.setFontSize(size); pdf.setTextColor(...col); return size * 0.3528; };
   const split = (t, w) => pdf.splitTextToSize(pdfSafe(t), w);
-  const roleParts = (t) => { const i = t.lastIndexOf(" · "); return i > 0 && /(19|20)\d{2}|aujourd/i.test(t.slice(i)) ? [t.slice(0, i), t.slice(i + 3)] : [t, ""]; };
+  // « Intitulé · Sept. 2025 – aujourd'hui · 1 an » : les dates (et la durée qui suit) partent à droite
+  const roleParts = (t) => { const P = t.split(" · "), i = P.findIndex((x, k) => k > 0 && /(19|20)\d{2}|aujourd/i.test(x)); return i > 0 ? [P.slice(0, i).join(" · "), P.slice(i).join(" · ")] : [t, ""]; };
+  // FORMATION et LANGUES côte à côte, comme sur le CV d'origine (aussi pour l'ancienne rubrique « FORMATION · LANGUES »)
+  const LANG_RE = /^(Fran[çc]ais|Anglais|Espagnol|Italien|Allemand|Portugais|Arabe|Chinois|Japonais|Russe|N[ée]erlandais)\b/i;
+  const cols = []; for (let k = 0; k < body.length; k++) {
+    const b = body[k]; if (b.k !== "h" || !/^FORMATIONS?\b/.test(b.t)) continue;
+    let j = k + 1; const fo = [], la = []; while (j < body.length && body[j].k !== "h") { if (String(body[j].t || "").trim()) fo.push(body[j].t); j++; }
+    if (/LANGUES?/.test(b.t)) { fo.forEach((t, n) => { const P = t.split(" · "), q = P.findIndex((x) => LANG_RE.test(x)); if (q > 0) { fo[n] = P.slice(0, q).join(" · "); la.push(P.slice(q).join(" · ")); } }); }
+    else if (body[j] && /^LANGUES?\b/.test(body[j].t)) { let e = j + 1; while (e < body.length && body[e].k !== "h") { if (String(body[e].t || "").trim()) String(body[e].t).split(" · ").forEach((x) => { if (LANG_RE.test(x) || !la.length) la.push(x); else la[la.length - 1] += " · " + x; }); e++; } j = e; }
+    if (!la.length) continue;
+    body.splice(k, j - k, { k: "cols", fo, la: la.map((t) => t.replace(/^([^,·]+),\s*/, "$1 · ")) });
+  }
   const LW = (s) => { f("bold", s, BLUE); return Math.min(60, Math.max(30, ...body.filter((b) => b.k === "kv").map((b) => pdf.getTextWidth(pdfSafe(b.a)) + 4))); };
+  const PW = 18, PH = 24;
   const run = (s, draw, H0) => {
     const T = (txt, x, y, opt) => { if (draw) pdf.text(txt, x, y, opt); };
     if (draw) { pdf.setFillColor(...NAVY); pdf.rect(0, 0, 210, H0, "F");
-      if (photo) { pdf.setFillColor(...WHITE); pdf.rect(M - 0.6, 8.4, 28.2, 37.2, "F"); try { pdf.addImage(photo.url, photo.fmt, M, 9, 27, 36); } catch {} } }
+      if (photo) { pdf.setFillColor(...WHITE); pdf.rect(M - 0.5, 5.5, PW + 1, PH + 1, "F"); try { pdf.addImage(photo.url, photo.fmt, M, 6, PW, PH); } catch {} } }
     // Bandeau
-    const hx = photo ? M + 33 : M, hw = 210 - hx - M; let y = 9, h;
+    const hx = photo ? M + PW + 6 : M, hw = 210 - hx - M; let y = 6, h;
     h = f("bold", s * 2.7, WHITE); const [first, ...rest] = pdfSafe(name).split(" "); T(first, hx, y + h * 0.8);
     const fw = pdf.getTextWidth(first + " "); f("normal", s * 2.7, WHITE); T(rest.join(" "), hx + fw, y + h * 0.8); y += h * 1.1;
     if (title) { h = f("bold", s * 1.25, LIGHT); split(title, hw).forEach((l) => { T(l, hx, y + h * 0.8); y += h * 1.25; }); y += 0.8; }
     h = f("normal", s * 0.98, WHITE); contact.forEach((c) => split(c, hw).forEach((l) => { T(l, hx, y + h * 0.8); y += h * 1.4; }));
-    const H = Math.max(y + 5, photo ? 51 : 0); y = H + 4;
+    const H = Math.max(y + 3, photo ? 6 + PH + 4 : 0); y = H + 3;
     // Corps
     for (const b of body) {
-      if (b.k === "gap" || !String(b.t || "").trim()) continue;
+      if (b.k === "gap" || (b.k !== "cols" && !String(b.t || "").trim())) continue;
       if (b.k === "h") { y += s * 0.5; h = f("bold", s * 1.15, INK);
         if (draw) { pdf.setFillColor(...BLUE); pdf.rect(M, y + h * 0.18, h * 0.62, h * 0.62, "F"); pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.3); pdf.line(M, y + h * 1.3, M + W, y + h * 1.3); }
         pdf.setCharSpace(0.9); T(pdfSafe(b.t), M + h * 1.05, y + h * 0.8); pdf.setCharSpace(0); y += h * 1.3 + s * 0.3; continue; }
       if (b.k === "kv") { const lw = LW(s); h = f("normal", s, INK) * 1.32; const vl = split(b.t, W - lw); vl.forEach((l, k) => T(l, M + lw, y + h * 0.75 + k * h)); f("bold", s, BLUE); T(pdfSafe(b.a), M, y + h * 0.75); y += h * vl.length + 0.3; continue; }
       if (b.k === "role") { y += s * 0.28; const [r, dt] = roleParts(b.t); h = f("bold", s * 1.08, INK); T(pdfSafe(r), M, y + h * 0.8); if (dt) { f("normal", s * 0.95, GRAY); T(pdfSafe(dt), M + W, y + h * 0.8, { align: "right" }); } y += h * 1.3; continue; }
       if (b.k === "org") { h = f("bold", s * 0.98, BLUE) * 1.32; split(b.t, W).forEach((l) => { T(l, M, y + h * 0.75); y += h; }); continue; }
+      if (b.k === "cols") { const g = 8, wl = (W - g) * 0.62, xr = M + wl + g, wr = W - wl - g; let yl = y, yr = y;
+        const head = (t, x, w, yy) => { h = f("bold", s * 1.15, INK); if (draw) { pdf.setFillColor(...BLUE); pdf.rect(x, yy + s * 0.5 + h * 0.18, h * 0.62, h * 0.62, "F"); pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.3); pdf.line(x, yy + s * 0.5 + h * 1.3, x + w, yy + s * 0.5 + h * 1.3); } pdf.setCharSpace(0.9); T(t, x + h * 1.05, yy + s * 0.5 + h * 0.8); pdf.setCharSpace(0); return yy + s * 0.5 + h * 1.3 + s * 0.3; };
+        yl = head("FORMATION", M, wl, yl); yr = head("LANGUES", xr, wr, yr);
+        b.fo.forEach((t) => { const q = t.indexOf(" — "), a = q > 0 ? t.slice(0, q) : t, c = q > 0 ? t.slice(q) : ""; h = f("bold", s, INK) * 1.36; const aw = pdf.getTextWidth(pdfSafe(a)); f("normal", s, INK);
+          if (c && aw + pdf.getTextWidth(pdfSafe(c)) <= wl) { f("bold", s, INK); T(pdfSafe(a), M, yl + h * 0.75); f("normal", s, INK); T(pdfSafe(c), M + aw, yl + h * 0.75); yl += h; }
+          else split(t, wl).forEach((l) => { T(l, M, yl + h * 0.75); yl += h; }); });
+        b.la.forEach((t) => { const [a, c] = t.split(" · "); h = f("bold", s, INK) * 1.36; T(pdfSafe(a), xr, yr + h * 0.75); if (c) { const aw = pdf.getTextWidth(pdfSafe(a) + " · "); f("normal", s, INK); T(pdfSafe("· " + c), xr + aw - pdf.getTextWidth("· "), yr + h * 0.75); } yr += h; });
+        y = Math.max(yl, yr); continue; }
       if (b.k === "li") { h = f("normal", s, INK) * 1.3; if (draw) { pdf.setFillColor(...BLUE); pdf.circle(M + 1.3, y + h * 0.5, 0.55, "F"); } split(b.t, W - 4.5).forEach((l) => { T(l, M + 4.5, y + h * 0.75); y += h; }); y += 0.15; continue; }
       h = f("normal", s, INK) * 1.36; split(b.t, W).forEach((l) => { T(l, M, y + h * 0.75); y += h; });
     }
