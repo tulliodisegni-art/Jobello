@@ -41,7 +41,11 @@
     const actif = (c) => c.decision !== "stop" && c.decision !== "pause";
 
     // Candidatures prêtes à envoyer, réponses à envoyer
-    const pretes = cands.filter((c) => c.statut === "a_envoyer" && actif(c) && (c.cv || c.lettre));
+    // (une candidature confiée à Claude n'est plus « prête à envoyer » : on demande une fois si elle est partie)
+    const lancees = cands.filter((c) => c.statut === "a_envoyer" && actif(c) && c.claudeLe);
+    if (lancees.length) add("envoi", "lancee:" + first, at(first, H), lancees.length === 1 ? `Ta candidature chez ${lancees[0].entreprise || "?"} est partie ?` : `${lancees.length} candidatures lancées avec Claude`,
+      lancees.length === 1 ? "Tu l'as lancée avec Claude. Si elle est partie, touche « C'est envoyé » sur sa fiche." : `${names(lancees)} : tu les as lancées avec Claude. Touche « C'est envoyé » sur celles qui sont parties.`, lancees.length === 1 ? link(lancees[0]) : "./#accueil");
+    const pretes = cands.filter((c) => c.statut === "a_envoyer" && actif(c) && (c.cv || c.lettre) && !c.claudeLe);
     const reps = cands.filter((c) => c.reponseMail && !c.reponseMail.envoye);
     if (pretes.length || reps.length) mornings(3).forEach((d, i) => {
       const seul = pretes.length + reps.length === 1 ? (pretes[0] || reps[0]) : null;
@@ -50,7 +54,7 @@
         seul ? link(seul) : "./#candidatures");
     });
     // Dossiers à finir
-    const afaire = cands.filter((c) => c.statut === "a_envoyer" && actif(c) && !c.cv && !c.lettre);
+    const afaire = cands.filter((c) => c.statut === "a_envoyer" && actif(c) && !c.cv && !c.lettre && !c.claudeLe);
     if (afaire.length) mornings(2).forEach((d) => add("dossier", "dossier:" + d, at(d, H, 1), afaire.length === 1 ? `Le dossier ${afaire[0].entreprise || ""} est à finir` : `${afaire.length} dossiers à finir`,
       `${names(afaire)} : choisis le CV et la lettre, Claude t'aide à les adapter.`, afaire.length === 1 ? link(afaire[0]) : "./#candidatures"));
     // Relances (par toi ou via un contact), jour par jour sur deux semaines
