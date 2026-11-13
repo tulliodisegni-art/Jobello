@@ -456,6 +456,15 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .fold.slim { background: transparent; border: none; } .fold.slim > summary { padding: 6px 2px; min-height: 36px; } .fold.slim .fold-t { font-size: .9rem; font-weight: 600; color: var(--muted); } .fold.slim .fold-b { padding: 4px 2px 8px; }
 .view { gap: 14px; }
 .home-cols, .home-main, .home-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.prep-list { display: flex; flex-direction: column; gap: 8px; }
+.prep-it { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px solid var(--line); border-left: 4px solid var(--sun); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+.prep-it.fait { border-left-color: var(--ok, #2e8b57); }
+.prep-it.erreur { border-left-color: var(--danger, #c0392b); }
+.prep-it .prep-txt { display: flex; flex-direction: column; gap: 2px; flex: 1 1 200px; min-width: 0; }
+.prep-it .prep-st { font-size: .86rem; }
+.prep-steps { display: flex; gap: 4px; font-size: .74rem; flex-wrap: wrap; }
+.prep-steps span { padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted, #777); }
+.prep-steps span.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .picks { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .pick { border: 1px solid var(--line); border-left: 4px solid var(--sun); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 5px; background: var(--surface); min-width: 0; }
 .pick .cc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .pick .cc-tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
@@ -745,6 +754,7 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077
     <div class="row" id="hero-join" hidden></div>
     <div class="kpis" id="kpis"></div>
     <div id="focus" hidden></div>
+    <section class="home-block prep-panel" id="prep-panel" hidden><div class="row between"><h2 class="home-h">Dossiers demandés à Claude</h2><span class="home-more" id="prep-meta"></span></div><div class="prep-list" id="prep-list"></div></section>
     <div class="home-grid">
       <section class="home-block" id="todo-panel"><div class="row between"><h2 class="home-h">À faire</h2><span class="home-more" id="todo-n"></span></div><div class="tasks" id="todo"></div></section>
       <div class="home-side2">
@@ -765,6 +775,7 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077
     <details class="fold slim"><summary><span class="fold-t">Trier et filtrer</span><span class="fold-s" id="fs-sort"></span></summary>
       <div class="fold-b"><div class="row"><span class="muted" style="font-size:0.85rem">Ranger par</span><div class="seg" id="groupby" role="group" aria-label="Ranger par"></div></div>
       <div class="chips" id="filters" role="group" aria-label="Filtrer par statut"></div></div></details>
+    <section class="prep-panel" id="prep-panel2" hidden><h3 class="ag-h">Dossiers demandés à Claude</h3><div class="prep-list" id="prep-list2"></div></section>
     <div class="groups" id="groups"></div>
     <details class="fold" id="sec-stats"><summary><span class="fold-t">Mes chiffres</span><span class="fold-s" id="fs-stats"></span></summary>
       <div class="fold-b">
@@ -1880,7 +1891,7 @@ function renderCareers(q) {
   $("#car-presta").innerHTML = x.length ? `<div class="car-grid">${x.map(card).join("")}</div>` : `<div class="empty">Aucune société de prestation dans ta liste.</div>`;
   $("#car-g-count").textContent = g.length + " sociétés"; $("#car-p-count").textContent = p.length + " sociétés"; $("#car-x-count").textContent = x.length + " sociétés";
 }
-function render() { renderHome(); renderCands(); renderAgenda(); renderContacts(); renderDocs(); renderComp(); renderPlats(); renderKit(); renderPicks(); if (typeof renderOffers === "function") renderOffers(); renderDash(); renderAlerts(); }
+function render() { renderHome(); renderCands(); renderAgenda(); renderContacts(); renderDocs(); renderComp(); renderPlats(); renderKit(); renderPicks(); if (typeof renderOffers === "function") renderOffers(); renderDash(); renderAlerts(); renderPrep(); }
 
 /* ---------- Feuilles (dossier, document, profil) ---------- */
 let sheetKind = null, editing = null;
@@ -3321,9 +3332,55 @@ let prepBusy = false;
    elle est rangée dans demandes/dossiers et la tâche planifiée prépare le dossier puis le range dans l'appli. */
 const sansCle = () => !!window.jobelloStore && !window.jobelloStore.get("aiKey", "");
 const demandeOf = (o) => (state.demandes?.liste || []).find((d) => d.url === o.url || d.cle === offerKey(o));
+/* Passages de la tâche planifiée qui prépare les dossiers : 9h47, 13h47 et 18h47 (heure de Paris). */
+const PREP_SLOTS = [9 * 60 + 47, 13 * 60 + 47, 18 * 60 + 47], PREP_DUREE = 20;
+function parisMin(d = new Date()) {
+  try { const p = Object.fromEntries(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map((x) => [x.type, x.value])); return +p.hour * 60 + +p.minute; }
+  catch { return d.getHours() * 60 + d.getMinutes(); }
+}
+const hhmm = (m) => `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, "0") : ""}`;
+/* État d'une demande : en_attente (avec l'heure du prochain passage), en_cours (passage en train de tourner), fait, erreur */
+function etatDemande(d) {
+  if (!d) return null;
+  if (d.statut === "fait") return { k: "fait", court: "Prêt ✓", txt: `Prêt${d.faitLe ? " depuis le " + fmt(d.faitLe.slice(0, 10)).replace(/\.$/, "") : ""} : ouvre-le pour relire et envoyer.` };
+  if (d.statut === "erreur") return { k: "erreur", court: "Échec", txt: `Claude n'a pas pu le préparer${d.raison ? " (" + d.raison + ")" : ""}. Tu peux le redemander.` };
+  const m = parisMin(), dem = d.demandeLe ? parisMin(new Date(d.demandeLe)) : -1, memeJour = d.demandeLe && new Date(d.demandeLe).toDateString() === new Date().toDateString();
+  const actif = PREP_SLOTS.find((s) => m >= s && m < s + PREP_DUREE && (!memeJour || dem < s));
+  if (actif != null) return { k: "en_cours", court: "En préparation…", txt: `Claude le prépare en ce moment (passage de ${hhmm(actif)}) : prêt d'ici une vingtaine de minutes.` };
+  const next = PREP_SLOTS.find((s) => s > m), quand = next != null ? `aujourd'hui vers ${hhmm(next + 13)}` : `demain vers ${hhmm(PREP_SLOTS[0] + 13)}`;
+  return { k: "en_attente", court: `Prêt ${quand.replace("aujourd'hui ", "")}`, txt: `En attente : Claude le préparera au prochain passage, ${quand}. Tu n'as rien à faire, il arrivera dans Suivi.`, quand };
+}
+const STEPS_PREP = [["en_attente", "Demandé"], ["en_cours", "En préparation"], ["fait", "Prêt"]];
+function prepItemHTML(d) {
+  const e = etatDemande(d), o = d.offre || {}, i = STEPS_PREP.findIndex((x) => x[0] === e.k);
+  const cand = d.candidature && state.cands.find((c) => c.id === d.candidature);
+  const act = e.k === "fait" && (cand || d.candidature) ? `<button type="button" class="small primary" data-open="${esc(d.candidature)}">Ouvrir le dossier</button>`
+    : e.k === "erreur" ? `<button type="button" class="small primary" data-prep="${esc(d.url)}">Redemander</button>` : "";
+  return `<div class="prep-it ${e.k}"><span class="prep-txt"><b>${esc(o.entreprise || "Offre")}</b><span class="muted" style="font-size:.84rem">${esc(o.titre || "")}</span>
+    ${e.k !== "erreur" ? `<span class="prep-steps">${STEPS_PREP.map((x, j) => `<span class="${j <= i ? "on" : ""}">${x[1]}</span>`).join("")}</span>` : ""}
+    <span class="prep-st">${esc(e.txt)}</span></span>
+    <span class="row">${act}${(o.url || d.url) ? `<a class="small ghost" href="${esc(o.url || d.url)}" target="_blank" rel="noopener" style="font-size:.82rem">Voir l'offre</a>` : ""}</span></div>`;
+}
+/* Liste visible : demandes non terminées + dossiers prêts depuis moins de 3 jours et pas encore envoyés */
+function demandesVisibles() {
+  const lim = Date.now() - 3 * 864e5;
+  return (state.demandes?.liste || []).filter((d) => {
+    if (d.statut !== "fait") return true;
+    const c = state.cands.find((x) => x.id === d.candidature);
+    return (!c || c.statut === "a_envoyer") && new Date(d.faitLe || d.demandeLe || 0).getTime() > lim;
+  }).sort((a, b) => (a.statut === "fait") - (b.statut === "fait") || String(b.demandeLe).localeCompare(String(a.demandeLe)));
+}
+function renderPrep() {
+  const list = demandesVisibles(), html = list.map(prepItemHTML).join("");
+  const enCours = list.filter((d) => d.statut !== "fait" && d.statut !== "erreur").length;
+  [["#prep-panel", "#prep-list"], ["#prep-panel2", "#prep-list2"]].forEach(([p, l]) => { const P = $(p), L = $(l); if (!P || !L) return; P.hidden = !list.length; L.innerHTML = html; });
+  const m = $("#prep-meta"); if (m) m.textContent = enCours ? `${enCours} en cours` : "";
+}
+clearInterval(window.__prepTick); window.__prepTick = setInterval(() => { try { renderPrep(); } catch {} }, 60000);
 function prepBtn(o) {
   const d = demandeOf(o);
-  if (d && d.statut !== "fait" && d.statut !== "erreur") return `<button type="button" class="small" disabled title="Claude prépare ce dossier depuis ton projet : il apparaîtra dans Suivi">Demandé à Claude ⏳</button>`;
+  if (d && d.statut !== "fait" && d.statut !== "erreur") { const e = etatDemande(d); return `<button type="button" class="small" data-prep-voir="${esc(o.url)}" title="${esc(e.txt)}">⏳ ${esc(e.court)}</button>`; }
+  if (d && d.statut === "fait" && d.candidature) return `<button type="button" class="small primary" data-open="${esc(d.candidature)}">Ouvrir le dossier</button>`;
   return `<button type="button" class="small primary" data-prep="${esc(o.url)}">Préparer mon dossier</button>`;
 }
 async function demanderDossier(o) {
@@ -3334,7 +3391,7 @@ async function demanderDossier(o) {
   const liste = (cur.liste || []).filter((d) => !(d.url === o.url && d.statut === "erreur")).concat({ url: o.url, cle: offerKey(o), offre, statut: "en_attente", demandeLe: new Date().toISOString() }).slice(-50);
   try { await state.db.doc("demandes/dossiers").set({ ...cur, liste }); state.demandes = { ...cur, liste }; }
   catch { return toast("La demande n'a pas pu être envoyée. Réessaie."); }
-  renderAlerts(); renderPicks(); if (typeof renderOffers === "function") try { renderOffers(); } catch {}
+  renderPrep(); renderAlerts(); renderPicks(); if (typeof renderOffers === "function") try { renderOffers(); } catch {}
   toast("C'est envoyé à Claude : ton dossier arrivera dans Suivi, avec CV, lettre et message.");
 }
 /* Déroulé en direct de « Préparer mon dossier » */
@@ -3872,6 +3929,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.addoffer) return addOffer(t);
 });
 document.addEventListener("click", (e) => {
+  const pv = e.target.closest("[data-prep-voir]"); if (pv) { e.preventDefault(); const d = (state.demandes?.liste || []).find((x) => x.url === pv.dataset.prepVoir); const et = etatDemande(d); if (et) toast(et.txt); const P = [$("#prep-panel"), $("#prep-panel2")].find((x) => x && !x.hidden && x.offsetParent); if (P) P.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const pr = e.target.closest("[data-prep]"); if (pr && !e.target.closest("#overlay")) return prepDossier(pr.dataset.prep, pr);
   const ch = e.target.closest("[data-chrome]"); if (ch) {
     const o = offerByUrl(ch.dataset.chrome); if (!o) return;
@@ -3965,7 +4023,7 @@ render();
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("societes").onSnapshot((snap) => { state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); }, () => {});
   db.doc("alertes/jour").onSnapshot((snap) => { if (!alertBusy) { state.alertes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); } }, () => {});
-  db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
+  db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderPrep(); renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
   db.doc("alertes/sites").onSnapshot((snap) => { state.sites = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); }, () => {});
   setTimeout(autoAlerts, 2500);
   db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; render(); }, () => {});
