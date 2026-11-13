@@ -3332,8 +3332,8 @@ let prepBusy = false;
    elle est rangée dans demandes/dossiers et la tâche planifiée prépare le dossier puis le range dans l'appli. */
 const sansCle = () => !!window.jobelloStore && !window.jobelloStore.get("aiKey", "");
 const demandeOf = (o) => (state.demandes?.liste || []).find((d) => d.url === o.url || d.cle === offerKey(o));
-/* Passages de la tâche planifiée qui prépare les dossiers : 9h47, 13h47 et 18h47 (heure de Paris). */
-const PREP_SLOTS = [9 * 60 + 47, 13 * 60 + 47, 18 * 60 + 47], PREP_DUREE = 20;
+/* Passages de la tâche planifiée qui prépare les dossiers : toutes les heures à h47, de 8h47 à 20h47 (heure de Paris). */
+const PREP_SLOTS = Array.from({ length: 13 }, (_, i) => (8 + i) * 60 + 47), PREP_DUREE = 20;
 function parisMin(d = new Date()) {
   try { const p = Object.fromEntries(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map((x) => [x.type, x.value])); return +p.hour * 60 + +p.minute; }
   catch { return d.getHours() * 60 + d.getMinutes(); }
