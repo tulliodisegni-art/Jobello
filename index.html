@@ -417,7 +417,7 @@ details.sec > .body { padding: 0 14px 14px; display: flex; flex-direction: colum
 .paper .p-title { color: #1d4f91; font-weight: 600; font-size: 1.08em; margin: 2px 0 6px; }
 .paper .p-contact { color: #5b6470; font-size: .86em; }
 .paper .p-h { color: #1d4f91; font-weight: 700; font-size: .9em; letter-spacing: .06em; border-bottom: 1px solid #c9d4e3; padding-bottom: 3px; margin: 16px 0 6px; }
-.paper .p-role { font-weight: 700; margin: 10px 0 0; } .paper .p-org { font-style: italic; color: #5b6470; margin: 0 0 3px; }
+.paper .p-role { font-weight: 700; margin: 10px 0 0; } .paper .p-org { font-style: italic; color: #5b6470; margin: 0 0 3px; } .paper .p-desc { font-style: italic; color: #5b6470; margin: 0 0 3px; }
 .paper ul { margin: 0 0 4px 1.1em; padding: 0; } .paper li { margin: 0 0 2px; }
 .paper.lettre { font-size: 14px; line-height: 1.6; } .paper.lettre p { margin: 0; }
 .thumbs { display: flex; gap: 8px; flex-wrap: wrap; } .thumbs:empty { display: none; }
@@ -2321,6 +2321,9 @@ function lib(src) {
   return libs[src] ||= new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => { delete libs[src]; s.remove(); ko(new Error("load")); }; document.head.appendChild(s); });
 }
 const isPdf = (d) => d.assetId && /\.pdf$/i.test(d.fichier || "") && d.pdfAJour !== false;
+/* Mise en forme légère dans le texte des CV : **gras** et, sur une ligne d'expérience, _description en italique_ */
+const mkHTML = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+const noMk = (t) => String(t || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/^_(.+?)_$/gm, "$1");
 function docBlocks(text, type) {
   const lines = String(text || "").replace(/\r/g, "").split("\n").map((l) => l.trim());
   if (type !== "cv") return lines.map((l) => l ? { k: "p", t: l } : { k: "gap" });
@@ -2334,9 +2337,13 @@ function docBlocks(text, type) {
     if (head) return out.push({ k: "contact", t: l });
     const exp = /EXP[ÉE]RIENCE|PARCOURS/.test(sec);
     if (exp && / · | - | – /.test(l) && /(19|20)\d{2}|aujourd/i.test(l) && l.length < 110) { afterRole = true; return out.push({ k: "role", t: l }); }
-    if (exp && afterRole) { afterRole = false; return out.push({ k: "org", t: l }); }
-    if (/^[a-zà-ÿ(]/.test(l) && last && ["li", "org", "p", "line"].includes(last.k)) { last.t += " " + l; return; }
-    const b = l.replace(/^[-•*–]\s*/, "");
+    // Sous l'intitulé : l'entreprise (« Société — Contrat · … »), sinon une phrase de description (ex. année sabbatique), en italique gris
+    if (exp && afterRole) { afterRole = false;
+      if (!/^_/.test(l) && (/ — /.test(l) || (l.length <= 70 && !/ : |;/.test(l)))) return out.push({ k: "org", t: l });
+      last.noOrg = true; return out.push({ k: "desc", t: l.replace(/^_|_$/g, "") }); }
+    if (/^[a-zà-ÿ(]/.test(l) && last && ["li", "org", "p", "line", "desc"].includes(last.k)) { last.t += " " + l; if (last.k === "desc") last.t = last.t.replace(/_$/, ""); return; }
+    if (exp && /^_/.test(l)) return out.push({ k: "desc", t: l.replace(/^_|_$/g, "") });
+    const b = l.replace(/^(?:[-•–]|\*(?!\*))\s*/, "");
     if (exp || b !== l) return out.push({ k: "li", t: b });
     if (/COMP[ÉE]TENCE/.test(sec)) { const m = l.match(/^(.{3,42}?)(?: · |: )(.+)$/); if (m) return out.push({ k: "kv", a: m[1], t: m[2] }); const m2 = l.match(/^(\S+ & \S+) (.+)$/); if (m2) return out.push({ k: "kv", a: m2[1], t: m2[2] }); }
     if (/PROFIL|R[ÉE]SUM|PROPOS/.test(sec) && last?.k === "p" && !/[.!?]$/.test(last.t)) { last.t += " " + l; return; }
@@ -2350,7 +2357,7 @@ function paperHTML(d) {
   let h = "", ul = false;
   for (const b of bl) {
     if (b.k === "li" && !ul) { h += "<ul>"; ul = true; } else if (b.k !== "li" && ul) { h += "</ul>"; ul = false; }
-    h += b.k === "gap" ? `<div class="gap"></div>` : b.k === "li" ? `<li>${esc(b.t)}</li>` : b.k === "kv" ? `<p class="p-line"><b>${esc(b.a)}</b> · ${esc(b.t)}</p>` : `<p class="p-${b.k}">${esc(b.t)}</p>`;
+    h += b.k === "gap" ? `<div class="gap"></div>` : b.k === "li" ? `<li>${mkHTML(b.t)}</li>` : b.k === "kv" ? `<p class="p-line"><b>${esc(b.a)}</b> · ${mkHTML(b.t)}</p>` : `<p class="p-${b.k}">${mkHTML(b.t)}</p>`;
   }
   return `<div class="paper ${d.type === "cv" ? "cv" : "lettre"}">${h}${ul ? "</ul>" : ""}</div>`;
 }
@@ -2388,7 +2395,8 @@ async function buildPdf(d) {
   pdf.setProperties({ title: pdfSafe(d.nom || "Document"), author: pdfSafe(state.profil?.nom || "") });
   if (letter) { drawLetter(pdf, d, { ACC, INK, GRAY }); return pdf.output("blob"); }
   if (!d.cvSimple) { await drawCV(pdf, d); return pdf.output("blob"); }
-  for (const b of docBlocks(d.contenu, d.type)) {
+  for (const b0 of docBlocks(d.contenu, d.type)) {
+    const b = b0.t ? { ...b0, t: noMk(b0.t) } : b0;
     if (b.k === "gap") { y += letter ? 4.5 : 2; continue; }
     if (letter) { write(b.t, M, W, font("normal", 11, INK) * 1.45); continue; }
     if (b.k === "name") write(b.t, M, W, font("bold", 20, INK) * 1.2);
@@ -2425,6 +2433,26 @@ async function drawCV(pdf, d) {
   const body = firstH < 0 ? [] : bl.slice(firstH);
   const f = (st, size, col) => { pdf.setFont("helvetica", st); pdf.setFontSize(size); pdf.setTextColor(...col); return size * 0.3528; };
   const split = (t, w) => pdf.splitTextToSize(pdfSafe(t), w);
+  // Texte riche, mot par mot : **gras**, italique, couleurs (comme le CV d'origine)
+  const segs = (t, st, col) => { const out = []; let bo = false; String(t).split(/(\*\*)/).forEach((x) => { if (x === "**") { bo = !bo; return; } if (x) out.push({ t: x, st: bo ? (st === "italic" ? "bolditalic" : "bold") : st, col }); }); return out; };
+  const rich = (sg, x, y0, w, size, lh, draw, base = lh * 0.75) => {
+    const toks = []; sg.forEach((g) => { let first = true; pdfSafe(g.t).split(/(\s+)/).forEach((x) => { if (!x) return; if (/^\s+$/.test(x)) toks.push({ sp: true }); else { toks.push({ w: x, st: g.st, col: g.col, gap: first ? g.gap || 0 : 0 }); first = false; } }); });
+    pdf.setFontSize(size); pdf.setFont("helvetica", "normal"); const spW = pdf.getTextWidth(" ");
+    const lines = [[]]; let lw = 0, pend = 0;
+    for (const tk of toks) {
+      if (tk.sp) { if (lw > 0) pend = spW; continue; }
+      pdf.setFont("helvetica", tk.st); tk.tw = pdf.getTextWidth(tk.w); const gp = lw > 0 ? pend + tk.gap : 0;
+      if (lw > 0 && lw + gp + tk.tw > w) { lines.push([]); lw = 0; pend = 0; tk.x = 0; tk.lead = ""; } else { tk.x = lw + gp; tk.lead = pend && !tk.gap ? " " : ""; }
+      lines[lines.length - 1].push(tk); lw = tk.x + tk.tw; pend = 0;
+    }
+    // Les mots de même style sont tracés d'un seul tenant : l'espacement reste celui de la police
+    if (draw) lines.forEach((L, i) => { let r = null; const out = () => { if (r) { pdf.setFont("helvetica", r.st); pdf.setFontSize(size); pdf.setTextColor(...r.col); pdf.text(r.s, x + r.x, y0 + base + i * lh); } r = null; };
+      L.forEach((tk) => { if (r && r.st === tk.st && r.col === tk.col && !tk.gap) r.s += tk.lead + tk.w; else { out(); r = { st: tk.st, col: tk.col, s: tk.w, x: tk.x }; } }); out(); });
+    return lines.length * lh;
+  };
+  // Coordonnées : les étiquettes (Tél., E-mail…) en bleu clair, un peu d'air entre chaque information
+  const CONTACT_LAB = /(T[ée]l\.|T[ée]l[ée]phone|E-mail|Email|Lieu|Nationalit[ée]|LinkedIn|Permis|Mobilit[ée]|Adresse|Site web)(?=\s)/;
+  const contactSegs = (c, WHITE, LIGHT) => { const P = String(c).split(CONTACT_LAB); if (P.length < 3 || P[0].trim()) return segs(c, "normal", WHITE); const out = []; P.forEach((x, i) => { if (!x.trim()) return; if (i % 2) out.push({ t: x, st: "bold", col: LIGHT, gap: out.length ? 3.2 : 0 }); else out.push({ t: x, st: "normal", col: WHITE }); }); return out; };
   // « Intitulé · Sept. 2025 – aujourd'hui · 1 an » : les dates (et la durée qui suit) partent à droite
   const roleParts = (t) => { const P = t.split(" · "), i = P.findIndex((x, k) => k > 0 && /(19|20)\d{2}|aujourd/i.test(x)); return i > 0 ? [P.slice(0, i).join(" · "), P.slice(i).join(" · ")] : [t, ""]; };
   // FORMATION et LANGUES côte à côte, comme sur le CV d'origine (aussi pour l'ancienne rubrique « FORMATION · LANGUES »)
@@ -2448,7 +2476,7 @@ async function drawCV(pdf, d) {
     h = f("bold", s * 2.7, WHITE); const [first, ...rest] = pdfSafe(name).split(" "); T(first, hx, y + h * 0.8);
     const fw = pdf.getTextWidth(first + " "); f("normal", s * 2.7, WHITE); T(rest.join(" "), hx + fw, y + h * 0.8); y += h * 1.1;
     if (title) { h = f("bold", s * 1.25, LIGHT); split(title, hw).forEach((l) => { T(l, hx, y + h * 0.8); y += h * 1.25; }); y += 0.8; }
-    h = f("normal", s * 0.98, WHITE); contact.forEach((c) => split(c, hw).forEach((l) => { T(l, hx, y + h * 0.8); y += h * 1.4; }));
+    h = f("normal", s * 0.98, WHITE); contact.forEach((c) => { y += rich(contactSegs(c, WHITE, LIGHT), hx, y, hw, s * 0.98, h * 1.4, draw, h * 0.8); });
     const H = Math.max(y + 3, photo ? 6 + PH + 4 : 0); y = H + 3;
     // Corps
     for (const b of body) {
@@ -2456,9 +2484,13 @@ async function drawCV(pdf, d) {
       if (b.k === "h") { y += s * 0.5; h = f("bold", s * 1.15, INK);
         if (draw) { pdf.setFillColor(...BLUE); pdf.rect(M, y + h * 0.18, h * 0.62, h * 0.62, "F"); pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.3); pdf.line(M, y + h * 1.3, M + W, y + h * 1.3); }
         pdf.setCharSpace(0.9); T(pdfSafe(b.t), M + h * 1.05, y + h * 0.8); pdf.setCharSpace(0); y += h * 1.3 + s * 0.3; continue; }
-      if (b.k === "kv") { const lw = LW(s); h = f("normal", s, INK) * 1.32; const vl = split(b.t, W - lw); vl.forEach((l, k) => T(l, M + lw, y + h * 0.75 + k * h)); f("bold", s, BLUE); T(pdfSafe(b.a), M, y + h * 0.75); y += h * vl.length + 0.3; continue; }
-      if (b.k === "role") { y += s * 0.28; const [r, dt] = roleParts(b.t); h = f("bold", s * 1.08, INK); T(pdfSafe(r), M, y + h * 0.8); if (dt) { f("normal", s * 0.95, GRAY); T(pdfSafe(dt), M + W, y + h * 0.8, { align: "right" }); } y += h * 1.3; continue; }
-      if (b.k === "org") { h = f("bold", s * 0.98, BLUE) * 1.32; split(b.t, W).forEach((l) => { T(l, M, y + h * 0.75); y += h; }); continue; }
+      if (b.k === "kv") { const lw = LW(s); h = f("normal", s, INK) * 1.32; const hh = rich(segs(b.t, "normal", INK), M + lw, y, W - lw, s, h, draw); f("bold", s, BLUE); T(pdfSafe(b.a), M, y + h * 0.75); y += hh + 0.3; continue; }
+      if (b.k === "role") { y += s * 0.28; const [r, dt] = roleParts(b.t); h = f("bold", s * 1.08, b.noOrg ? BLUE : INK); T(pdfSafe(r), M, y + h * 0.8); if (dt) { f("normal", s * 0.95, GRAY); T(pdfSafe(dt), M + W, y + h * 0.8, { align: "right" }); } y += h * 1.3; continue; }
+      // « Société — Contrat » en bleu, puis le détail (« · dispositifs médicaux implantables ») en italique gris ; « · en mission chez … » reste en bleu
+      if (b.k === "org") { h = f("bold", s * 0.98, BLUE) * 1.32; const P = b.t.split(" · "), q = P.findIndex((x, k) => k > 0 && !/^(en mission|chez|pour le compte)\b/i.test(x));
+        const sg = q > 0 ? [{ t: P.slice(0, q).join(" · "), st: "bold", col: BLUE }, { t: " · ", st: "normal", col: GRAY }, { t: P.slice(q).join(" · "), st: "italic", col: GRAY }] : [{ t: b.t, st: "bold", col: BLUE }];
+        y += rich(sg, M, y, W, s * 0.98, h, draw); continue; }
+      if (b.k === "desc") { h = f("italic", s, GRAY) * 1.32; y += rich(segs(b.t, "italic", GRAY), M, y, W, s, h, draw); y += 0.2; continue; }
       if (b.k === "cols") { const g = 8, wl = (W - g) * 0.62, xr = M + wl + g, wr = W - wl - g; let yl = y, yr = y;
         const head = (t, x, w, yy) => { h = f("bold", s * 1.15, INK); if (draw) { pdf.setFillColor(...BLUE); pdf.rect(x, yy + s * 0.5 + h * 0.18, h * 0.62, h * 0.62, "F"); pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.3); pdf.line(x, yy + s * 0.5 + h * 1.3, x + w, yy + s * 0.5 + h * 1.3); } pdf.setCharSpace(0.9); T(t, x + h * 1.05, yy + s * 0.5 + h * 0.8); pdf.setCharSpace(0); return yy + s * 0.5 + h * 1.3 + s * 0.3; };
         yl = head("FORMATION", M, wl, yl); yr = head("LANGUES", xr, wr, yr);
@@ -2467,8 +2499,8 @@ async function drawCV(pdf, d) {
           else split(t, wl).forEach((l) => { T(l, M, yl + h * 0.75); yl += h; }); });
         b.la.forEach((t) => { const [a, c] = t.split(" · "); h = f("bold", s, INK) * 1.36; T(pdfSafe(a), xr, yr + h * 0.75); if (c) { const aw = pdf.getTextWidth(pdfSafe(a) + " · "); f("normal", s, INK); T(pdfSafe("· " + c), xr + aw - pdf.getTextWidth("· "), yr + h * 0.75); } yr += h; });
         y = Math.max(yl, yr); continue; }
-      if (b.k === "li") { h = f("normal", s, INK) * 1.3; if (draw) { pdf.setFillColor(...BLUE); pdf.circle(M + 1.3, y + h * 0.5, 0.55, "F"); } split(b.t, W - 4.5).forEach((l) => { T(l, M + 4.5, y + h * 0.75); y += h; }); y += 0.15; continue; }
-      h = f("normal", s, INK) * 1.36; split(b.t, W).forEach((l) => { T(l, M, y + h * 0.75); y += h; });
+      if (b.k === "li") { h = f("normal", s, INK) * 1.3; if (draw) { pdf.setFillColor(...BLUE); pdf.circle(M + 1.3, y + h * 0.5, 0.55, "F"); } y += rich(segs(b.t, "normal", INK), M + 4.5, y, W - 4.5, s, h, draw); y += 0.15; continue; }
+      h = f("normal", s, INK) * 1.36; y += rich(segs(b.t, "normal", INK), M, y, W, s, h, draw);
     }
     return { y, H };
   };
@@ -3761,7 +3793,7 @@ $("#overlay").addEventListener("click", async (e) => {
   if (sheetKind === "docview") {
     if (act === "edit-doc") return editDoc(editing.id);
     if (act === "make-pdf") return makePdfNow(t);
-    if (act === "copy-doc") return copyText(editing.contenu || "", null);
+    if (act === "copy-doc") return copyText(editing.type === "cv" ? noMk(editing.contenu) : editing.contenu || "", null);
   }
   if (sheetKind === "limaj") {
     if (act === "m-rm") { const [f] = mailImgs.splice(+t.dataset.i, 1); if (f) URL.revokeObjectURL(f._url); return drawThumbs(); }
