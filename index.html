@@ -4294,7 +4294,7 @@ render();
   db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderPrep(); renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
   db.doc("alertes/sites").onSnapshot((snap) => { state.sites = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); }, () => {});
   setTimeout(autoAlerts, 2500);
-  db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; render(); }, () => {});
+  db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; state.profilVu = true; render(); }, () => {});
   db.doc("entrainement/main").onSnapshot((snap) => { state.entr = snap.exists ? snap.data() : null; if (!entrEdit) renderEntr(); }, () => {});
 })();
 </script>
@@ -4302,6 +4302,7 @@ render();
 <script src="notifs.js"></script>
 <script src="plus.js"></script>
 <script src="ciblage.js"></script>
+<script src="accueil.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>
