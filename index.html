@@ -586,7 +586,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .ccard .cc-next .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 4px; }
 .ccard .cc-next.late { color: var(--s-refused); }
 
-.rr-box .body{display:grid;gap:10px}.rr-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media (max-width:520px){.rr-who{grid-template-columns:1fr}}.rr-mail summary{cursor:pointer;font-weight:600;font-size:.9rem}.rr-mail[open]{display:grid;gap:8px}.rr-dt input{flex:1;min-width:0}.rr-slots input[list]{flex:1.3}.rp-alts{display:grid;gap:6px}.rp-alts .row{flex-wrap:nowrap;gap:6px}.rp-alts input{flex:1;min-width:0}.rp-alts span{font-size:.85rem}
+.annonce{border-top:1px solid var(--line);padding-top:8px}.annonce summary{cursor:pointer;font-weight:600;font-size:.9rem}.annonce-t{white-space:pre-wrap;font-size:.88rem;line-height:1.5;max-height:60vh;overflow:auto;margin-top:6px}.brief-offre:empty{display:none}.rr-box .body{display:grid;gap:10px}.rr-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media (max-width:520px){.rr-who{grid-template-columns:1fr}}.rr-mail summary{cursor:pointer;font-weight:600;font-size:.9rem}.rr-mail[open]{display:grid;gap:8px}.rr-dt input{flex:1;min-width:0}.rr-slots input[list]{flex:1.3}.rp-alts{display:grid;gap:6px}.rp-alts .row{flex-wrap:nowrap;gap:6px}.rp-alts input{flex:1;min-width:0}.rp-alts span{font-size:.85rem}
 .stop-row{gap:6px;align-items:center;font-size:.85rem}.stop-row+.stop-row{margin-top:-4px}
 .ag-sec { display: flex; flex-direction: column; gap: 8px; }
 .ag-h { margin: 6px 2px 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
@@ -3119,14 +3119,15 @@ function drawCandSum() {
   const urgent = isDue(c) || needsRecruiter(c) || (!!pc && (pc.prochaineAction || "9") <= todayISO());
   const md = modeOf(c), chips = [canalLabel(c), MODEL[md], c.ville, c.contrat, c.salaire, c.dateEnvoi && `Envoyée le ${fmt(c.dateEnvoi)}`].filter(Boolean);
   const next = pc ? `Relance via ${pc.nom}${pc.prochaineAction ? " le " + fmt(pc.prochaineAction) : ""}` : ownRelance(c) ? (isDue(c) ? "Relance à faire maintenant" : `Prochaine relance le ${fmt(c.prochaineRelance)}`) : "";
-  const fold = (t, sub, body, open) => body ? `<details class="sec"${open ? " open" : ""}><summary>${t} <small>${esc(sub || "")}</small></summary><div class="body">${body}</div></details>` : "";
+  const fold = (t, sub, body, open, id) => body ? `<details class="sec"${id ? ` id="${id}"` : ""}${open ? " open" : ""}><summary>${t} <small>${esc(sub || "")}</small></summary><div class="body">${body}</div></details>` : "";
   const cv = state.docs.find((d) => d.id === c.cv), lt = state.docs.find((d) => d.id === c.lettre);
   const poste = (c.resume ? `<p style="margin:0">${esc(c.resume)}</p>` : `<p class="muted" style="margin:0">Pas encore de résumé du poste : « Modifier les infos » puis colle le texte de l'offre.</p>`)
     + ((c.motsCles || []).length ? `<div class="kw">${c.motsCles.map((k) => `<i>${esc(k)}</i>`).join("")}</div>` : "")
     + ((c.preparation || []).length ? `<span class="lbl">Pense-bête pour l'entretien</span><ul style="margin:0">${c.preparation.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
     + (c.conseilRelance ? `<div class="tip">${esc(c.conseilRelance)}</div>` : "")
     + salaryLine(c, societeOf(c))
-    + (c.lien ? `<div class="row">${offerLinks(c, false)}</div>` : "");
+    + `<details class="annonce" id="annonce"><summary>${c.description ? "Lire l'annonce complète" : "Annonce non gardée"}</summary>${c.description ? `<div class="annonce-t">${esc(c.description)}</div>` : `<p class="muted" style="margin:0;font-size:.88rem">Ouvre l'offre tant qu'elle est en ligne, copie son texte et colle-le dans « Modifier les infos » (Texte de l'offre) : tu pourras la relire ici même quand l'annonce aura disparu.</p>`}</details>`
+    + `<div class="row">${offerLinks(c, false)}</div>`;
   const stopRow = `<div class="row stop-row"><span class="muted">Ils ont répondu ?</span><button type="button" class="small" data-act="rel-refus">C'est un refus</button><button type="button" class="small" data-act="rel-mail">Importer leur mail</button></div><div class="row stop-row"><span class="muted">Ou bien :</span><button type="button" class="small" data-act="rel-later">Plus tard (7 j)</button><button type="button" class="small" data-act="rel-pause">En pause</button><button type="button" class="small ghost danger" data-act="rel-stop">J'abandonne ce poste</button></div>`;
   const relBox = rt ? `<div class="relance-box"><span class="lbl" style="font-weight:600">${needsRecruiter(c) && rt.k === "li" ? "Trouver un recruteur LinkedIn" : "Relancer"}</span>${stopRow}
       ${routes.length > 1 ? `<div class="seg" role="group" aria-label="Comment relancer">${routes.map((x, i) => `<button type="button" data-route="${i}" aria-pressed="${x === rt}">${esc(x.label)}</button>`).join("")}</div>` : ""}
@@ -3141,6 +3142,7 @@ function drawCandSum() {
     <div class="brief"><div class="meta">${chips.map((x, i) => `<span${i ? "" : ' class="canal"'}>${esc(x)}</span>`).join("")}</div>
       ${next ? `<p style="margin:0"><b>${esc(next)}</b>${pc ? ` <button type="button" class="small" data-contact="${esc(pc.id)}">Ouvrir ${esc(firstName(pc.nom))}</button>` : ""}</p>` : ""}
       ${c.contact ? `<p class="muted" style="margin:0;font-size:.88rem">Contact : ${esc(c.contact)}</p>` : ""}
+      ${c.statut !== "a_envoyer" ? `<div class="row brief-offre">${c.description ? `<button type="button" class="small" data-act="sum-annonce">Relire l'annonce</button>` : ""}${offerLinks(c, false)}</div>` : ""}
       ${md === "prestataire" ? `<p class="muted" style="margin:0;font-size:.85rem">Société de prestation : tu serais salarié chez eux mais en mission chez un client. Deuxième choix, garde la priorité aux postes en direct.${(societeOf(c) || cibleOf(c))?.modeNote ? " " + esc((societeOf(c) || cibleOf(c)).modeNote) : ""}</p>` : ""}</div>
     ${replyBoxHTML(c)}
     ${archivedCand(c) && c.statut !== "refus" ? "" : rrHTML(c)}
@@ -3153,7 +3155,7 @@ function drawCandSum() {
     ${urgent ? relBox : ""}
     ${prepaHTML(c)}
     ${qPosteHTML(c)}
-    ${fold("Le poste", c.analyse ? `${c.analyse.score} % · ${VERD[c.analyse.verdict] || ""}` : c.ville || "", poste, false)}
+    ${fold("Le poste", c.analyse ? `${c.analyse.score} % · ${VERD[c.analyse.verdict] || ""}` : c.ville || "", poste, false, "sec-poste")}
     ${fitSummaryHTML(c)}
     ${!urgent && relBox ? fold("Relancer", next, relBox, false) : ""}
     ${archivedCand(c) || c.statut === "a_envoyer" ? "" : fold("Ma candidature", [cv && "CV", lt && "lettre"].filter(Boolean).join(" + ") || "à préparer", dossierDocsHTML(c), false)}
@@ -3775,7 +3777,7 @@ ${desc ? desc.slice(0, 6000) : "(texte complet indisponible : base-toi sur le ti
     }
     const plat = /indeed/i.test(o.url) || o.jobId ? "Indeed" : "";
     const c = Object.assign(blankCand(), {
-      poste: o.titre, entreprise: o.entreprise, ville: r.ville || o.ville || "", domaine: r.domaine || "", lien: o.url,
+      poste: o.titre, entreprise: o.entreprise, ville: r.ville || o.ville || "", domaine: r.domaine || "", lien: o.url, jobId: o.jobId || "",
       canal: plat ? "plateforme" : "site", source: plat || o.source || "Site carrière", contrat: r.contrat || (o.type === "Permanent" ? "CDI" : o.type || ""), salaire: r.salaire || (o.salaire && o.salaire !== "N/A" ? o.salaire : ""),
       description: desc, resume: String(r.resume || ""), motsCles: (r.motsCles || []).slice(0, 8).map(String), mode: r.employeur === "prestataire" || guessMode(o.entreprise) === "prestataire" ? "prestataire" : "",
       analyse: { score: Math.round(+r.score || 0), verdict: ["fonce", "tente", "bof"].includes(r.verdict) ? r.verdict : "tente", resume: String(r.adequation || ""), competences: (r.competences || []).slice(0, 12).map((x) => ({ nom: String(x.nom || ""), niveau: ["oui", "partiel", "non"].includes(x.niveau) ? x.niveau : "non", preuve: String(x.preuve || "") })), date: todayISO(), source: desc ? "d'après l'offre" : "d'après le titre de l'offre" },
@@ -3854,8 +3856,11 @@ async function apMsgAI(btn) {
 const offerHref = (o) => /to\.indeed\.com/i.test(o?.url || "") ? indeedFind({ poste: o.titre, entreprise: o.entreprise, ville: o.ville }) : safeUrl(o?.url);
 const isIndeed = (u) => /(^|\.)indeed\.(com|fr)\b|to\.indeed\.com/i.test(String(u || ""));
 const indeedFind = (c) => `https://fr.indeed.com/emplois?q=${enc(`${c.poste || ""} ${c.groupe || c.entreprise || ""}`.trim())}&l=${enc(String(c.ville || "").replace(/\s*\(\d+\)/, ""))}`;
+const indeedJk = (c) => c.jobId || (String(c.lien || "").match(/[?&]jk=([0-9a-f]{8,})/i) || [])[1] || "";
+const offerSearch = (c) => `https://www.google.com/search?q=${enc(`${c.poste || ""} ${c.entreprise || ""} offre d'emploi`.trim())}`;
 function offerLinks(c, primary) {
-  if (!c.lien) return "";
+  if (!c.lien) return primary ? "" : (c.poste || c.entreprise) ? `<a class="btn small" href="${esc(offerSearch(c))}" target="_blank" rel="noopener">Chercher l'offre</a>` : "";
+  if (!primary && indeedJk(c)) return `<a class="btn small" href="https://fr.indeed.com/viewjob?jk=${enc(indeedJk(c))}" target="_blank" rel="noopener">Voir l'offre sur Indeed</a>`;
   if (!isIndeed(c.lien)) return `<a class="btn${primary ? " primary" : " small"}" href="${esc(safeUrl(c.lien))}" target="_blank" rel="noopener">${primary ? `Postuler sur ${esc(c.canal === "plateforme" ? c.source || "la plateforme" : "le site")}` : "Voir l'offre"}</a>`;
   return `<a class="btn${primary ? " primary" : " small"}"${primary ? ' id="ap-go"' : ""} href="${esc(indeedFind(c))}" target="_blank" rel="noopener">${primary ? "Chercher l'offre sur Indeed" : "Voir l'offre sur Indeed"}</a><a class="btn small ghost" href="${esc(safeUrl(c.lien))}" target="_blank" rel="noopener">Lien direct</a>`;
 }
@@ -4004,6 +4009,7 @@ $("#overlay").addEventListener("click", async (e) => {
   }
   if (sheetKind === "candsum") {
     if (act === "sum-edit") return openDossier(editing.id);
+    if (act === "sum-annonce") { const d = $("#sec-poste"), a = $("#annonce"); if (d) d.open = true; if (a) { a.open = true; a.scrollIntoView({ behavior: "smooth", block: "start" }); } return; }
     if (act === "sum-relanced") return markRelanced();
     if (act === "rel-mail") return openMail();
     if (act === "rel-later" || act === "rel-pause" || act === "rel-stop" || act === "rel-refus") {
