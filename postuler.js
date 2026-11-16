@@ -291,8 +291,11 @@
         await saveCand(c);
       }
       // 2. Les PDF à joindre (CV adapté + lettre) : rangés dans tes fichiers, avec un lien temporaire pour l'agent
-      for (const c of state.cands.filter((x) => x.envoi && ["valide", "a_valider"].includes(x.envoi.statut) && !(x.envoi.fichiers || []).length && x.statut === "a_envoyer")) {
-        const docs = [["cv", state.docs.find((d) => d.id === c.cvAdapte) || state.docs.find((d) => d.id === c.cv)], ["lettre", state.docs.find((d) => d.id === c.lettre)]].filter(([, d]) => d);
+      // (aussi pendant qu'un agent remplit déjà le formulaire : les PDF partent dès que la lettre ET le CV adapté sont écrits)
+      for (const c of state.cands.filter((x) => x.envoi && ["valide", "a_valider", "en_cours"].includes(x.envoi.statut) && !(x.envoi.fichiers || []).length && x.statut === "a_envoyer")) {
+        const dCv = c.cvAdapte ? state.docs.find((d) => d.id === c.cvAdapte) : state.docs.find((d) => d.id === c.cv), dL = c.lettre ? state.docs.find((d) => d.id === c.lettre) : null;
+        if (!dCv || (c.lettre && !dL)) continue; // les agents rédacteurs n'ont pas encore fini : jamais l'ancien CV à la place du CV adapté
+        const docs = [["cv", dCv], ["lettre", dL]].filter(([, d]) => d);
         const fichiers = [];
         for (const [type, d] of docs) {
           try { const blob = await pdfDe(d); if (!blob) continue; const nom = docFileName(d); const url = await window.jobelloFileLink(`envois/${c.id}-${type}.pdf`, blob); fichiers.push({ type, nom, url }); } catch (e) {}
