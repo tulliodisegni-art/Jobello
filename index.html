@@ -2917,7 +2917,15 @@ const RR_TYPES = [
   ["decliner", "Décliner poliment"]];
 const RR_LABEL = Object.fromEntries(RR_TYPES);
 const RR_SLOTS = ["tel", "visio", "physique", "decaler"];
-const RR_PLAGES = ["dans la matinée", "entre 12 h et 14 h", "dans l'après-midi", "à partir de 17 h 30", "toute la journée", "à 9 h", "à 10 h", "à 11 h", "à 14 h", "à 15 h", "à 16 h"];
+const RR_PLAGES = ["dans la matinée", "à 9 h", "à 9 h 30", "à 10 h", "à 10 h 30", "à 11 h", "à 11 h 30", "entre 12 h et 14 h", "à 12 h", "à 12 h 30", "à 13 h", "à 13 h 30", "dans l'après-midi", "à 14 h", "à 14 h 30", "à 15 h", "à 15 h 30", "à 16 h", "à 16 h 30", "à 17 h", "à partir de 17 h 30", "à 18 h", "toute la journée"];
+// Civilité devinée d'après le prénom, modifiable dans la fiche
+const RR_HOMMES = /^(jean|pierre|philippe|stephane|jerome|christophe|guillaume|antoine|maxime|alexandre|baptiste|brice|bruce|charles|georges|jacques|andre|rene|herve|remi|eddie|steve|mike|joshua|luca|nicola|andrea|sacha|elie|theophile|achille|hugues|gilles|serge|claude|dominique|camille|lucas|thomas|nicolas|jules|louis|paul|mathis|mathias|yannick|loic|cedric|ludovic|david|marc|eric|frederic)\b/;
+function rrGuessCiv(nom) {
+  const f = normTxt(String(nom || "").split(/\s+/)[0]); if (!f) return "";
+  if (RR_HOMMES.test(f)) return "Monsieur";
+  return /(a|e|ie|ine|elle|ette|ice)$/.test(f) ? "Madame" : "Monsieur";
+}
+const rrLastName = (nom) => { const w = String(nom || "").trim().split(/\s+/); return w.length > 1 ? w.slice(1).join(" ") : w[0] || ""; };
 const RR_MODES = [["tel", "Par téléphone"], ["visio", "En visio"], ["physique", "Sur place"]];
 const MOIS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"];
 let rr = null;
@@ -2926,7 +2934,8 @@ function nextWorkDays(n) {
   while (out.length < n) { d = addDays(d, 1); const w = new Date(d + "T12:00:00").getDay(); if (w && w < 6) out.push(d); }
   return out;
 }
-function rrPlages() { try { const p = JSON.parse(localStorage.getItem("jb-plages") || "null"); if (Array.isArray(p) && p.length === 3) return p; } catch {} return ["entre 12 h et 14 h", "à partir de 17 h 30", "entre 12 h et 14 h"]; }
+function rrDays(cur) { const L = nextWorkDays(15); return cur && !L.includes(cur) ? [cur, ...L] : L; }
+function rrPlages() { try { const p = JSON.parse(localStorage.getItem("jb-plages") || "null"); if (Array.isArray(p) && p.length === 3) return p; } catch {} return ["entre 12 h et 14 h", "", ""]; }
 function rrContact(c) {
   const raw = String(c.contact || ""), mail = [c.email, raw, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
   const nom = raw.replace(EMAIL_RE, "").split(/[·,(|]/)[0].trim() || [...(c.mails || [])].reverse().find((m) => m.de)?.de?.split(/[,(·]/)[0].trim() || "";
@@ -2936,7 +2945,7 @@ function rrInit(c) {
   if (rr && rr.id === (c.id || "new")) return rr;
   const k = rrContact(c), pl = rrPlages(), defType = c.statut === "entretien" ? (c.dateEntretien && c.dateEntretien < todayISO() ? "merci" : "confirmer") : ACTIVE.includes(c.statut) ? "tel" : c.statut === "refus" ? "refus" : c.statut === "offre" ? "offre" : "tel";
   const mode = /t[ée]l[ée]phone/i.test(c.typeEntretien || "") ? "tel" : /visio/i.test(c.typeEntretien || "") || c.lienVisio ? "visio" : /place/i.test(c.typeEntretien || "") ? "physique" : "tel";
-  rr = { id: c.id || "new", type: defType, mail: "", nom: k.nom, email: k.email, slots: nextWorkDays(3).map((d, i) => ({ d, p: pl[i] })), date: c.dateEntretien || "", heure: c.heureEntretien || "", mode, draft: "", open: false, info: "" };
+  rr = { id: c.id || "new", type: defType, mail: "", nom: k.nom, email: k.email, slots: [{ d: nextWorkDays(1)[0], p: pl[0] || "entre 12 h et 14 h" }, { d: "", p: "" }, { d: "", p: "" }], civ: rrGuessCiv(k.nom), date: c.dateEntretien || "", heure: c.heureEntretien || "", mode, draft: "", open: false, info: "" };
   return rr;
 }
 // Lit le mail collé, sans IA : expéditeur, adresse, type de demande, date et heure proposées
@@ -2948,6 +2957,7 @@ function rrParse(text) {
   const head = t.match(/^\s*(?:De|From|Expéditeur)\s*:\s*"?([^<"\n]+?)"?\s*(?:<|$)/mi);
   const isName = (s) => s && /^[\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+){1,3}$/u.test(s.trim()) && normTxt(s) !== me && !/^(Bonjour|Madame|Monsieur|Cordialement|Bien|Bonne|Merci|Envoy)/.test(s.trim());
   if (head && isName(head[1].replace(EMAIL_RE, ""))) out.nom = head[1].trim();
+  { const cm = t.match(/\b(Mme|Madame|M\.|Monsieur)\s+([\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+)?)\s*$/mu); if (cm && normTxt(cm[2]) !== me && !/^(Disegni|Tullio)/i.test(cm[2])) { out.civ = /^M(me|adame)/.test(cm[1]) ? "Madame" : "Monsieur"; if (!out.nom) out.nom = cm[2]; } }
   if (!out.nom) {
     const sig = t.match(/(?:cordialement|bien à vous|bien a vous|belle journée|bonne journée|bonne soirée|à bientôt|a bientot|salutations|bien sincèrement)[^\n]*\n+\s*([^\n]+)/i);
     if (sig && isName(sig[1])) out.nom = sig[1].trim();
@@ -2976,7 +2986,7 @@ function rrParse(text) {
 }
 function rrFromMail(c) {
   const p = rrParse(rr.mail), got = [];
-  if (p.nom) { rr.nom = p.nom; got.push(p.nom); }
+  if (p.nom) { rr.nom = p.nom; rr.civ = p.civ || rrGuessCiv(p.nom); got.push(p.nom); }
   if (p.email) { rr.email = p.email; got.push(p.email); }
   else if (p.nom) rr.email = rrContact(c).email;
   if (p.type) { rr.type = p.type; got.push(RR_LABEL[p.type].toLowerCase()); }
@@ -2985,16 +2995,18 @@ function rrFromMail(c) {
   rr.draft = ""; rr.info = got.length ? "J'ai trouvé : " + got.join(", ") + ". Vérifie le type de réponse et tes créneaux." : "Je n'ai rien reconnu dans ce mail : choisis le type de réponse et complète le nom.";
 }
 const rrSlotsTxt = (slots) => { const s = slots.filter((x) => x.d).map((x) => `${dayFr(x.d)}${x.p ? " " + x.p.trim() : ""}`); return s.length > 1 ? s.slice(0, -1).join(", ") + " ou " + s[s.length - 1] : s[0] || ""; };
+const rrN = () => rr.slots.filter((x) => x.d).length;
 function rrText(c) {
   const pr = state.profil || {}, tel = pr.telephone || "", poste = c.poste ? `au poste ${dePoste(c.poste)}` : "", soc = c.entreprise || "";
   const chez = soc ? ` chez ${soc}` : "", slots = rrSlotsTxt(rr.slots), dispo = slots ? `Je suis disponible ${slots}.` : "Je suis assez disponible dans les prochains jours.";
   const quand = rr.date ? `le ${dayFr(rr.date)}${rr.heure ? " à " + hFr(rr.heure) : ""}` : "au moment que vous m'avez proposé";
   const joindre = tel ? `Vous pouvez me joindre au ${tel}.` : "";
-  const salut = rr.nom ? `Bonjour ${rr.nom},` : "Bonjour,";
+  const salut = rr.nom && rr.civ ? `Bonjour ${rr.civ} ${rrLastName(rr.nom)},` : "Bonjour Madame, Monsieur,";
+  const plus = rrN() > 1;
   let body = "", fin = "Bien cordialement,";
   switch (rr.type) {
-    case "tel": body = `Merci beaucoup pour votre retour concernant ma candidature ${poste}${chez}. C'est avec grand plaisir que j'accepte cet échange téléphonique.\n\n${dispo} Si aucun de ces moments ne vous convient, je m'adapterai volontiers à vos disponibilités.${joindre ? "\n\n" + joindre : ""}`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break;
-    case "visio": body = `Merci beaucoup pour votre message et pour l'intérêt que vous portez à ma candidature ${poste}${chez}. Je serai ravi d'échanger avec vous en visioconférence.\n\n${dispo} Si ces créneaux ne vous arrangent pas, n'hésitez pas à m'en proposer d'autres, je m'organiserai en conséquence.`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break;
+    case "tel": body = `Merci beaucoup pour votre retour concernant ma candidature ${poste}${chez}. C'est avec grand plaisir que j'accepte cet échange téléphonique.\n\n${dispo} Si ${plus ? "aucun de ces moments ne vous convient" : "ce moment ne vous convient pas"}, je m'adapterai volontiers à vos disponibilités.${joindre ? "\n\n" + joindre : ""}`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break;
+    case "visio": body = `Merci beaucoup pour votre message et pour l'intérêt que vous portez à ma candidature ${poste}${chez}. Je serai ravi d'échanger avec vous en visioconférence.\n\n${dispo} Si ${plus ? "ces créneaux ne vous arrangent" : "ce créneau ne vous arrange"} pas, n'hésitez pas à m'en proposer d'autres, je m'organiserai en conséquence.`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break;
     case "physique": body = `Merci beaucoup pour votre retour. Je suis très heureux de pouvoir vous rencontrer dans vos locaux pour échanger autour du poste${c.poste ? " " + dePoste(c.poste) : ""}${chez}.\n\n${slots ? `Je pourrais venir ${slots}.` : "Je suis assez disponible dans les prochains jours."} Si cela ne vous convient pas, je m'adapterai bien volontiers à votre agenda.\n\nPourriez-vous simplement me confirmer l'adresse exacte et le nom de la personne à demander à l'accueil ?`; fin = "Au plaisir de vous rencontrer,\nBien cordialement,"; break;
     case "confirmer": {
       const what = { tel: "notre échange téléphonique", visio: "notre entretien en visioconférence", physique: "notre entretien dans vos locaux" }[rr.mode] || "notre entretien";
@@ -3030,12 +3042,11 @@ function rrHTML(c) {
     </details>
     ${rr.info ? `<p class="tip" style="margin:0">${esc(rr.info)}</p>` : ""}
     <div class="field"><label for="rr-type">Type de réponse</label><select id="rr-type">${RR_TYPES.map(([k, l]) => `<option value="${k}"${k === rr.type ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
-    <div class="rr-who"><div class="field"><label for="rr-nom">À qui</label><input id="rr-nom" data-rr="nom" value="${esc(rr.nom)}" placeholder="Prénom Nom"></div><div class="field"><label for="rr-email">Son adresse mail</label><input id="rr-email" data-rr="email" type="email" value="${esc(rr.email)}" placeholder="adresse@societe.fr"></div></div>
+    <div class="rr-who"><div class="field"><label for="rr-civ">Civilité</label><select id="rr-civ" data-rr="civ">${["Madame", "Monsieur"].map((x) => `<option${rr.civ === x ? " selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label for="rr-nom">À qui (prénom et nom)</label><input id="rr-nom" data-rr="nom" value="${esc(rr.nom)}" placeholder="Prénom Nom"></div><div class="field"><label for="rr-email">Son adresse mail</label><input id="rr-email" data-rr="email" type="email" value="${esc(rr.email)}" placeholder="adresse@societe.fr"></div></div>
     ${rr.type === "confirmer" ? `<div class="field"><label>Comment</label><div class="seg" role="group" aria-label="Comment">${RR_MODES.map(([k, l]) => `<button type="button" data-act="rr-mode" data-m="${k}" aria-pressed="${rr.mode === k}">${l}</button>`).join("")}</div></div>` : ""}
     ${dateOn ? `<div class="field"><label>${rr.type === "decaler" ? "Le rendez-vous qu'ils proposaient" : "Le rendez-vous proposé"}</label><div class="row rr-dt"><input type="date" data-rr="date" value="${esc(rr.date)}" aria-label="Date"><input type="time" data-rr="heure" value="${esc(rr.heure)}" step="900" aria-label="Heure"></div></div>` : ""}
-    ${slotsOn ? `<div class="field"><label>${rr.type === "decaler" ? "Tes nouveaux créneaux" : "Tes créneaux"}</label><div class="rp-alts rr-slots">${rr.slots.map((x, i) => `<div class="row"><input type="date" data-slot="${i}" data-f="d" value="${esc(x.d || "")}" aria-label="Jour ${i + 1}"><input list="rr-plages" data-slot="${i}" data-f="p" value="${esc(x.p || "")}" placeholder="entre 12 h et 14 h" aria-label="Moment ${i + 1}"></div>`).join("")}</div>
-      <datalist id="rr-plages">${RR_PLAGES.map((p) => `<option value="${esc(p)}">`).join("")}</datalist>
-      <p class="muted" style="margin:0;font-size:.8rem">Laisse un jour vide pour ne proposer que deux créneaux. Je retiens tes horaires pour la prochaine fois.</p></div>` : ""}
+    ${slotsOn ? `<div class="field"><label>${rr.type === "decaler" ? "Tes nouveaux créneaux" : "Tes créneaux"}</label><div class="rp-alts rr-slots">${rr.slots.map((x, i) => `<div class="row"><select data-slot="${i}" data-f="d" aria-label="Jour ${i + 1}">${i ? `<option value="">Facultatif</option>` : ""}${rrDays(x.d).map((d) => `<option value="${d}"${d === x.d ? " selected" : ""}>${esc(fmt(d, { weekday: "long", day: "numeric", month: "short" }).replace(/^\w/, (m) => m.toUpperCase()))}</option>`).join("")}</select><select data-slot="${i}" data-f="p" aria-label="Horaire ${i + 1}"${x.d ? "" : " disabled"}>${(RR_PLAGES.includes(x.p) || !x.p ? RR_PLAGES : [x.p, ...RR_PLAGES]).map((h) => `<option${h === (x.p || "entre 12 h et 14 h") ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></div>`).join("")}</div>
+      <p class="muted" style="margin:0;font-size:.8rem">Choisis le jour puis l'horaire : le mail s'adapte tout seul. Les créneaux 2 et 3 sont facultatifs.</p></div>` : ""}
     <textarea id="rr-msg" rows="12">${esc(txt)}</textarea>
     <div class="row">${copyBtn("rr-msg", "Copier la réponse")}${href ? `<a class="btn primary" id="rr-go" href="${esc(href)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}<button type="button" data-act="rr-sent">C'est envoyé</button></div>
     <p class="muted" style="margin:0;font-size:.8rem">${rr.email ? `Le mail s'ouvre adressé à ${esc(rr.email)}, avec l'objet et le texte. Tu peux retoucher le texte avant.` : "Ajoute son adresse pour ouvrir le mail tout prêt, ou copie la réponse et colle-la en répondant au mail reçu."}</p>
@@ -4139,7 +4150,7 @@ $("#overlay").addEventListener("input", (e) => {
   if (e.target.id === "rr-mail" && rr) rr.mail = e.target.value;
   if (e.target.id === "rr-msg" && rr) { rr.draft = e.target.value; rrRefresh(true); }
   if (e.target.dataset.rr && rr) { rr[e.target.dataset.rr] = e.target.value; rrRefresh(); }
-  if (e.target.dataset.slot != null && rr) { rr.slots[+e.target.dataset.slot][e.target.dataset.f] = e.target.value; if (e.target.dataset.f === "p") try { localStorage.setItem("jb-plages", JSON.stringify(rr.slots.map((x) => x.p || ""))); } catch {} rrRefresh(); }
+  if (e.target.dataset.slot != null && rr) { const sl = rr.slots[+e.target.dataset.slot]; sl[e.target.dataset.f] = e.target.value; if (e.target.dataset.f === "d") { if (sl.d && !sl.p) sl.p = "entre 12 h et 14 h"; rr.draft = ""; return rrRedraw(); } if (e.target.dataset.f === "p") try { localStorage.setItem("jb-plages", JSON.stringify(rr.slots.map((x) => x.p || ""))); } catch {} rrRefresh(); }
   if (e.target.dataset.alt != null && editing?.reponseMail) { const R = editing.reponseMail; R.alts = R.alts || [{}, {}]; R.alts[+e.target.dataset.alt][e.target.dataset.f] = e.target.value; replyRefresh(); }
   if (e.target.id === "rl-msg" && $("#rl-count")) { const n = e.target.value.length; $("#rl-count").textContent = `${n} / 300 caractères`; $("#rl-count").classList.toggle("over", n > 300); }
   if (e.target.id === "bulk-text") { const n = parseBulk(e.target.value).length; $("#bulk-preview").textContent = `${n} personne${n > 1 ? "s" : ""} détectée${n > 1 ? "s" : ""}`; }
