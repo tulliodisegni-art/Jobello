@@ -1088,6 +1088,7 @@ function homeTasks() {
     if (c.statut === "entretien" && !c.dateEntretien && !isDue(c) && c.decision !== "pause") return T.push({ ...base, p: 2, k: "ent", t: `Entretien chez ${ent} : date à fixer`, s: "Note la date, ou dis-moi si tu l'as déjà passé", w: "à fixer" });
     if (isDue(c)) { const n = late(c.prochaineRelance); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n }); }
     if (pc && c.decision !== "pause" && (pc.prochaineAction || "9") <= today) { const n = late(pc.prochaineAction); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent} via ${firstName(pc.nom) || pc.nom}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n, contact: pc.id }); }
+    if (c.statut === "a_envoyer" && c.envoi && ["a_valider", "valide", "en_cours"].includes(c.envoi.statut)) return; // les agents s'en occupent (postuler.js)
     if (c.statut === "a_envoyer" && c.decision !== "stop" && c.claudeLe) return T.push({ ...base, p: 3, k: "send", t: `Candidature ${ent} : elle est partie ?`, s: `Lancée avec Claude ${lanceeFr(c)}. Confirme l'envoi sur la fiche`, w: "à confirmer", score: 101 });
     if (c.statut === "a_envoyer" && c.decision !== "stop") return T.push({ ...base, p: 3, k: "send", t: `Postuler chez ${ent}`, w: c.analyse ? `${c.analyse.score} %` : "", score: c.analyse?.score ?? 50, presta: modeOf(c) === "prestataire" });
     if (needsRecruiter(c)) return T.push({ ...base, p: 5, k: "li", t: `Trouver un contact chez ${ent}`, s: "Un message à la bonne personne double tes chances", task: "li" });
@@ -4303,6 +4304,7 @@ render();
 <script src="plus.js"></script>
 <script src="ciblage.js"></script>
 <script src="accueil.js"></script>
+<script src="postuler.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>
