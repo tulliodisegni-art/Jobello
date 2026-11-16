@@ -586,7 +586,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .ccard .cc-next .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 4px; }
 .ccard .cc-next.late { color: var(--s-refused); }
 
-.rp-alts{display:grid;gap:6px}.rp-alts .row{flex-wrap:nowrap;gap:6px}.rp-alts input{flex:1;min-width:0}.rp-alts span{font-size:.85rem}
+.rr-box .body{display:grid;gap:10px}.rr-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media (max-width:520px){.rr-who{grid-template-columns:1fr}}.rr-mail summary{cursor:pointer;font-weight:600;font-size:.9rem}.rr-mail[open]{display:grid;gap:8px}.rr-dt input{flex:1;min-width:0}.rr-slots input[list]{flex:1.3}.rp-alts{display:grid;gap:6px}.rp-alts .row{flex-wrap:nowrap;gap:6px}.rp-alts input{flex:1;min-width:0}.rp-alts span{font-size:.85rem}
 .stop-row{gap:6px;align-items:center;font-size:.85rem}.stop-row+.stop-row{margin-top:-4px}
 .ag-sec { display: flex; flex-direction: column; gap: 8px; }
 .ag-h { margin: 6px 2px 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
@@ -2902,6 +2902,179 @@ async function replySent(btn) {
   if (await saveCand(c)) { toast("Réponse notée"); drawCandSum(); } else btn.disabled = false;
 }
 
+/* ---------- Répondre au recruteur : réponses types, sans IA ---------- */
+const RR_TYPES = [
+  ["tel", "Accepter un appel téléphonique"],
+  ["visio", "Accepter un entretien en visio"],
+  ["physique", "Accepter un entretien sur place"],
+  ["confirmer", "Confirmer le jour et l'heure proposés"],
+  ["decaler", "Demander à décaler le rendez-vous"],
+  ["infos", "Envoyer les infos demandées (CV, dispo…)"],
+  ["merci", "Remercier après l'entretien"],
+  ["relance", "Relancer pour avoir des nouvelles"],
+  ["offre", "Remercier pour une offre et demander l'écrit"],
+  ["refus", "Répondre à un refus (garder le lien)"],
+  ["decliner", "Décliner poliment"]];
+const RR_LABEL = Object.fromEntries(RR_TYPES);
+const RR_SLOTS = ["tel", "visio", "physique", "decaler"];
+const RR_PLAGES = ["dans la matinée", "entre 12 h et 14 h", "dans l'après-midi", "à partir de 17 h 30", "toute la journée", "à 9 h", "à 10 h", "à 11 h", "à 14 h", "à 15 h", "à 16 h"];
+const RR_MODES = [["tel", "Par téléphone"], ["visio", "En visio"], ["physique", "Sur place"]];
+const MOIS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"];
+let rr = null;
+function nextWorkDays(n) {
+  const out = []; let d = todayISO();
+  while (out.length < n) { d = addDays(d, 1); const w = new Date(d + "T12:00:00").getDay(); if (w && w < 6) out.push(d); }
+  return out;
+}
+function rrPlages() { try { const p = JSON.parse(localStorage.getItem("jb-plages") || "null"); if (Array.isArray(p) && p.length === 3) return p; } catch {} return ["entre 12 h et 14 h", "à partir de 17 h 30", "entre 12 h et 14 h"]; }
+function rrContact(c) {
+  const raw = String(c.contact || ""), mail = [c.email, raw, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
+  const nom = raw.replace(EMAIL_RE, "").split(/[·,(|]/)[0].trim() || [...(c.mails || [])].reverse().find((m) => m.de)?.de?.split(/[,(·]/)[0].trim() || "";
+  return { nom: /^[\p{L}' .-]{3,40}$/u.test(nom) ? nom : "", email: mail ? mail[0] : "" };
+}
+function rrInit(c) {
+  if (rr && rr.id === (c.id || "new")) return rr;
+  const k = rrContact(c), pl = rrPlages(), defType = c.statut === "entretien" ? (c.dateEntretien && c.dateEntretien < todayISO() ? "merci" : "confirmer") : ACTIVE.includes(c.statut) ? "tel" : c.statut === "refus" ? "refus" : c.statut === "offre" ? "offre" : "tel";
+  const mode = /t[ée]l[ée]phone/i.test(c.typeEntretien || "") ? "tel" : /visio/i.test(c.typeEntretien || "") || c.lienVisio ? "visio" : /place/i.test(c.typeEntretien || "") ? "physique" : "tel";
+  rr = { id: c.id || "new", type: defType, mail: "", nom: k.nom, email: k.email, slots: nextWorkDays(3).map((d, i) => ({ d, p: pl[i] })), date: c.dateEntretien || "", heure: c.heureEntretien || "", mode, draft: "", open: false, info: "" };
+  return rr;
+}
+// Lit le mail collé, sans IA : expéditeur, adresse, type de demande, date et heure proposées
+function rrParse(text) {
+  const t = String(text || ""), n = normTxt(t), me = normTxt(state.profil?.nom || ""), myMail = String(state.profil?.email || "").toLowerCase();
+  const out = {};
+  const mails = (t.match(new RegExp(EMAIL_RE.source, "g")) || []).filter((m) => m.toLowerCase() !== myMail && !/no-?reply|ne-pas-repondre|notification/i.test(m));
+  if (mails[0]) out.email = mails[0];
+  const head = t.match(/^\s*(?:De|From|Expéditeur)\s*:\s*"?([^<"\n]+?)"?\s*(?:<|$)/mi);
+  const isName = (s) => s && /^[\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+){1,3}$/u.test(s.trim()) && normTxt(s) !== me && !/^(Bonjour|Madame|Monsieur|Cordialement|Bien|Bonne|Merci|Envoy)/.test(s.trim());
+  if (head && isName(head[1].replace(EMAIL_RE, ""))) out.nom = head[1].trim();
+  if (!out.nom) {
+    const sig = t.match(/(?:cordialement|bien à vous|bien a vous|belle journée|bonne journée|bonne soirée|à bientôt|a bientot|salutations|bien sincèrement)[^\n]*\n+\s*([^\n]+)/i);
+    if (sig && isName(sig[1])) out.nom = sig[1].trim();
+  }
+  if (!out.nom) { const m = t.match(/je (?:suis|m'appelle|me présente,?)\s+([\p{Lu}][\p{L}'-]+\s+[\p{Lu}][\p{L}'-]+)/u); if (m && isName(m[1])) out.nom = m[1]; }
+  // Date proposée
+  const today = todayISO(), y0 = +today.slice(0, 4);
+  const mk = (d, m, y) => { if (!d || !m || m > 12 || d > 31) return ""; let yy = y ? (y < 100 ? 2000 + y : y) : y0; let iso = `${yy}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`; if (!y && iso < addDays(today, -60)) iso = `${yy + 1}${iso.slice(4)}`; return iso; };
+  let dm = n.match(/\b(\d{1,2})(?:er)? (janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)(?: (\d{4}))?/);
+  if (dm) out.date = mk(+dm[1], MOIS.indexOf(dm[2]) + 1, dm[3] ? +dm[3] : 0);
+  else { dm = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/); if (dm) out.date = mk(+dm[1], +dm[2], dm[3] ? +dm[3] : 0); }
+  if (!out.date) { const jours = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"], jm = n.match(/\b(lundi|mardi|mercredi|jeudi|vendredi) (prochain|\d)/); if (jm) { let d = today; for (let i = 0; i < 8; i++) { d = addDays(d, 1); if (new Date(d + "T12:00:00").getDay() === jours.indexOf(jm[1])) break; } out.date = d; } }
+  if (out.date && out.date < today) out.date = "";
+  const hm = t.match(/\b([01]?\d|2[0-3])\s?(?:h|H|:)\s?([0-5]\d)?(?![\p{L}\d])/u);
+  if (hm && out.date) out.heure = `${hm[1].padStart(2, "0")}:${hm[2] || "00"}`;
+  // Type de demande
+  const has = (re) => re.test(n);
+  out.mode = has(/\b(visio|teams|zoom|google meet|meet google|webex|visioconference)\b/) ? "visio" : has(/\b(nos locaux|sur site|nos bureaux|a l adresse|en presentiel|vous recevoir|nous rendre visite|rencontrer en personne)\b/) ? "physique" : has(/\b(telephon\w*|appel|vous appeler|vous joindre|votre numero|call)\b/) ? "tel" : "";
+  if (has(/\b(malheureusement|pas ete retenue?|pas retenue?|ne pas donner suite|ne donnerons pas suite|pas pu donner une suite|autre candidat|ne correspond pas)\b/)) out.type = "refus";
+  else if (has(/\b(promesse d embauche|proposition d embauche|proposition de contrat|vous proposer le poste|offre ferme|proposition salariale)\b/)) out.type = "offre";
+  else if (out.date && out.heure && (out.mode || has(/\b(entretien|echange|rendez vous|rdv)\b/))) out.type = "confirmer";
+  else if (out.mode) out.type = out.mode;
+  else if (has(/\b(entretien|echanger|rencontrer)\b/)) out.type = "tel";
+  else if (has(/\b(cv|pretentions?|preavis|disponibilites?|salaire|remuneration)\b/)) out.type = "infos";
+  return out;
+}
+function rrFromMail(c) {
+  const p = rrParse(rr.mail), got = [];
+  if (p.nom) { rr.nom = p.nom; got.push(p.nom); }
+  if (p.email) { rr.email = p.email; got.push(p.email); }
+  else if (p.nom) rr.email = rrContact(c).email;
+  if (p.type) { rr.type = p.type; got.push(RR_LABEL[p.type].toLowerCase()); }
+  if (p.mode) rr.mode = p.mode;
+  if (p.date) { rr.date = p.date; rr.heure = p.heure || rr.heure; got.push("proposé le " + dayFr(p.date) + (p.heure ? " à " + hFr(p.heure) : "")); }
+  rr.draft = ""; rr.info = got.length ? "J'ai trouvé : " + got.join(", ") + ". Vérifie le type de réponse et tes créneaux." : "Je n'ai rien reconnu dans ce mail : choisis le type de réponse et complète le nom.";
+}
+const rrSlotsTxt = (slots) => { const s = slots.filter((x) => x.d).map((x) => `${dayFr(x.d)}${x.p ? " " + x.p.trim() : ""}`); return s.length > 1 ? s.slice(0, -1).join(", ") + " ou " + s[s.length - 1] : s[0] || ""; };
+function rrText(c) {
+  const pr = state.profil || {}, tel = pr.telephone || "", poste = c.poste ? `au poste ${dePoste(c.poste)}` : "", soc = c.entreprise || "";
+  const chez = soc ? ` chez ${soc}` : "", slots = rrSlotsTxt(rr.slots), dispo = slots ? `Je suis disponible ${slots}.` : "Je suis assez disponible dans les prochains jours.";
+  const quand = rr.date ? `le ${dayFr(rr.date)}${rr.heure ? " à " + hFr(rr.heure) : ""}` : "au moment que vous m'avez proposé";
+  const joindre = tel ? `Vous pouvez me joindre au ${tel}.` : "";
+  const salut = rr.nom ? `Bonjour ${rr.nom},` : "Bonjour,";
+  let body = "", fin = "Bien cordialement,";
+  switch (rr.type) {
+    case "tel": body = `Merci beaucoup pour votre retour concernant ma candidature ${poste}${chez}. C'est avec grand plaisir que j'accepte cet échange téléphonique.\n\n${dispo} Si aucun de ces moments ne vous convient, je m'adapterai volontiers à vos disponibilités.${joindre ? "\n\n" + joindre : ""}`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break;
+    case "visio": body = `Merci beaucoup pour votre message et pour l'intérêt que vous portez à ma candidature ${poste}${chez}. Je serai ravi d'échanger avec vous en visioconférence.\n\n${dispo} Si ces créneaux ne vous arrangent pas, n'hésitez pas à m'en proposer d'autres, je m'organiserai en conséquence.`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break;
+    case "physique": body = `Merci beaucoup pour votre retour. Je suis très heureux de pouvoir vous rencontrer dans vos locaux pour échanger autour du poste${c.poste ? " " + dePoste(c.poste) : ""}${chez}.\n\n${slots ? `Je pourrais venir ${slots}.` : "Je suis assez disponible dans les prochains jours."} Si cela ne vous convient pas, je m'adapterai bien volontiers à votre agenda.\n\nPourriez-vous simplement me confirmer l'adresse exacte et le nom de la personne à demander à l'accueil ?`; fin = "Au plaisir de vous rencontrer,\nBien cordialement,"; break;
+    case "confirmer": {
+      const what = { tel: "notre échange téléphonique", visio: "notre entretien en visioconférence", physique: "notre entretien dans vos locaux" }[rr.mode] || "notre entretien";
+      const after = { tel: joindre, visio: "Je me connecterai quelques minutes avant l'heure avec le lien que vous m'avez transmis.", physique: "Je serai présent quelques minutes en avance." }[rr.mode] || "";
+      body = `Merci pour votre message. Je vous confirme avec plaisir ma disponibilité pour ${what} ${quand}.${after ? "\n\n" + after : ""}`; fin = "Au plaisir d'échanger avec vous,\nBien cordialement,"; break; }
+    case "decaler": body = `Merci beaucoup pour votre proposition. Je suis sincèrement désolé, mais je ne pourrai pas me libérer ${quand}.\n\nSerait-il possible de décaler notre rendez-vous ? ${slots ? `Je suis disponible ${slots}, et je reste bien sûr ouvert à tout autre moment qui vous conviendrait mieux.` : "Je reste ouvert au moment qui vous conviendra le mieux."}\n\nJe vous prie de m'excuser pour ce contretemps et vous remercie de votre compréhension.`; break;
+    case "infos": body = `Merci pour votre retour et pour l'intérêt porté à ma candidature ${poste}${chez}.\n\nVous trouverez ci-joint mon CV à jour.${pr.disponibilite ? ` Côté disponibilité, ${String(pr.disponibilite).replace(/^\w/, (x) => x.toLowerCase()).replace(/\.$/, "")}.` : ""}${pr.salaire ? ` Mes prétentions salariales se situent autour de ${String(pr.salaire).replace(/\.$/, "")}.` : ""}\n\nJe reste à votre disposition pour toute autre information et serais ravi d'en parler de vive voix.`; break;
+    case "merci": body = `Je tenais à vous remercier pour le temps que vous m'avez accordé lors de notre échange. Il m'a permis de mieux comprendre le poste${c.poste ? " " + dePoste(c.poste) : ""} et les projets${soc ? " de " + soc : " de votre équipe"}, et il a encore renforcé mon envie de vous rejoindre.\n\nLes sujets de conception mécanique dont nous avons parlé m'ont particulièrement intéressé, et je serais très heureux de pouvoir y apporter ma contribution.\n\nJe reste à votre disposition pour toute information complémentaire.`; break;
+    case "relance": body = `Je me permets de revenir vers vous au sujet de ma candidature ${poste}${chez}${c.dateEnvoi ? `, envoyée le ${fmt(c.dateEnvoi, { day: "numeric", month: "long" })}` : ""}. Ce poste m'intéresse toujours beaucoup, et je serais heureux de savoir où en est votre recrutement.\n\nJe reste bien sûr disponible pour un échange, par téléphone ou en visio, au moment qui vous conviendra.`; break;
+    case "offre": body = `Merci beaucoup pour votre proposition, je suis très touché de la confiance que vous m'accordez. Le poste${c.poste ? " " + dePoste(c.poste) : ""}${chez} me tient particulièrement à cœur.\n\nAfin de vous donner une réponse réfléchie, pourriez-vous me transmettre la proposition écrite, avec le détail de la rémunération et la date de démarrage envisagée ? Je reviendrai vers vous très rapidement.`; break;
+    case "refus": body = `Merci d'avoir pris le temps de me répondre. Je regrette bien sûr que ma candidature ${poste} n'ait pas été retenue, mais je comprends votre décision.\n\nSi vous en avez la possibilité, un bref retour sur ce qui a orienté votre choix m'aiderait beaucoup. Et si une autre opportunité en conception mécanique venait à s'ouvrir${chez}, je serais très heureux que vous pensiez à moi.`; break;
+    case "decliner": body = `Merci beaucoup pour votre message et pour l'intérêt que vous portez à mon profil. Après réflexion, j'ai choisi de ne pas poursuivre le processus pour le poste${c.poste ? " " + dePoste(c.poste) : ""}, mon projet ayant pris une autre direction.\n\nJ'ai beaucoup apprécié nos échanges et je garde un très bon souvenir de${soc ? " " + soc : " votre équipe"}. Je vous souhaite pleine réussite dans ce recrutement.`; break;
+  }
+  return `${salut}\n\n${body}\n\n${fin}\n${[pr.nom || "", tel && !body.includes(tel) ? tel : ""].filter(Boolean).join("\n")}`.trim();
+}
+function rrSubject(c) {
+  const base = `Candidature au poste ${dePoste(c.poste || "d'ingénieur")}${c.refOffre ? " (réf. " + c.refOffre + ")" : ""}`;
+  return { merci: "Merci pour notre échange", confirmer: "Confirmation de notre rendez-vous", decaler: "Report de notre rendez-vous" }[rr.type] ? `${{ merci: "Merci pour notre échange", confirmer: "Confirmation de notre rendez-vous", decaler: "Report de notre rendez-vous" }[rr.type]}${c.poste ? " : " + c.poste : ""}` : "Re: " + base;
+}
+function rrRedraw() {
+  const o = $("#overlay"), sh = o.querySelector(".sheet"), a = o.scrollTop, b = sh ? sh.scrollTop : 0;
+  drawCandSum(); o.scrollTop = a; const sh2 = o.querySelector(".sheet"); if (sh2) sh2.scrollTop = b;
+}
+function rrHTML(c) {
+  rrInit(c);
+  const txt = rr.draft || rrText(c), slotsOn = RR_SLOTS.includes(rr.type), dateOn = rr.type === "confirmer" || rr.type === "decaler";
+  const href = rr.email ? `mailto:${rr.email}?subject=${enc(rrSubject(c))}&body=${enc(txt)}` : "";
+  return `<details class="sec rr-box" id="rr-sec"${rr.open ? " open" : ""}><summary>Répondre au recruteur <small>${esc(rr.open ? RR_LABEL[rr.type] : "réponses toutes prêtes")}</small></summary><div class="body">
+    <details class="rr-mail"${rr.mail ? " open" : ""}><summary>Coller le mail reçu (facultatif)</summary>
+      <p class="muted" style="margin:0;font-size:.85rem">Colle le mail du recruteur : je reprends son nom, son adresse, ce qu'il demande et la date qu'il propose.</p>
+      <textarea id="rr-mail" rows="5" placeholder="Colle ici le mail reçu">${esc(rr.mail)}</textarea>
+      <div class="row"><button type="button" class="small" data-act="rr-paste">Coller depuis le presse-papiers</button><button type="button" class="small primary" data-act="rr-read">Préparer la réponse</button></div>
+    </details>
+    ${rr.info ? `<p class="tip" style="margin:0">${esc(rr.info)}</p>` : ""}
+    <div class="field"><label for="rr-type">Type de réponse</label><select id="rr-type">${RR_TYPES.map(([k, l]) => `<option value="${k}"${k === rr.type ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+    <div class="rr-who"><div class="field"><label for="rr-nom">À qui</label><input id="rr-nom" data-rr="nom" value="${esc(rr.nom)}" placeholder="Prénom Nom"></div><div class="field"><label for="rr-email">Son adresse mail</label><input id="rr-email" data-rr="email" type="email" value="${esc(rr.email)}" placeholder="adresse@societe.fr"></div></div>
+    ${rr.type === "confirmer" ? `<div class="field"><label>Comment</label><div class="seg" role="group" aria-label="Comment">${RR_MODES.map(([k, l]) => `<button type="button" data-act="rr-mode" data-m="${k}" aria-pressed="${rr.mode === k}">${l}</button>`).join("")}</div></div>` : ""}
+    ${dateOn ? `<div class="field"><label>${rr.type === "decaler" ? "Le rendez-vous qu'ils proposaient" : "Le rendez-vous proposé"}</label><div class="row rr-dt"><input type="date" data-rr="date" value="${esc(rr.date)}" aria-label="Date"><input type="time" data-rr="heure" value="${esc(rr.heure)}" step="900" aria-label="Heure"></div></div>` : ""}
+    ${slotsOn ? `<div class="field"><label>${rr.type === "decaler" ? "Tes nouveaux créneaux" : "Tes créneaux"}</label><div class="rp-alts rr-slots">${rr.slots.map((x, i) => `<div class="row"><input type="date" data-slot="${i}" data-f="d" value="${esc(x.d || "")}" aria-label="Jour ${i + 1}"><input list="rr-plages" data-slot="${i}" data-f="p" value="${esc(x.p || "")}" placeholder="entre 12 h et 14 h" aria-label="Moment ${i + 1}"></div>`).join("")}</div>
+      <datalist id="rr-plages">${RR_PLAGES.map((p) => `<option value="${esc(p)}">`).join("")}</datalist>
+      <p class="muted" style="margin:0;font-size:.8rem">Laisse un jour vide pour ne proposer que deux créneaux. Je retiens tes horaires pour la prochaine fois.</p></div>` : ""}
+    <textarea id="rr-msg" rows="12">${esc(txt)}</textarea>
+    <div class="row">${copyBtn("rr-msg", "Copier la réponse")}${href ? `<a class="btn primary" id="rr-go" href="${esc(href)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}<button type="button" data-act="rr-sent">C'est envoyé</button></div>
+    <p class="muted" style="margin:0;font-size:.8rem">${rr.email ? `Le mail s'ouvre adressé à ${esc(rr.email)}, avec l'objet et le texte. Tu peux retoucher le texte avant.` : "Ajoute son adresse pour ouvrir le mail tout prêt, ou copie la réponse et colle-la en répondant au mail reçu."}</p>
+  </div></details>`;
+}
+function rrRefresh(keepDraft) {
+  const c = editing; if (!c || !rr) return;
+  if (!keepDraft) { rr.draft = ""; const ta = $("#rr-msg"); if (ta) ta.value = rrText(c); }
+  const a = $("#rr-go"), ta = $("#rr-msg");
+  if (a && ta) a.href = `mailto:${rr.email}?subject=${enc(rrSubject(c))}&body=${enc(ta.value)}`;
+}
+async function rrSent(btn) {
+  const c = editing; if (!c || !rr) return;
+  btn.disabled = true;
+  const today = todayISO(), t = rr.type, slots = rr.slots.filter((x) => x.d);
+  const typeEnt = { tel: "Téléphone", visio: c.typeEntretien && /visio/i.test(c.typeEntretien) ? c.typeEntretien : "Visio Teams", physique: "Sur place" };
+  c.historique = c.historique || [];
+  if (["tel", "visio", "physique"].includes(t)) {
+    if (c.statut !== "offre") c.statut = "entretien";
+    if (!c.typeEntretien) c.typeEntretien = typeEnt[t];
+    if (!c.dateEntretien) c.entretienAConfirmer = true;
+    if (!c.dateReponse) c.dateReponse = today;
+  }
+  if (t === "confirmer") Object.assign(c, { statut: c.statut === "offre" ? "offre" : "entretien", dateEntretien: rr.date || c.dateEntretien, heureEntretien: rr.heure || c.heureEntretien, typeEntretien: (rr.mode === "visio" && /visio/i.test(c.typeEntretien || "")) ? c.typeEntretien : typeEnt[rr.mode] || c.typeEntretien, entretienAConfirmer: false });
+  if (t === "decaler") { if (c.dateEntretien && c.dateEntretien === rr.date) { c.dateEntretien = ""; c.heureEntretien = ""; } c.entretienAConfirmer = true; }
+  if (t === "relance") { if (c.statut === "envoyee") c.statut = "relancee"; c.prochaineRelance = addDays(today, 7); }
+  if (t === "decliner") c.statut = "abandon";
+  if (t === "refus" && c.statut !== "refus") c.statut = "refus";
+  if (["tel", "visio", "physique", "decaler"].includes(t) && !c.prochaineRelance) c.prochaineRelance = addDays(today, 4);
+  if (!c.contact && rr.nom) c.contact = rr.nom + (rr.email ? " · " + rr.email : "");
+  if (!c.email && rr.email) c.email = rr.email;
+  c.historique.push({ date: today, texte: `Réponse envoyée : ${RR_LABEL[t].replace(/ \(.*\)$/, "").toLowerCase()}${(RR_SLOTS.includes(t) && slots.length) ? " (" + slots.map((x) => fmt(x.d) + (x.p ? " " + x.p : "")).join(", ") + ")" : t === "confirmer" && rr.date ? " (" + fmt(rr.date) + (rr.heure ? " " + rr.heure : "") + ")" : ""}` });
+  if (rr.mail.trim()) {
+    const h = hashTxt(rr.mail);
+    if (!(c.mails || []).some((m) => m.hash === h)) c.mails = [...(c.mails || []), { date: today, type: { refus: "refus", offre: "offre", infos: "demande" }[t] || "entretien", de: rr.nom, email: rr.email, resume: "Mail collé pour y répondre", texte: rr.mail.slice(0, 4000), hash: h }].slice(-12);
+  }
+  if (await saveCand(c)) { rr = null; toast("Réponse notée dans la fiche"); drawCandSum(); } else btn.disabled = false;
+}
+
 /* ---------- Résumé de fiche + Relancer ---------- */
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
 const platOf = (c) => PLATS.find((p) => norm(c.source).includes(p.nom.toLowerCase()) || norm(c.source).includes(p.id));
@@ -2970,6 +3143,7 @@ function drawCandSum() {
       ${c.contact ? `<p class="muted" style="margin:0;font-size:.88rem">Contact : ${esc(c.contact)}</p>` : ""}
       ${md === "prestataire" ? `<p class="muted" style="margin:0;font-size:.85rem">Société de prestation : tu serais salarié chez eux mais en mission chez un client. Deuxième choix, garde la priorité aux postes en direct.${(societeOf(c) || cibleOf(c))?.modeNote ? " " + esc((societeOf(c) || cibleOf(c)).modeNote) : ""}</p>` : ""}</div>
     ${replyBoxHTML(c)}
+    ${archivedCand(c) && c.statut !== "refus" ? "" : rrHTML(c)}
     ${applyBoxHTML(c)}
     ${offreHTML(c)}
     ${nextRoundHTML(c)}
@@ -3822,6 +3996,12 @@ $("#overlay").addEventListener("click", async (e) => {
     if (act === "m-read") return readMail();
     if (act === "m-apply") return applyMail();
   }
+  if (sheetKind === "candsum" && rr) {
+    if (act === "rr-paste") { try { rr.mail = await navigator.clipboard.readText(); rrFromMail(editing); rr.open = true; return rrRedraw(); } catch { $("#rr-mail")?.focus(); return toast("Appuie longuement dans le champ puis « Coller »"); } }
+    if (act === "rr-read") { rr.mail = $("#rr-mail")?.value || ""; if (!rr.mail.trim()) return toast("Colle d'abord le mail reçu"); rrFromMail(editing); rr.open = true; return rrRedraw(); }
+    if (act === "rr-mode") { rr.mode = t.dataset.m; rr.draft = ""; return rrRedraw(); }
+    if (act === "rr-sent") return rrSent(t);
+  }
   if (sheetKind === "candsum") {
     if (act === "sum-edit") return openDossier(editing.id);
     if (act === "sum-relanced") return markRelanced();
@@ -3950,12 +4130,18 @@ $("#overlay").addEventListener("click", async (e) => {
 $("#overlay").addEventListener("input", (e) => {
   if (e.target.id === "li-text") updateCounter();
   if (e.target.id === "rp-msg") replyLink();
+  if (e.target.id === "rr-mail" && rr) rr.mail = e.target.value;
+  if (e.target.id === "rr-msg" && rr) { rr.draft = e.target.value; rrRefresh(true); }
+  if (e.target.dataset.rr && rr) { rr[e.target.dataset.rr] = e.target.value; rrRefresh(); }
+  if (e.target.dataset.slot != null && rr) { rr.slots[+e.target.dataset.slot][e.target.dataset.f] = e.target.value; if (e.target.dataset.f === "p") try { localStorage.setItem("jb-plages", JSON.stringify(rr.slots.map((x) => x.p || ""))); } catch {} rrRefresh(); }
   if (e.target.dataset.alt != null && editing?.reponseMail) { const R = editing.reponseMail; R.alts = R.alts || [{}, {}]; R.alts[+e.target.dataset.alt][e.target.dataset.f] = e.target.value; replyRefresh(); }
   if (e.target.id === "rl-msg" && $("#rl-count")) { const n = e.target.value.length; $("#rl-count").textContent = `${n} / 300 caractères`; $("#rl-count").classList.toggle("over", n > 300); }
   if (e.target.id === "bulk-text") { const n = parseBulk(e.target.value).length; $("#bulk-preview").textContent = `${n} personne${n > 1 ? "s" : ""} détectée${n > 1 ? "s" : ""}`; }
 });
+$("#overlay").addEventListener("toggle", (e) => { if (e.target.id === "rr-sec" && rr) rr.open = e.target.open; }, true);
 $("#overlay").addEventListener("change", (e) => {
   if (e.target.id === "m-imgs") { addMailImgs([...e.target.files]); e.target.value = ""; return; }
+  if (e.target.id === "rr-type" && rr) { rr.type = e.target.value; rr.draft = ""; rr.open = true; return rrRedraw(); }
   if (e.target.id === "m-target" && mailRes) { mailRes.match = e.target.value; return drawMailResult(); }
   if (e.target.id === "d-file") $("#d-file-name").textContent = e.target.files[0] ? "Sera joint : " + e.target.files[0].name : ""; });
 document.addEventListener("keydown", (e) => {
