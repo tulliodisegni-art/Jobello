@@ -53,6 +53,12 @@
     const { data, error } = await sb.storage.from("fichiers").createSignedUrl(user.id + "/" + id, secs || 14 * 86400);
     if (error) throw error; return data.signedUrl;
   };
+  /* Fonctions de la base (départ immédiat des agents : agents_status, agents_set_token, agents_reveil…) */
+  window.jobelloRpc = async (fn, args) => {
+    if (!sb || !user) throw new Error("Connecte-toi à Jobello");
+    const { data, error } = await sb.rpc(fn, args || {});
+    if (error) throw new Error(error.message || "Erreur"); return data;
+  };
 
   async function start() {
     if (!sb) { ready(); return; } // pas de base en ligne configurée : tout reste sur ce téléphone

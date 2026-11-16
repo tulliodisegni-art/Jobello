@@ -7,6 +7,8 @@
    Suivi d'une candidature : c.envoi = { statut: a_valider | valide | en_cours | envoyee | bloquee, auto, valideLe,
      fichiers: [{ type, nom, url }], fichiersLe, debut, fin, raison, agent }.
    Réglages : docs path demandes/envois = { valider: false, passage: { le, chrome, texte } }.
+   Départ immédiat : une fois le téléphone et l'ordi reliés (jeton de la tâche collé ici, rangé dans Vault),
+     la base réveille la tâche dès qu'une offre est swipée (fonctions agents_* de Supabase).
    Ce fichier se charge après la page de l'appli : il utilise ses données (state) et ses outils. */
 (function () {
   const css = `
@@ -18,6 +20,11 @@
   .ag-it{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);cursor:pointer}
   .ag-it .dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--s-todo)}
   .ag-it.run .dot{background:var(--accent);animation:agp 1.1s ease-in-out infinite}
+  .ag-link{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 10px;padding:11px 14px;border-radius:14px;border:1.5px dashed var(--accent);background:var(--surface);color:var(--fg);font:inherit;cursor:pointer}
+  .ag-link.on{border-style:solid;border-color:var(--line)}.ag-link.ko{border-color:var(--s-follow)}
+  .ag-link .ic{flex:none;font-size:1.25rem}.ag-link .tx{flex:1;min-width:0;display:flex;flex-direction:column}.ag-link small{color:var(--muted);font-size:.82rem}.ag-link .ch{flex:none;font-size:1.3rem;color:var(--muted)}
+  .ag-steps{margin:14px 0;padding-left:22px;display:flex;flex-direction:column;gap:12px;line-height:1.45}
+  .ag-steps input{width:100%;margin-top:6px}
   .ag-it.ok .dot{background:var(--accent)}.ag-it.ko .dot{background:#e8782f}
   .ag-it .t{flex:1;min-width:0;display:flex;flex-direction:column}.ag-it .t b{font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ag-it .t span{font-size:.8rem;color:var(--muted)}
@@ -55,8 +62,11 @@
   const AG_SLOTS = Array.from({ length: 14 }, (_, i) => (8 + i) * 60 + 17);
   const ready = () => !!(state && state.loaded && state.db);
   let cfg = { valider: false };
+  let lien = null; // départ immédiat : état du lien téléphone ↔ ordi (fonction agents_status de la base)
+  const relie = () => !!(lien && lien.relie);
   const cand = (id) => state.cands.find((c) => c.id === id);
   const nextSlot = () => { const m = parisMin(), s = AG_SLOTS.find((x) => x > m); return s != null ? hhmm(s) : "demain " + hhmm(AG_SLOTS[0]); };
+  const quand = () => relie() ? "tout de suite" : "vers " + nextSlot();
 
   /* ---------- File d'attente (écritures l'une après l'autre, pour ne rien perdre en swipant vite) ---------- */
   let chain = Promise.resolve();
@@ -126,7 +136,7 @@
     if (!o) {
       ov.innerHTML = head + `<div class="sw-end"><span class="big">${deck.oui ? "🚀" : "✨"}</span>
         <b>${deck.oui ? `${deck.oui} candidature${deck.oui > 1 ? "s" : ""} confiée${deck.oui > 1 ? "s" : ""} aux agents` : "Plus d'offre à trier pour l'instant"}</b>
-        <span class="muted">${deck.oui ? `Claude prépare CV et lettre puis les agents postulent en même temps sur ton ordinateur (Chrome ouvert). Prochain passage vers ${nextSlot()}. Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>
+        <span class="muted">${deck.oui ? `Claude prépare CV et lettre pendant que les agents postulent en même temps sur ton ordinateur (Chrome ouvert). ${relie() ? "Ça part tout de suite." : `Prochain passage vers ${nextSlot()}.`} Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>
         <button type="button" class="primary" data-sw="close">${deck.oui ? "Voir mes agents" : "Fermer"}</button></div>`;
       return;
     }
@@ -175,7 +185,7 @@
       const c = d.candidature && cand(d.candidature);
       if (c) return; // la candidature existe : on la suit plus bas
       if (d.statut === "erreur") return L.push({ k: "ko", t: d.offre?.entreprise, s: d.offre?.titre, st: "Échec", d: d.raison || "Dossier non préparé", url: d.url });
-      L.push({ k: "wait", t: d.offre?.entreprise, s: d.offre?.titre, st: d.statut === "en_preparation" ? "CV et lettre…" : "En file", d: d.statut === "en_preparation" ? "Claude écrit ta lettre et adapte ton CV" : `Prochain passage des agents vers ${nextSlot()}`, url: d.url, at: d.demandeLe });
+      L.push({ k: "wait", t: d.offre?.entreprise, s: d.offre?.titre, st: d.statut === "en_preparation" ? "CV et lettre…" : "En file", d: d.statut === "en_preparation" ? "Claude écrit ta lettre et adapte ton CV" : relie() ? "Les agents démarrent sur ton ordinateur" : `Prochain passage des agents vers ${nextSlot()}`, url: d.url, at: d.demandeLe });
     });
     state.cands.filter((c) => c.envoi && c.envoi.auto !== false).forEach((c) => {
       if (seen.has(c.id)) return; seen.add(c.id); const e = c.envoi;
@@ -184,7 +194,7 @@
       if (e.statut === "bloquee") return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: "À finir toi-même", d: e.raison || "L'agent n'a pas pu terminer" });
       if (e.statut === "en_cours") return L.push({ k: "run", id: c.id, t: c.entreprise, s: c.poste, st: "Agent au travail", d: e.etape || "Remplit le formulaire sur le site", at: e.debut });
       if (e.statut === "a_valider") return L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "À valider", d: "Touche pour relire et lancer l'envoi" });
-      L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "Prête", d: `CV et lettre prêts${e.fichiers?.length ? "" : " (PDF en cours)"} · envoi vers ${nextSlot()}` });
+      L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "Prête", d: `CV et lettre prêts${e.fichiers?.length ? "" : " (PDF en cours)"} · envoi ${quand()}` });
     });
     const ord = { run: 0, ko: 1, wait: 2, ok: 3 };
     return L.sort((a, b) => ord[a.k] - ord[b.k]);
@@ -193,13 +203,66 @@
     const n = ready() ? aDefiler().length : 0, L = suivi(), cfgP = cfg.passage;
     const run = L.filter((x) => x.k === "run").length, ok = L.filter((x) => x.k === "ok").length, enAttente = L.filter((x) => x.k === "wait").length;
     const go = `<button type="button" class="ag-go" data-sw="open"><span class="ic">👆</span><span class="tx"><b>${n ? `Swipe ${n} offre${n > 1 ? "s" : ""}` : "Swipe et ça part"}</b><small>${n ? "À droite : les agents postulent pour toi" : "Plus d'offre à trier pour l'instant"}</small></span><span class="ch">›</span></button>`;
-    if (!L.length) return go;
+    if (!L.length) return go + lienHTML();
     const pc = cfgP && cfgP.le && Date.now() - new Date(cfgP.le).getTime() < 2 * 3600e3 ? (cfgP.chrome ? `Dernier passage ${new Date(cfgP.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} : Chrome connecté.` : `Dernier passage ${new Date(cfgP.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} : ton ordinateur n'était pas joignable. Allume-le, ouvre Chrome et l'extension Claude.`) : "";
-    return go + `<div class="row between" style="margin:4px 2px 8px"><h2 class="home-h" style="margin:0">Mes agents</h2><span class="home-more">${[run && run + " au travail", enAttente && enAttente + " en attente", ok && ok + " envoyée" + (ok > 1 ? "s" : "")].filter(Boolean).join(" · ")}</span></div>
+    return go + lienHTML() + `<div class="row between" style="margin:4px 2px 8px"><h2 class="home-h" style="margin:0">Mes agents</h2><span class="home-more">${[run && run + " au travail", enAttente && enAttente + " en attente", ok && ok + " envoyée" + (ok > 1 ? "s" : "")].filter(Boolean).join(" · ")}</span></div>
       <div class="ag-list">${L.slice(0, 12).map((x) => `<div class="ag-it ${x.k}" ${x.id ? `data-open="${esc(x.id)}"` : ""}><span class="dot"></span><span class="t"><b>${esc(x.t || "Offre")}</b><span>${esc(x.s || "")}${x.d ? " · " + esc(x.d) : ""}</span></span><span class="st">${esc(x.st)}</span></div>`).join("")}</div>
-      ${pc ? `<p class="ag-meta">${esc(pc)}</p>` : `<p class="ag-meta">Les agents passent toutes les heures (8h17-21h17) et travaillent dans Chrome sur ton ordinateur : laisse-le allumé avec Chrome ouvert.</p>`}
+      ${pc ? `<p class="ag-meta">${esc(pc)}</p>` : `<p class="ag-meta">${relie() ? "Les agents partent dès que tu swipes et travaillent dans Chrome sur ton ordinateur : laisse-le allumé avec Chrome ouvert." : "Les agents passent toutes les heures (8h17-21h17) et travaillent dans Chrome sur ton ordinateur : laisse-le allumé avec Chrome ouvert."}</p>`}
       <label class="ag-set"><input type="checkbox" data-sw="valider" ${cfg.valider ? "checked" : ""}> Me demander un dernier OK avant chaque envoi</label>`;
   }
+  /* ---------- Départ immédiat : relier le téléphone et l'ordi ---------- */
+  const heure = (iso) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  function lienHTML() {
+    if (!lien || !lien.disponible) return "";
+    if (!relie()) return `<button type="button" class="ag-link" data-sw="lier"><span class="ic">⚡</span><span class="tx"><b>Relier mon téléphone et mon ordi</b><small>Une seule fois : ensuite chaque swipe part tout de suite</small></span><span class="ch">›</span></button>`;
+    const ko = lien.statut && lien.statut >= 400;
+    const sub = ko ? "La clé ne marche plus : touche ici pour la remplacer" : lien.enCours ? "Les agents travaillent sur ton ordi en ce moment" : "Chaque swipe part tout de suite" + (lien.dernier ? " · dernier départ " + heure(lien.dernier) : "");
+    return `<button type="button" class="ag-link on${ko ? " ko" : ""}" data-sw="lier"><span class="ic">⚡</span><span class="tx"><b>Téléphone et ordi reliés</b><small>${esc(sub)}</small></span><span class="ch">›</span></button>`;
+  }
+  function openLien() {
+    const on = relie();
+    openSheet(`<div class="sheet-head"><div style="min-width:0"><span class="label">Départ immédiat</span><h2>Relier mon téléphone et mon ordi</h2></div><button type="button" class="ghost" data-act="close">Fermer</button></div>
+      <p>${on ? "C'est relié : chaque offre swipée à droite part tout de suite dans Chrome sur ton ordinateur, sans attendre l'heure. Pour changer de clé, refais les étapes ci-dessous." : "À faire une seule fois, sur ton ordinateur. Ensuite, chaque offre swipée à droite part tout de suite dans Chrome, sans attendre l'heure."}</p>
+      <ol class="ag-steps">
+        <li>Ouvre la page de tes tâches Claude : <a href="https://claude.ai/code/routines" target="_blank" rel="noopener">claude.ai/code/routines</a></li>
+        <li>Clique sur la tâche « Agents Jobello », puis sur le menu à côté de son nom, et choisis « Modifier » (Edit).</li>
+        <li>Dans la ligne « Déclencheur » (Trigger), clique sur + puis sur « API ». Clique sur « Générer un jeton » (Generate token) et copie le jeton.</li>
+        <li>Colle-le ici :<input id="lien-tok" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></li>
+      </ol>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="primary" data-sw="lien-ok">Relier</button>${on ? `<button type="button" class="ghost" data-sw="lien-off">Couper le lien</button>` : ""}</div>
+      <p class="ag-meta">Le jeton reste rangé dans le coffre de ta base Jobello : l'appli ne le réaffiche jamais. Il sert seulement à réveiller tes agents.</p>`, "lien");
+  }
+  async function majLien() {
+    if (!window.jobelloRpc) return;
+    try { lien = await window.jobelloRpc("agents_status"); } catch (e) { return; }
+    try { drawPanel(); } catch {}
+  }
+  async function lienAction(a) {
+    try {
+      if (a === "lien-ok") {
+        const v = (document.getElementById("lien-tok")?.value || "").trim();
+        if (!v) return toast("Colle d'abord le jeton");
+        await window.jobelloRpc("agents_set_token", { p_token: v });
+        closeSheet(); toast("C'est relié : chaque swipe part tout de suite sur ton ordi");
+        await majLien(); reveil(true);
+      } else if (a === "lien-off") {
+        await window.jobelloRpc("agents_unlink");
+        closeSheet(); toast("Lien coupé : les agents repassent toutes les heures"); await majLien();
+      }
+    } catch (e) { toast((e && e.message) || "Ça n'a pas marché : réessaie"); }
+  }
+  /* L'appli ouverte sur l'ordinateur réveille les agents s'il reste des candidatures en attente (ordi qui était éteint) */
+  const surOrdi = () => !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) && matchMedia("(pointer: fine)").matches;
+  async function reveil(force) {
+    if (!relie() || !ready() || !surOrdi()) return;
+    const attente = (state.demandes?.liste || []).some((d) => d.auto && d.statut === "en_attente") || state.cands.some((c) => c.statut === "a_envoyer" && c.envoi && c.envoi.statut === "valide");
+    if (!attente || lien.enCours) return;
+    const p = cfg.passage; if (!force && p && p.chrome === false && Date.now() - new Date(p.le).getTime() < 30 * 60e3) return;
+    const last = +localStorage.getItem("jb-reveil") || 0; if (!force && Date.now() - last < 10 * 60e3) return;
+    localStorage.setItem("jb-reveil", String(Date.now()));
+    try { await window.jobelloRpc("agents_reveil"); setTimeout(majLien, 4000); } catch {}
+  }
+
   function drawPanel() {
     const home = document.getElementById("v-accueil") || document.querySelector("#prep-panel")?.parentElement; if (!home) return;
     let p = document.getElementById("ag-panel");
@@ -248,7 +311,7 @@
       const c = cand(id), e = c && c.envoi; if (!e) return r;
       const sh = document.querySelector("#overlay .sheet .sheet-head"); if (!sh) return r;
       const box = document.createElement("div"); box.className = "relance-box";
-      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.", valide: `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`, en_cours: "Un agent est en train de remplir le formulaire sur le site.", envoyee: `Envoyée par un agent${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via ? " via " + e.via : ""}.`, bloquee: `L'agent n'a pas pu finir : ${e.raison || "raison inconnue"}. Termine-la toi-même avec « Postuler » plus bas.` }[e.statut] || "";
+      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.", valide: relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`, en_cours: "Un agent est en train de remplir le formulaire sur le site.", envoyee: `Envoyée par un agent${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via ? " via " + e.via : ""}.`, bloquee: `L'agent n'a pas pu finir : ${e.raison || "raison inconnue"}. Termine-la toi-même avec « Postuler » plus bas.` }[e.statut] || "";
       box.innerHTML = `<span class="lbl" style="font-weight:600">🤖 Agents Jobello</span><p style="margin:0">${esc(t)}</p>
         <div class="row">${e.statut === "a_valider" ? `<button type="button" class="small primary" data-ag="ok" data-id="${esc(c.id)}">Envoyer</button>` : ""}${["a_valider", "valide", "bloquee"].includes(e.statut) ? `<button type="button" class="small ghost" data-ag="stop" data-id="${esc(c.id)}">${e.statut === "bloquee" ? "Je m'en occupe" : "Ne pas l'envoyer"}</button>` : ""}${e.statut === "bloquee" ? `<button type="button" class="small" data-ag="retry" data-id="${esc(c.id)}">Réessayer</button>` : ""}</div>`;
       sh.after(box);
@@ -260,7 +323,7 @@
     if (a === "ok") c.envoi = { ...c.envoi, statut: "valide", valideLe: new Date().toISOString() };
     if (a === "retry") c.envoi = { ...c.envoi, statut: "valide", raison: "", essais: (c.envoi.essais || 0) + 1 };
     if (a === "stop") c.envoi = { ...c.envoi, statut: "annulee", auto: false };
-    if (await saveCand(c)) { toast(a === "stop" ? "D'accord, les agents n'y touchent plus" : `Les agents l'enverront vers ${nextSlot()}`); closeSheet(); render(); preparer(); }
+    if (await saveCand(c)) { toast(a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : `Les agents l'enverront vers ${nextSlot()}`); closeSheet(); render(); preparer(); }
   }
 
   /* ---------- Branchements ---------- */
@@ -268,6 +331,8 @@
     const s = e.target.closest && e.target.closest("[data-sw],[data-ag]"); if (!s) return;
     if (s.dataset.ag) { e.preventDefault(); e.stopPropagation(); return agAction(s.dataset.ag, s.dataset.id); }
     const a = s.dataset.sw; if (a === "valider") return; e.preventDefault(); e.stopPropagation();
+    if (a === "lier") return openLien();
+    if (a === "lien-ok" || a === "lien-off") return lienAction(a);
     if (a === "open") return openDeck();
     if (a === "close") { const vers = deck && deck.oui; closeDeck(); if (vers) document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (a === "yes") return decide(true);
@@ -283,12 +348,14 @@
 
   const _render = render;
   render = function () { const r = _render.apply(this, arguments); try { drawPanel(); clearTimeout(render.agT); render.agT = setTimeout(preparer, 1500); } catch (e) {} return r; };
-  clearInterval(window.__agTick); window.__agTick = setInterval(() => { try { if (!document.hidden) drawPanel(); } catch {} }, 60000);
+  clearInterval(window.__agTick); window.__agTick = setInterval(() => { try { if (!document.hidden) { drawPanel(); majLien().then(() => reveil()); } } catch {} }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) majLien().then(() => reveil()); });
   let hooked = false;
   (function hook() {
     if (!(state && state.db)) return setTimeout(hook, 800);
     if (hooked) return; hooked = true;
     state.db.doc("demandes/envois").onSnapshot((snap) => { cfg = { valider: false, ...(snap.exists ? snap.data() : {}) }; try { drawPanel(); } catch {} }, () => {});
     if (new URLSearchParams(location.search).has("swipe")) setTimeout(() => { if (ready()) openDeck(); }, 1200);
+    setTimeout(() => majLien().then(() => reveil()), 2500);
   })();
 })();
