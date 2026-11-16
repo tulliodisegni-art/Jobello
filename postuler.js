@@ -219,15 +219,16 @@
     const sub = ko ? "La clé ne marche plus : touche ici pour la remplacer" : lien.enCours ? "Les agents travaillent sur ton ordi en ce moment" : "Chaque swipe part tout de suite" + (lien.dernier ? " · dernier départ " + heure(lien.dernier) : "");
     return `<button type="button" class="ag-link on${ko ? " ko" : ""}" data-sw="lier"><span class="ic">⚡</span><span class="tx"><b>Téléphone et ordi reliés</b><small>${esc(sub)}</small></span><span class="ch">›</span></button>`;
   }
+  const tacheURL = () => lien && /^trig_[A-Za-z0-9]+$/.test(lien.tache || "") ? "https://claude.ai/code/routines/" + lien.tache : "https://claude.ai/code/routines";
   function openLien() {
     const on = relie();
     openSheet(`<div class="sheet-head"><div style="min-width:0"><span class="label">Départ immédiat</span><h2>Relier mon téléphone et mon ordi</h2></div><button type="button" class="ghost" data-act="close">Fermer</button></div>
       <p>${on ? "C'est relié : chaque offre swipée à droite part tout de suite dans Chrome sur ton ordinateur, sans attendre l'heure. Pour changer de clé, refais les étapes ci-dessous." : "À faire une seule fois, sur ton ordinateur. Ensuite, chaque offre swipée à droite part tout de suite dans Chrome, sans attendre l'heure."}</p>
       <ol class="ag-steps">
-        <li>Ouvre la page de tes tâches Claude : <a href="https://claude.ai/code/routines" target="_blank" rel="noopener">claude.ai/code/routines</a></li>
-        <li>Clique sur la tâche « Agents Jobello », puis sur le menu à côté de son nom, et choisis « Modifier » (Edit).</li>
-        <li>Dans la ligne « Déclencheur » (Trigger), clique sur + puis sur « API ». Clique sur « Générer un jeton » (Generate token) et copie le jeton.</li>
-        <li>Colle-le ici :<input id="lien-tok" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></li>
+        <li>Ouvre ta tâche Claude « Agents Jobello » : <a href="${tacheURL()}" target="_blank" rel="noopener">ouvrir la tâche</a></li>
+        <li>Clique sur la petite flèche à côté de son nom, puis sur « Modifier ».</li>
+        <li>Dans « Déclencheur », clique sur + puis sur « API ». Clique sur « Générer un token » et copie-le.</li>
+        <li>Colle-le ici (Ctrl+V) :<input id="lien-tok" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></li>
       </ol>
       <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="primary" data-sw="lien-ok">Relier</button>${on ? `<button type="button" class="ghost" data-sw="lien-off">Couper le lien</button>` : ""}</div>
       <p class="ag-meta">Le jeton reste rangé dans le coffre de ta base Jobello : l'appli ne le réaffiche jamais. Il sert seulement à réveiller tes agents.</p>`, "lien");
