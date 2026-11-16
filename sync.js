@@ -46,6 +46,13 @@
     async putBlob(id, blob) { const { error } = await sb.storage.from("fichiers").upload(user.id + "/" + id, blob, { upsert: true, contentType: blob.type || "application/octet-stream" }); if (error) throw error; },
     async getBlob(id) { const { data, error } = await sb.storage.from("fichiers").download(user.id + "/" + id); return error ? null : data; },
   };
+  /* Lien temporaire vers un fichier (pour les agents qui joignent CV et lettre sur les sites de candidature) */
+  window.jobelloFileLink = async (id, blob, secs) => {
+    if (!sb || !user) throw new Error("hors ligne");
+    if (blob) await remote.putBlob(id, blob);
+    const { data, error } = await sb.storage.from("fichiers").createSignedUrl(user.id + "/" + id, secs || 14 * 86400);
+    if (error) throw error; return data.signedUrl;
+  };
 
   async function start() {
     if (!sb) { ready(); return; } // pas de base en ligne configurée : tout reste sur ce téléphone
