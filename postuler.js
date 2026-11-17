@@ -22,6 +22,8 @@
   .ag-it.run .dot{background:var(--accent);animation:agp 1.1s ease-in-out infinite}
   .ag-link{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 10px;padding:11px 14px;border-radius:14px;border:1.5px dashed var(--accent);background:var(--surface);color:var(--fg);font:inherit;cursor:pointer}
   .ag-link.on{border-style:solid;border-color:var(--line)}.ag-link.ko{border-color:var(--s-follow)}
+  a.ag-link{text-decoration:none}.ag-link.run{cursor:default;border-style:solid;border-color:var(--line)}.ag-link.run .ic{animation:agp 1.6s ease-in-out infinite}
+  .sw-end .btn.primary{padding:12px 18px;font-size:1rem}
   .ag-link .ic{flex:none;font-size:1.25rem}.ag-link .tx{flex:1;min-width:0;display:flex;flex-direction:column}.ag-link small{color:var(--muted);font-size:.82rem}.ag-link .ch{flex:none;font-size:1.3rem;color:var(--muted)}
   .ag-steps{margin:14px 0;padding-left:22px;display:flex;flex-direction:column;gap:12px;line-height:1.45}
   .ag-steps input{width:100%;margin-top:6px}
@@ -134,10 +136,13 @@
     const o = deck.list[deck.i], nx = deck.list[deck.i + 1], reste = deck.list.length - deck.i;
     const head = `<div class="sw-top"><div><h2>Swipe et ça part</h2><span class="n">${o ? `${reste} offre${reste > 1 ? "s" : ""} · ${deck.oui} envoyée${deck.oui > 1 ? "s" : ""} aux agents` : ""}</span></div><button type="button" class="ghost" data-sw="close">Fermer</button></div>`;
     if (!o) {
+      const lc = !!(deck.oui && lien && lien.lancer), lanc = lc && !lien.enCours;
+      const depart = relie() ? "Ça part tout de suite." : lc && lien.enCours ? "Tes agents sont déjà au travail : ils prennent aussi ces offres." : lanc ? `Pour qu'ils partent tout de suite, touche ⚡ ci-dessous, puis « Exécuter maintenant » sur la page qui s'ouvre. Sinon, ils partent vers ${nextSlot()}.` : `Prochain passage vers ${nextSlot()}.`;
       ov.innerHTML = head + `<div class="sw-end"><span class="big">${deck.oui ? "🚀" : "✨"}</span>
         <b>${deck.oui ? `${deck.oui} candidature${deck.oui > 1 ? "s" : ""} confiée${deck.oui > 1 ? "s" : ""} aux agents` : "Plus d'offre à trier pour l'instant"}</b>
-        <span class="muted">${deck.oui ? `Claude prépare CV et lettre pendant que les agents postulent en même temps sur ton ordinateur (Chrome ouvert). ${relie() ? "Ça part tout de suite." : `Prochain passage vers ${nextSlot()}.`} Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>
-        <button type="button" class="primary" data-sw="close">${deck.oui ? "Voir mes agents" : "Fermer"}</button></div>`;
+        <span class="muted">${deck.oui ? `Claude prépare CV et lettre pendant que les agents postulent en même temps sur ton ordinateur (Chrome ouvert). ${depart} Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>
+        ${lanc ? `<a class="btn primary" href="${tacheURL()}" target="_blank" rel="noopener" data-lancer>⚡ Lancer mes agents maintenant</a>` : ""}
+        <button type="button" class="${lanc ? "ghost" : "primary"}" data-sw="close">${deck.oui ? "Voir mes agents" : "Fermer"}</button></div>`;
       return;
     }
     ov.innerHTML = head + `<div class="sw-stack">${nx ? cardHTML(nx, true) : ""}${cardHTML(o)}</div>
@@ -213,6 +218,7 @@
   /* ---------- Départ immédiat : relier le téléphone et l'ordi ---------- */
   const heure = (iso) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   function lienHTML() {
+    if (lien && lien.lancer) return lancerHTML();
     if (!lien || !lien.disponible) return "";
     if (!relie()) return `<button type="button" class="ag-link" data-sw="lier"><span class="ic">⚡</span><span class="tx"><b>Relier mon téléphone et mon ordi</b><small>Une seule fois : ensuite chaque swipe part tout de suite</small></span><span class="ch">›</span></button>`;
     const ko = lien.statut && lien.statut >= 400;
@@ -220,6 +226,15 @@
     return `<button type="button" class="ag-link on${ko ? " ko" : ""}" data-sw="lier"><span class="ic">⚡</span><span class="tx"><b>Téléphone et ordi reliés</b><small>${esc(sub)}</small></span><span class="ch">›</span></button>`;
   }
   const tacheURL = () => lien && /^trig_[A-Za-z0-9]+$/.test(lien.tache || "") ? "https://claude.ai/code/routines/" + lien.tache : "https://claude.ai/code/routines";
+  /* Lancer les agents tout de suite : le bouton ⚡ ouvre la tâche Claude « Agents Jobello », où on touche « Exécuter maintenant » */
+  const aEnvoyer = () => ready() && ((state.demandes?.liste || []).some((d) => d.auto && d.statut === "en_attente") || state.cands.some((c) => c.statut === "a_envoyer" && c.envoi && c.envoi.statut === "valide"));
+  const lanceLe = () => +localStorage.getItem("jb-lance") || 0;
+  function lancerHTML() {
+    if (lien.enCours) return `<div class="ag-link run"><span class="ic">⚡</span><span class="tx"><b>Tes agents sont au travail</b><small>Ils postulent sur ton ordinateur${lien.enCoursLe ? " depuis " + heure(lien.enCoursLe) : ""}</small></span></div>`;
+    if (!aEnvoyer()) return "";
+    const t = lanceLe(), recent = Date.now() - t < 4 * 60e3;
+    return `<a class="ag-link${recent ? " on" : ""}" href="${tacheURL()}" target="_blank" rel="noopener" data-lancer><span class="ic">⚡</span><span class="tx"><b>${recent ? "Lancement demandé à " + heure(t) : "Lancer mes agents maintenant"}</b><small>${recent ? "Les agents démarrent en une minute environ si tu as touché « Exécuter maintenant ». Sinon, touche ici." : "Sur la page qui s'ouvre, touche « Exécuter maintenant »"}</small></span><span class="ch">›</span></a>`;
+  }
   function openLien() {
     const on = relie();
     openSheet(`<div class="sheet-head"><div style="min-width:0"><span class="label">Départ immédiat</span><h2>Relier mon téléphone et mon ordi</h2></div><button type="button" class="ghost" data-act="close">Fermer</button></div>
@@ -256,8 +271,7 @@
   const surOrdi = () => !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) && matchMedia("(pointer: fine)").matches;
   async function reveil(force) {
     if (!relie() || !ready() || !surOrdi()) return;
-    const attente = (state.demandes?.liste || []).some((d) => d.auto && d.statut === "en_attente") || state.cands.some((c) => c.statut === "a_envoyer" && c.envoi && c.envoi.statut === "valide");
-    if (!attente || lien.enCours) return;
+    if (!aEnvoyer() || lien.enCours) return;
     const p = cfg.passage; if (!force && p && p.chrome === false && Date.now() - new Date(p.le).getTime() < 30 * 60e3) return;
     const last = +localStorage.getItem("jb-reveil") || 0; if (!force && Date.now() - last < 10 * 60e3) return;
     localStorage.setItem("jb-reveil", String(Date.now()));
@@ -343,6 +357,12 @@
     if (a === "no") return decide(false);
     if (a === "undo") return undo();
   }, true);
+  document.addEventListener("click", (e) => {
+    if (!(e.target.closest && e.target.closest("a[data-lancer]"))) return; // le lien s'ouvre normalement (nouvel onglet)
+    localStorage.setItem("jb-lance", String(Date.now()));
+    setTimeout(() => { try { drawPanel(); } catch {} }, 400);
+    setTimeout(majLien, 75e3);
+  });
   document.addEventListener("change", async (e) => {
     const s = e.target.closest && e.target.closest('[data-sw="valider"]'); if (!s) return;
     cfg = { ...cfg, valider: s.checked };
