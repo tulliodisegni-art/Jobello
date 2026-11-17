@@ -1960,7 +1960,8 @@ function visioBox(c) {
   const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "date à préciser";
   return `<div class="visio-box"><div><span class="label">Entretien${(c.entretiens || []).length ? " n° " + ((c.entretiens || []).length + 1) : ""}</span><strong style="display:block">${esc(when)}${c.typeEntretien ? " · " + esc(c.typeEntretien) : ""}</strong>${c.avecQui ? `<span class="muted" style="font-size:.85rem;display:block">Avec ${esc(c.avecQui)}</span>` : ""}${c.lieuEntretien ? `<a href="https://maps.apple.com/?q=${enc(c.lieuEntretien)}" target="_blank" rel="noopener" style="font-size:.88rem">📍 ${esc(c.lieuEntretien)}</a>` : ""}</div>
     ${c.lienVisio ? joinHTML(c) : isVisio ? `<div class="field"><label for="vx-link">Coller le lien Teams</label><input id="vx-link" placeholder="Colle ici le lien ou toute l'invitation reçue par e-mail"></div>
-      <div class="row"><button type="button" class="small" data-act="paste-visio">Coller depuis le presse-papiers</button><button type="button" class="small primary" data-act="save-visio">Enregistrer le lien</button></div>` : ""}</div>`;
+      <div class="row"><button type="button" class="small" data-act="paste-visio">Coller depuis le presse-papiers</button><button type="button" class="small primary" data-act="save-visio">Enregistrer le lien</button></div>` : ""}
+    ${c.statut === "entretien" && c.dateEntretien > todayISO() ? `<div class="row"><button type="button" class="small" data-act="nr-done">Je l'ai déjà passé</button></div>` : ""}</div>`;
 }
 function briefHTML(c) {
   if (!c.resume && !(c.motsCles || []).length && !c.canal) return "";
@@ -3156,6 +3157,7 @@ function drawCandSum() {
     <div class="brief"><div class="meta">${chips.map((x, i) => `<span${i ? "" : ' class="canal"'}>${esc(x)}</span>`).join("")}</div>
       ${next ? `<p style="margin:0"><b>${esc(next)}</b>${pc ? ` <button type="button" class="small" data-contact="${esc(pc.id)}">Ouvrir ${esc(firstName(pc.nom))}</button>` : ""}</p>` : ""}
       ${c.contact ? `<p class="muted" style="margin:0;font-size:.88rem">Contact : ${esc(c.contact)}</p>` : ""}
+      ${afterInterview(c) ? `<div class="row"><button type="button" class="primary" data-act="go-suite">✅ Entretien fait → et ensuite ?</button></div>` : ""}
       ${c.statut !== "a_envoyer" ? `<div class="row brief-offre">${c.description ? `<button type="button" class="small" data-act="sum-annonce">Relire l'annonce</button>` : ""}${offerLinks(c, false)}</div>` : ""}
       ${md === "prestataire" ? `<p class="muted" style="margin:0;font-size:.85rem">Société de prestation : tu serais salarié chez eux mais en mission chez un client. Deuxième choix, garde la priorité aux postes en direct.${(societeOf(c) || cibleOf(c))?.modeNote ? " " + esc((societeOf(c) || cibleOf(c)).modeNote) : ""}</p>` : ""}</div>
     ${replyBoxHTML(c)}
@@ -3532,15 +3534,15 @@ function suiviHTML(c) {
   if (!afterInterview(c)) return "";
   const mail = [c.email, c.contact, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
   const msg = c.messageMerci || thanksText(c);
-  return `<div class="relance-box"><span class="lbl" style="font-weight:600">Après l'entretien</span>
-    ${c.notesEntretien ? suiteHTML(c, true) : ""}
+  return `<div class="relance-box" id="apres-entretien"><span class="lbl" style="font-weight:600">✅ Entretien fait : et ensuite ?</span>
+    ${suiteHTML(c, true)}
+    <details class="sec"${c.notesEntretien || needThanks(c) ? " open" : ""}><summary>Mes notes et le remerciement <small>${c.remerciement ? "remerciement envoyé" : c.notesEntretien ? "notes prises" : ""}</small></summary><div class="body">
     <div class="field"><label for="ni-notes">Ce qui s'est dit (questions posées, prochaines étapes, noms)</label><textarea id="ni-notes" rows="4">${esc(c.notesEntretien || "")}</textarea></div>
     ${c.remerciement ? `<p class="muted" style="margin:0">Remerciement envoyé le ${fmt(c.remerciement)}.</p>` : `<span class="lbl">Message de remerciement, à envoyer le jour même</span>
     <textarea id="ni-msg" rows="7">${esc(msg)}</textarea>
     <div class="row">${copyBtn("ni-msg")}${mail ? `<a class="btn primary" data-relance="mail" href="mailto:${esc(mail[0])}?subject=${enc("Merci pour notre échange – " + (c.poste || ""))}&body=${enc(msg)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}
       <button type="button" class="small" data-act="ni-ai">Personnaliser avec mes notes</button><button type="button" data-act="ni-sent">C'est envoyé</button></div>`}
-    <div class="row"><button type="button" class="small" data-act="ni-save">Enregistrer mes notes</button></div>
-    ${c.notesEntretien ? "" : suiteHTML(c)}</div>`;
+    <div class="row"><button type="button" class="small" data-act="ni-save">Enregistrer mes notes</button></div></div></details></div>`;
 }
 /* ---------- Suite d'une candidature après un entretien, jusqu'au point final ---------- */
 let suiteMode = "";
@@ -3569,7 +3571,7 @@ function suiteHTML(c, top) {
       <div class="row"><button type="button" class="primary" data-act="suite-offre">Enregistrer l'offre</button></div>`,
     refus: `<div class="field"><label for="su-why">Ce qu'ils ont dit (pour t'améliorer)</label><textarea id="su-why" rows="3"></textarea></div><div class="row"><button type="button" class="primary" data-act="suite-refus">Clôturer la candidature</button></div>`
   };
-  return `<div class="suite${top ? " top" : ""}"><span class="lbl" style="font-weight:600">Et ensuite ?</span>${top ? `<span class="muted" style="font-size:.86rem">Tes notes sont enregistrées. Choisis ce qui se passe maintenant.</span>` : ""}
+  return `<div class="suite${top ? " top" : ""}" id="suite"><span class="muted" style="font-size:.86rem">Dis-moi ce qui se passe maintenant : je range cet entretien et je prépare la suite.</span>
     <div class="seg" role="group" aria-label="Suite">${opt.map(([k, l]) => `<button type="button" data-act="suite-mode" data-mode="${k}" aria-pressed="${suiteMode === k}">${l}</button>`).join("")}</div>
     ${suiteMode ? form[suiteMode] : ""}</div>`;
 }
@@ -4212,6 +4214,7 @@ $("#overlay").addEventListener("click", async (e) => {
     }
     if (act === "ap-msg-ai") return apMsgAI(t);
     if (act === "q-ai") return qPosteAI(t);
+    if (act === "go-suite") { const el = $("#apres-entretien"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (act === "suite-mode") { const sc = $("#overlay .sheet")?.scrollTop; editing.notesEntretien = $("#ni-notes")?.value ?? editing.notesEntretien; suiteMode = suiteMode === t.dataset.mode ? "" : t.dataset.mode; drawCandSum(); const sh = $("#overlay .sheet"); if (sh && sc != null) sh.scrollTop = sc; return; }
     if (act.startsWith("suite-") || act === "nr-save" || act === "nr-done" || act === "offre-ok" || act === "offre-non") {
       const c = editing, today = todayISO(); if ($("#ni-notes")) c.notesEntretien = $("#ni-notes").value; let msg = "Enregistré";
