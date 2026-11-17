@@ -586,6 +586,8 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .ccard .cc-next .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 4px; }
 .ccard .cc-next.late { color: var(--s-refused); }
 
+.annonce-t.ann{white-space:normal;max-height:none;overflow:visible}.ann h4{margin:12px 0 4px;font-size:.92rem;color:var(--accent)}.ann h4:first-child{margin-top:4px}.ann p{margin:0 0 6px}.ann ul{margin:0 0 6px;padding-left:18px;display:grid;gap:3px}
+.skills.sk-edit li{grid-template-columns:22px 1fr auto}.sk-b{margin-left:0;align-self:center;white-space:nowrap}.ia-wait{display:grid;gap:6px}
 .annonce{border-top:1px solid var(--line);padding-top:8px}.annonce summary{cursor:pointer;font-weight:600;font-size:.9rem}.annonce-t{white-space:pre-wrap;font-size:.88rem;line-height:1.5;max-height:60vh;overflow:auto;margin-top:6px}.brief-offre:empty{display:none}.rr-box .body{display:grid;gap:10px}.rr-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media (max-width:520px){.rr-who{grid-template-columns:1fr}}.rr-mail summary{cursor:pointer;font-weight:600;font-size:.9rem}.rr-mail[open]{display:grid;gap:8px}.rr-dt input{flex:1;min-width:0}.rr-slots input[list]{flex:1.3}.rp-alts{display:grid;gap:6px}.rp-alts .row{flex-wrap:nowrap;gap:6px}.rp-alts input{flex:1;min-width:0}.rp-alts span{font-size:.85rem}
 .stop-row{gap:6px;align-items:center;font-size:.85rem}.stop-row+.stop-row{margin-top:-4px}
 .ag-sec { display: flex; flex-direction: column; gap: 8px; }
@@ -1592,8 +1594,8 @@ function qPosteHTML(c) {
   if (!Q.length && !live) return "";
   const body = Q.length ? `<div class="qa-list">${Q.map((x) => `<details class="qa"><summary><span>${esc(x.q)}</span></summary><div class="qa-b"><p class="qa-a">${esc(x.a)}</p></div></details>`).join("")}</div>
       <p class="muted" style="margin:0;font-size:.8rem">Les questions générales (parcours, motivation, salaire…) sont dans l'onglet CV, « S'entraîner à l'entretien ».</p>`
-    : `<p class="muted" style="margin:0;font-size:.86rem">Claude prépare 5 questions probables pour ce poste, avec des réponses tirées de ton CV.</p><div class="row"><button type="button" class="small primary" data-act="q-ai">Préparer les 5 questions</button></div>`;
-  return `<details class="sec"${c.statut === "entretien" ? " open" : ""}><summary>Questions probables pour ce poste <small>${Q.length || "à préparer"}</small></summary><div class="body">${body}</div></details>`;
+    : `<p class="muted" style="margin:0;font-size:.86rem">Claude prépare 5 questions probables pour ce poste, avec des réponses tirées de ton CV.</p>${iaBoutonHTML(c, "questions", "Préparer les 5 questions", `<button type="button" class="small primary" data-act="q-ai">Préparer les 5 questions</button>`, true)}`;
+  return `<details class="sec" id="sec-qposte"${c.statut === "entretien" ? " open" : ""}><summary>Questions probables pour ce poste <small>${Q.length || "à préparer"}</small></summary><div class="body">${body}</div></details>`;
 }
 async function qPosteAI(btn) {
   const c = editing; if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
@@ -3138,7 +3140,7 @@ function drawCandSum() {
     + ((c.preparation || []).length ? `<span class="lbl">Pense-bête pour l'entretien</span><ul style="margin:0">${c.preparation.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
     + (c.conseilRelance ? `<div class="tip">${esc(c.conseilRelance)}</div>` : "")
     + salaryLine(c, societeOf(c))
-    + `<details class="annonce" id="annonce"><summary>${c.description ? "Lire l'annonce complète" : "Annonce non gardée"}</summary>${c.description ? `<div class="annonce-t">${esc(c.description)}</div>` : `<p class="muted" style="margin:0;font-size:.88rem">Ouvre l'offre tant qu'elle est en ligne, copie son texte et colle-le dans « Modifier les infos » (Texte de l'offre) : tu pourras la relire ici même quand l'annonce aura disparu.</p>`}</details>`
+    + `<details class="annonce" id="annonce"><summary>${c.description || c.annonce ? "Lire l'annonce complète" : "Annonce non gardée"}</summary>${c.description || c.annonce ? annonceHTML(c) : `<p class="muted" style="margin:0;font-size:.88rem">Ouvre l'offre tant qu'elle est en ligne, copie son texte et colle-le dans « Modifier les infos » (Texte de l'offre) : tu pourras la relire ici même quand l'annonce aura disparu.</p>`}</details>`
     + `<div class="row">${offerLinks(c, false)}</div>`;
   const stopRow = `<div class="row stop-row"><span class="muted">Ils ont répondu ?</span><button type="button" class="small" data-act="rel-refus">C'est un refus</button><button type="button" class="small" data-act="rel-mail">Importer leur mail</button></div><div class="row stop-row"><span class="muted">Ou bien :</span><button type="button" class="small" data-act="rel-later">Plus tard (7 j)</button><button type="button" class="small" data-act="rel-pause">En pause</button><button type="button" class="small ghost danger" data-act="rel-stop">J'abandonne ce poste</button></div>`;
   const relBox = rt ? `<div class="relance-box"><span class="lbl" style="font-weight:600">${needsRecruiter(c) && rt.k === "li" ? "Trouver un recruteur LinkedIn" : "Relancer"}</span>${stopRow}
@@ -3294,21 +3296,192 @@ N'invente pas de faits précis : si tu n'es pas sûr, laisse le champ vide. Pas 
   } catch (e) { toast(e?.code === "invalid_json" ? "La fiche n'a pas abouti, réessaie." : aiError(e)); btn.disabled = false; btn.textContent = "Créer la fiche avec Claude"; }
 }
 
+/* ---------- Préparation d'entretien et 5 questions sans clé Anthropic ----------
+   La demande part à Claude du projet (demandes/ia) ; la tâche « Claude pour Jobello » la traite
+   à ses passages (8h27, 12h27, 18h27) ou tout de suite si tu touches « Exécuter maintenant » sur sa page,
+   et range le résultat dans la candidature (prepa, questionsEntretien). */
+const IA_SLOTS = [8 * 60 + 27, 12 * 60 + 27, 18 * 60 + 27];
+const iaTache = () => { const t = state.ia && state.ia.tache; return /^trig_[A-Za-z0-9]+$/.test(t || "") ? t : ""; };
+const iaURL = () => "https://claude.ai/code/routines/" + iaTache();
+const iaParClaude = () => sansCle() && !!iaTache();
+const iaDemande = (cand, type) => (state.ia?.liste || []).filter((d) => d.cand === cand && d.type === type && (d.statut === "en_attente" || d.statut === "en_cours")).pop();
+const hhmmIso = (iso) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function iaProchain() { const m = parisMin(), x = IA_SLOTS.find((v) => v > m); return x != null ? `vers ${hhmm(x + 5)}` : `demain vers ${hhmm(IA_SLOTS[0] + 5)}`; }
+function iaBoutonHTML(c, type, label, normal, primary) {
+  if (!iaParClaude() || !c.id) return `<div class="row">${normal}</div>`;
+  const d = iaDemande(c.id, type);
+  if (d) return `<div class="ia-wait"><p class="muted" style="margin:0;font-size:.86rem">⏳ ${d.statut === "en_cours" ? "Claude s'en occupe en ce moment : ça arrive ici dans une ou deux minutes." : `Demandé à Claude à ${hhmmIso(d.demandeLe)}. Ça arrive ici dès que sa tâche a tourné : tout de suite si tu as touché « Exécuter maintenant », sinon au prochain passage (${iaProchain()}).`}</p>${d.statut === "en_cours" ? "" : `<div class="row"><a class="btn small primary" href="${iaURL()}" target="_blank" rel="noopener" data-ia-go>⚡ Lancer maintenant</a></div>`}</div>`;
+  return `<div class="row"><a class="btn small${primary ? " primary" : ""}" href="${iaURL()}" target="_blank" rel="noopener" data-ia="${type}">${esc(label)} ⚡</a></div><p class="muted" style="margin:0;font-size:.8rem">Sur la page Claude qui s'ouvre, touche « Exécuter maintenant » : c'est prêt ici en 2 à 3 minutes, sans clé payante.</p>`;
+}
+async function demanderIA(type, c) {
+  if (!state.db || !c || !c.id) { toast("Enregistre d'abord la candidature"); return false; }
+  let cur = state.ia || {};
+  try { const sn = await state.db.doc("demandes/ia").get(); if (sn.exists) cur = sn.data(); } catch {}
+  const liste = (cur.liste || []).filter((d) => !(d.cand === c.id && d.type === type && d.statut !== "fait")).concat({ id: Math.random().toString(36).slice(2, 12), type, cand: c.id, entreprise: c.entreprise || "", poste: c.poste || "", statut: "en_attente", demandeLe: new Date().toISOString() }).slice(-40);
+  const doc = { ...cur, liste };
+  try { await state.db.doc("demandes/ia").set(doc); state.ia = doc; return true; } catch { toast("La demande n'a pas pu partir. Réessaie."); return false; }
+}
+/* Redessine la fiche ouverte en gardant la position et les parties ouvertes */
+function redessinerFiche(ouvrir) {
+  if (sheetKind !== "candsum" || !editing) return;
+  const sh = $("#overlay .sheet"), sc = sh ? sh.scrollTop : 0, open = [...document.querySelectorAll("#overlay details[id]")].filter((d) => d.open).map((d) => d.id);
+  try { drawCandSum(); } catch { return; }
+  open.concat(ouvrir || []).forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
+  const s2 = $("#overlay .sheet"); if (s2) s2.scrollTop = sc;
+}
+/* Quand Claude a rangé la préparation (ou l'annonce) dans la candidature ouverte, la fiche se met à jour toute seule */
+function iaRafraichir() {
+  if (sheetKind !== "candsum" || !editing || !editing.id) return;
+  const f = state.cands.find((x) => x.id === editing.id); if (!f) return;
+  const ks = ["prepa", "questionsEntretien", "annonce"].filter((k) => f[k] && JSON.stringify(f[k]) !== JSON.stringify(editing[k] || null));
+  const attente = !!(iaDemande(editing.id, "prepa") || iaDemande(editing.id, "questions")), affiche = !!$("#overlay .ia-wait");
+  if (!ks.length && attente === affiche) return;
+  ks.forEach((k) => { editing[k] = structuredClone(f[k]); });
+  redessinerFiche(ks.includes("prepa") ? ["sec-prepa"] : ks.includes("questionsEntretien") ? ["sec-qposte"] : []);
+}
+document.addEventListener("click", (e) => {
+  const a = e.target.closest && e.target.closest("a[data-ia]"); if (!a) return; // le lien ouvre la tâche Claude (nouvel onglet)
+  const c = editing, type = a.dataset.ia; if (!c || !c.id) return;
+  demanderIA(type, c).then((ok) => { if (ok) { toast("C'est noté : sur la page Claude, touche « Exécuter maintenant »"); redessinerFiche([type === "prepa" ? "sec-prepa" : "sec-qposte"]); } });
+});
+
+/* ---------- L'annonce complète, rangée : l'entreprise, le poste, les missions, le profil, les plus, salaire et conditions ----------
+   c.annonce = version rangée par Claude ; sinon on range au mieux le texte gardé (c.description). */
+const ANN_PARTS = [["entreprise", "L'entreprise"], ["poste", "Le poste"], ["missions", "Tes missions"], ["profil", "Le profil recherché"], ["atouts", "Les plus"], ["conditions", "Salaire et conditions"], ["autres", "À savoir aussi"]];
+const ANN_MARK = [
+  ["entreprise", /(?:qui sommes[- ]nous|à propos de nous|à propos|l'entreprise|notre société|la société|présentation de l'entreprise|l'employeur)\s*\??\s*:/gi],
+  ["missions", /(?:vos |tes |les |principales |ses )?(?:missions?(?: principales)?|responsabilités|activités principales|description du poste|descriptif du poste|votre rôle|ton rôle|le poste|ce que vous ferez)\s*:/gi],
+  ["profil", /(?:votre |ton |le )?(?:profil(?: recherché| souhaité| attendu)?|compétences(?: requises| attendues| techniques| recherchées)?|qualifications|prérequis|exigences|savoir[- ]faire|savoir[- ]être|formation(?: et expérience)?|expérience requise)\s*:/gi],
+  ["atouts", /(?:atouts?|les plus|un plus|serait un plus|appréciés?|bonus|souhaités?)\s*:/gi],
+  ["conditions", /(?:avantages|rémunération|salaire|conditions(?: de travail)?|package|type de contrat|contrat|localisation|lieu(?: de travail)?|télétravail|horaires|informations complémentaires|ce que nous offrons|ce que nous proposons|pourquoi nous rejoindre)\s*:/gi],
+];
+const ANN_COND = /^(?:salaire|rémunération|avantages?|télétravail|poste basé|basé à|lieu|contrat|cdi|cdd|horaires|prime|mutuelle|tickets? restaurant|rtt|package|statut cadre|démarrage|prise de poste)\b/i;
+const ANN_SOFT = /^(?:personnalité|savoir[- ]être|qualités|vous êtes|tu es|curieux|rigoureux|autonome)\b/i;
+const annCap = (t) => { t = String(t).trim().replace(/^[-–•·*]\s*/, "").replace(/[;.,]\s*$/, ""); return t ? t[0].toUpperCase() + t.slice(1) : ""; };
+const annPhrases = (t) => String(t).replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý«])/).map((x) => x.trim()).filter(Boolean);
+function annListe(t) {
+  t = String(t).trim(); if (!t) return [];
+  const lignes = t.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  if (lignes.length > 1) return lignes.map(annCap).filter(Boolean);
+  const pv = t.split(/\s*;\s*/).filter(Boolean);
+  if (pv.length > 1) return pv.map(annCap).filter(Boolean);
+  const ph = annPhrases(t);
+  return ph.length > 2 ? ph.map(annCap) : [t.replace(/\s+/g, " ")];
+}
+function decouperAnnonce(txt) {
+  const out = {}, add = (k, v) => { if (!v || !String(v).trim()) return; (out[k] = out[k] || []).push(String(v).trim()); };
+  txt = String(txt || "").replace(/\r/g, "").replace(/[ \t]+/g, " ").trim(); if (!txt) return out;
+  // Repère les intitulés (« Missions : », « Profil recherché : »…), en ligne ou seuls sur leur ligne
+  const marks = [];
+  ANN_MARK.forEach(([k, re]) => { re.lastIndex = 0; let m; while ((m = re.exec(txt))) { const avant = txt.slice(Math.max(0, m.index - 2), m.index); if (m.index === 0 || /[\s.;:!?)]$/.test(avant) || /\n/.test(avant)) marks.push({ k, i: m.index, f: m.index + m[0].length }); } });
+  marks.sort((a, b) => a.i - b.i);
+  const parts = []; let pos = 0, cle = "intro";
+  marks.filter((m, j) => !j || m.i >= marks[j - 1].f).forEach((m) => { parts.push([cle, txt.slice(pos, m.i)]); cle = m.k; pos = m.f; });
+  parts.push([cle, txt.slice(pos)]);
+  for (const [k, brut] of parts) {
+    const t = brut.trim(); if (!t) continue;
+    if (k === "intro") {
+      const ph = annPhrases(t);
+      add("entreprise", ph[0]);
+      const reste = ph.slice(1);
+      reste.forEach((x) => add(ANN_COND.test(x) ? "conditions" : "poste", x));
+      continue;
+    }
+    // Dans une partie, les phrases sur le salaire ou les avantages vont dans « Salaire et conditions »
+    const ph = /\n/.test(t) ? [t] : annPhrases(t), garde = [];
+    ph.forEach((x) => { if (k !== "conditions" && ANN_COND.test(x)) add("conditions", annCap(x)); else if (k === "atouts" && ANN_SOFT.test(x)) add("profil", annCap(x)); else garde.push(x); });
+    const corps = garde.join(" ");
+    if (!corps.trim()) continue;
+    if (k === "entreprise" || k === "poste") add(k, corps); else annListe(corps).forEach((x) => add(k, x));
+  }
+  const r = {};
+  for (const [k] of ANN_PARTS) if (out[k]) r[k] = ["entreprise", "poste"].includes(k) ? out[k].join(" ") : out[k];
+  return r;
+}
+function annonceHTML(c) {
+  const a = c.annonce && typeof c.annonce === "object" && Object.keys(c.annonce).length ? c.annonce : decouperAnnonce(c.description);
+  const cond = (Array.isArray(a.conditions) ? a.conditions : a.conditions ? [a.conditions] : []).slice(), vu = cond.join(" ");
+  const deja = { Contrat: /\b(cdi|cdd|contrat|alternance|stage|intérim)\b/i, Lieu: /\b(lieu|basé|localisation|site de)\b/i, Salaire: /(salaire|rémunération|€|k€)/i };
+  const pre = [["Contrat", c.contrat], ["Lieu", c.ville], ["Salaire", c.salaire]].filter(([l, v]) => v && !deja[l].test(vu) && !normTxt(vu).includes(normTxt(v))).map(([l, v]) => `${l} : ${v}`);
+  const parts = { ...a, conditions: pre.concat(cond) };
+  const bloc = (v) => Array.isArray(v) ? (v.filter(Boolean).length ? `<ul>${v.filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "") : v ? String(v).split(/\n{2,}/).map((x) => `<p>${esc(x.trim())}</p>`).join("") : "";
+  const html = ANN_PARTS.map(([k, t]) => { const b = bloc(parts[k]); return b ? `<h4>${t}</h4>${b}` : ""; }).join("");
+  return `<div class="annonce-t ann">${html || `<p>${esc(c.description || "")}</p>`}${c.annonce && c.description ? "" : ""}</div>`;
+}
+
+/* ---------- Compétences d'une offre : « Je l'ai » ----------
+   La compétence passe à ✓ sur cette candidature (et sur les autres qui la demandent), le pourcentage remonte,
+   et elle rejoint ton profil (competencesDetail, niveau 2 « Pratiqué ») pour noter les prochaines offres. */
+const SK_VAL = { oui: 1, partiel: 0.5, non: 0 }, SK_RANG = { bof: 0, tente: 1, fonce: 2 };
+const verdictDe = (sc) => (sc >= 70 ? "fonce" : sc >= 50 ? "tente" : "bof");
+function skRecalc(a) {
+  const sk = a.competences || [], n = sk.length || 1, base = a.scoreIA ?? (+a.score || 0), vIA = a.verdictIA ?? a.verdict ?? "tente";
+  const gain = sk.reduce((t, x) => t + (x.parToi ? SK_VAL.oui - (SK_VAL[x.avant] ?? 0) : 0), 0);
+  const score = Math.max(0, Math.min(97, Math.round(base + gain * Math.min(10, 70 / n)))), vS = verdictDe(score);
+  return { ...a, scoreIA: base, verdictIA: vIA, score, verdict: (SK_RANG[vS] ?? 0) > (SK_RANG[vIA] ?? 0) ? vS : vIA };
+}
+function skMaj(an, j, mode) {
+  const sk = (an.competences || []).map((y) => ({ ...y })), y = sk[j]; if (!y) return an;
+  if (mode === "oui") { if (y.niveau === "oui") return an; sk[j] = { ...y, niveau: "oui", avant: y.niveau || "non", preuveAvant: y.preuve || "", preuve: "D'après toi", parToi: todayISO() }; }
+  else { if (!y.parToi) return an; const { avant, preuveAvant, parToi, ...rest } = y; sk[j] = { ...rest, niveau: avant || "non", preuve: preuveAvant || "" }; }
+  return skRecalc({ ...an, competences: sk });
+}
+const SK_CATS = [[/catia|solidworks|creo|\bnx\b|inventor|python|matlab|excel|vba|plm|windchill|teamcenter|3dexperience|enovia|\bcao\b|\bdao\b|autocad/i, "CAO et outils"], [/calcul|simulation|ansys|abaqus|nastran|hypermesh|dimensionnement|\brdm\b|fatigue|vibration|modal|thermique|éléments finis/i, "Calcul et simulation"], [/essai|validation|qualification|\bdvp\b|banc|instrumentation|mesure/i, "Essais et validation"], [/\biso\b|norme|qualité|amdec|apqp|ppap|iatf|9100|\b8d\b|\bspc\b|\bmsp\b|configuration|revue|risque/i, "Qualité et normes"], [/usinage|injection|matériau|composite|fonderie|soudure|tôlerie|procédé|fabrication|traitement|plasturgie|emboutissage|moulage/i, "Procédés et matériaux"], [/projet|planning|budget|coordination|pilotage|management|encadrement|équipe/i, "Gestion de projet"], [/anglais|allemand|espagnol|italien|langue/i, "Langues"]];
+async function skProfil(nom, mode, c, msg) {
+  const L = (state.profil?.competencesDetail || []).filter((x) => x && x.nom).map((x) => ({ ...x }));
+  const k = normTxt(nom), j = L.findIndex((x) => normTxt(x.nom) === k);
+  if (mode === "oui") {
+    const source = `d'après toi (fiche ${c.entreprise || "candidature"}, ${fmt(todayISO())})`;
+    if (j >= 0) { if ((L[j].niveau ?? 0) >= 2 && !L[j].aConfirmer) return toast(msg); L[j] = { ...L[j], avantFiche: { niveau: L[j].niveau ?? null, source: L[j].source || "", aConfirmer: !!L[j].aConfirmer }, niveau: Math.max(2, L[j].niveau || 0), aConfirmer: false, source, depuisFiche: c.id }; }
+    else L.push({ nom, niveau: 2, source, categorie: (SK_CATS.find(([re]) => re.test(nom)) || [null, "Autres"])[1], aConfirmer: false, depuisFiche: c.id });
+  } else {
+    if (j < 0 || L[j].depuisFiche !== c.id) return toast(msg);
+    if (L[j].avantFiche) { const { avantFiche, depuisFiche, ...rest } = L[j]; L[j] = { ...rest, ...avantFiche }; } else L.splice(j, 1);
+  }
+  await saveProfil({ competencesDetail: L }, msg);
+}
+async function skMarquer(i, mode) {
+  const c = editing, a = c && c.analyse; if (!a || !a.competences?.[i] || !c.id || !state.db) return;
+  const nom = a.competences[i].nom, avant = a.score, k = normTxt(nom);
+  const na = skMaj(a, i, mode); if (na === a) return;
+  try { await state.db.collection("candidatures").doc(c.id).update({ analyse: na, updatedAt: new Date().toISOString() }); } catch { return toast("Enregistrement refusé, réessaie."); }
+  c.analyse = na; const sc = state.cands.find((x) => x.id === c.id); if (sc) sc.analyse = na;
+  // Les autres candidatures qui demandent la même compétence en profitent aussi
+  let autres = 0;
+  for (const o of state.cands) {
+    if (o.id === c.id || !o.analyse?.competences) continue;
+    const j = o.analyse.competences.findIndex((y) => normTxt(y.nom) === k); if (j < 0) continue;
+    const oa = skMaj(o.analyse, j, mode); if (oa === o.analyse) continue;
+    try { await state.db.collection("candidatures").doc(o.id).update({ analyse: oa }); o.analyse = oa; autres++; } catch {}
+  }
+  const plus = autres ? ` (et ${autres} autre${autres > 1 ? "s" : ""} candidature${autres > 1 ? "s" : ""})` : "";
+  const msg = mode === "oui" ? `Ajouté à ton profil : ${nom}. Correspondance ${avant} % → ${na.score} %${plus}` : `C'est retiré. Correspondance ${na.score} %${plus}`;
+  await skProfil(nom, mode, c, msg);
+  redessinerFiche(["sec-fit"]);
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-sk]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); b.disabled = true;
+  skMarquer(+b.dataset.i, b.dataset.sk === "oui" ? "oui" : "retirer");
+});
+
 /* ---------- Préparation d'entretien ---------- */
 const hasInterview = (c) => c.statut === "entretien" || !!c.dateEntretien;
 function fitSummaryHTML(c) {
   const a = c.analyse; if (!a || !(a.competences || []).length && !a.resume) return "";
   const sk = a.competences || [];
-  return `<details class="sec"><summary>Ce poste est-il fait pour toi ? <small>${a.score} % · ${esc(VERD[a.verdict] || "")}</small></summary><div class="body">
+  const bt = (x, i) => !c.id ? "" : x.parToi ? `<button type="button" class="small ghost sk-b" data-sk="retirer" data-i="${i}">Retirer</button>` : x.niveau !== "oui" ? `<button type="button" class="small sk-b" data-sk="oui" data-i="${i}">Je l'ai</button>` : "";
+  return `<details class="sec" id="sec-fit"><summary>Ce poste est-il fait pour toi ? <small>${a.score} % · ${esc(VERD[a.verdict] || "")}</small></summary><div class="body">
     ${a.resume ? `<p style="margin:0">${esc(a.resume)}</p>` : ""}
-    ${sk.length ? `<ul class="skills">${sk.map((x) => { const L = LVL[x.niveau] || LVL.non; return `<li><span class="k" style="color:${L[1]}" title="${L[2]}">${L[0]}</span><span>${esc(x.nom)}<span class="p">${esc(x.preuve || L[2])}</span></span></li>`; }).join("")}</ul>` : ""}
+    ${sk.length ? `<ul class="skills sk-edit">${sk.map((x, i) => { const L = LVL[x.niveau] || LVL.non; return `<li><span class="k" style="color:${L[1]}" title="${L[2]}">${L[0]}</span><span>${esc(x.nom)}<span class="p">${esc(x.preuve || L[2])}</span></span>${bt(x, i)}</li>`; }).join("")}</ul>` : ""}
+    ${c.id && sk.some((x) => x.niveau !== "oui") ? `<p class="muted" style="margin:0;font-size:.8rem">Tu as une de ces compétences et je ne l'ai pas vue ? Touche « Je l'ai » : je l'ajoute à ton profil, le pourcentage remonte, et je m'en servirai pour noter tes prochaines offres.</p>` : ""}
   </div></details>`;
 }
 function prepaHTML(c) {
   if (!hasInterview(c)) return "";
   const p = c.prepa, qa = (a) => (a || []).map((x) => `<details class="qa"><summary>${esc(x.q)}</summary><p>${esc(x.r)}</p></details>`).join("");
   const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "";
-  return `<details class="sec prepa-sec" ${c.dateEntretien >= todayISO() && c.dateEntretien <= addDays(todayISO(), 7) ? "open" : ""}><summary>Préparer l'entretien <small>${esc(when)}</small></summary><div class="body">
+  return `<details class="sec prepa-sec" id="sec-prepa" ${c.dateEntretien >= todayISO() && c.dateEntretien <= addDays(todayISO(), 7) ? "open" : ""}><summary>Préparer l'entretien <small>${esc(when)}</small></summary><div class="body">
     ${p ? `${p.pitch ? `<span class="lbl">Ta présentation (1 minute)</span><p class="pitch">${esc(p.pitch)}</p>` : ""}
       ${p.techniques?.length ? `<span class="lbl">Questions techniques probables</span>${qa(p.techniques)}` : ""}
       ${p.rh?.length ? `<span class="lbl">Questions RH et motivation</span>${qa(p.rh)}` : ""}
@@ -3318,7 +3491,7 @@ function prepaHTML(c) {
       ${p.attention?.length ? `<span class="lbl">Points d'attention</span><ul>${p.attention.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       <span class="muted" style="font-size:.78rem">Préparé le ${fmt(p.date)}${p.origine ? " · " + esc(p.origine) : ""}</span>`
       : `<p class="muted" style="margin:0">Claude prépare la fiche : ta présentation, les questions probables avec des réponses tirées de ton parcours, tes questions à poser et la négociation.</p>`}
-    <div class="row"><button type="button" class="small${p ? "" : " primary"}" data-act="prepa-ai" id="prepa-btn">${p ? "Refaire la préparation" : "Préparer avec Claude"}</button></div>
+    ${iaBoutonHTML(c, "prepa", p ? "Refaire la préparation" : "Préparer avec Claude", `<button type="button" class="small${p ? "" : " primary"}" data-act="prepa-ai" id="prepa-btn">${p ? "Refaire la préparation" : "Préparer avec Claude"}</button>`, !p)}
   </div></details>`;
 }
 async function aiPrepa(btn) {
@@ -4286,13 +4459,14 @@ render();
   use("assets").then((a) => { state.assets = a; });
   use("sample").then((s) => { state.sample = s; });
   use("downloads").then((d) => { state.downloads = d; if (!window.JOBELLO_CONFIG && $("#jb-export")) $("#jb-export").hidden = false; });
-  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; render(); }, () => banner("Tes candidatures ne se chargent plus. Recharge la page."));
+  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; render(); iaRafraichir(); }, () => banner("Tes candidatures ne se chargent plus. Recharge la page."));
   db.collection("documents").onSnapshot((snap) => { state.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("cibles").onSnapshot((snap) => { state.cibles = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("societes").onSnapshot((snap) => { state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); }, () => {});
   db.doc("alertes/jour").onSnapshot((snap) => { if (!alertBusy) { state.alertes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); } }, () => {});
   db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderPrep(); renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
+  db.doc("demandes/ia").onSnapshot((snap) => { state.ia = snap.exists ? snap.data() : null; iaRafraichir(); }, () => {});
   db.doc("alertes/sites").onSnapshot((snap) => { state.sites = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); }, () => {});
   setTimeout(autoAlerts, 2500);
   db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; state.profilVu = true; render(); }, () => {});
