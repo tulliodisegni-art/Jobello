@@ -1912,7 +1912,7 @@ function unlockScroll() {
 }
 function openSheet(html, kind) { sheetKind = kind; $("#overlay").innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`; $("#overlay").hidden = false; lockScroll(); }
 let docBack = null;
-function closeSheet() { suiteMode = ""; docBack = null; aiCtl?.abort(); $("#overlay").hidden = true; $("#overlay").innerHTML = ""; unlockScroll(); editing = null; sheetKind = null; }
+function closeSheet() { suiteMode = ""; hadCallOpen = false; docBack = null; aiCtl?.abort(); $("#overlay").hidden = true; $("#overlay").innerHTML = ""; unlockScroll(); editing = null; sheetKind = null; }
 const opts = (arr, v) => arr.map((x) => Array.isArray(x) ? x : [x, x]).map(([k, l]) => `<option value="${esc(k)}" ${k === v ? "selected" : ""}>${esc(l)}</option>`).join("");
 const datalist = (id, arr) => `<datalist id="${id}">${arr.map((x) => `<option value="${esc(x)}"></option>`).join("")}</datalist>`;
 const uniq = (f) => [...new Set(state.cands.map((c) => (c[f] || "").trim()).filter(Boolean))];
@@ -3157,7 +3157,7 @@ function drawCandSum() {
     <div class="brief"><div class="meta">${chips.map((x, i) => `<span${i ? "" : ' class="canal"'}>${esc(x)}</span>`).join("")}</div>
       ${next ? `<p style="margin:0"><b>${esc(next)}</b>${pc ? ` <button type="button" class="small" data-contact="${esc(pc.id)}">Ouvrir ${esc(firstName(pc.nom))}</button>` : ""}</p>` : ""}
       ${c.contact ? `<p class="muted" style="margin:0;font-size:.88rem">Contact : ${esc(c.contact)}</p>` : ""}
-      ${afterInterview(c) ? `<div class="row"><button type="button" class="primary" data-act="go-suite">✅ Entretien fait → et ensuite ?</button></div>` : ""}
+      ${afterInterview(c) ? `<div class="row"><button type="button" class="primary" data-act="go-suite">✅ Entretien fait → et ensuite ?</button></div>` : hadCallHTML(c)}
       ${c.statut !== "a_envoyer" ? `<div class="row brief-offre">${c.description ? `<button type="button" class="small" data-act="sum-annonce">Relire l'annonce</button>` : ""}${offerLinks(c, false)}</div>` : ""}
       ${md === "prestataire" ? `<p class="muted" style="margin:0;font-size:.85rem">Société de prestation : tu serais salarié chez eux mais en mission chez un client. Deuxième choix, garde la priorité aux postes en direct.${(societeOf(c) || cibleOf(c))?.modeNote ? " " + esc((societeOf(c) || cibleOf(c)).modeNote) : ""}</p>` : ""}</div>
     ${replyBoxHTML(c)}
@@ -3545,7 +3545,18 @@ function suiviHTML(c) {
     <div class="row"><button type="button" class="small" data-act="ni-save">Enregistrer mes notes</button></div></div></details></div>`;
 }
 /* ---------- Suite d'une candidature après un entretien, jusqu'au point final ---------- */
-let suiteMode = "";
+let suiteMode = "", hadCallOpen = false;
+/* Appel ou entretien imprévu : on le note d'un geste, puis « Et ensuite ? » */
+function hadCallHTML(c) {
+  if (archivedCand(c) || c.statut === "offre") return "";
+  if (!hadCallOpen) return `<div class="row"><button type="button" class="primary" data-act="hc-open">📞 J'ai eu un appel / un entretien</button></div>`;
+  return `<div class="relance-box" id="hc-box"><span class="lbl" style="font-weight:600">📞 J'ai eu un appel / un entretien</span>
+    <div class="grid2"><div class="field"><label for="hc-date">Quand</label><input id="hc-date" type="date" value="${todayISO()}" max="${todayISO()}"></div>
+      <div class="field"><label for="hc-type">Comment</label><select id="hc-type">${opts(["Téléphone", "Visio", "Sur place"], "Téléphone")}</select></div></div>
+    <div class="field"><label for="hc-qui">Avec qui</label><input id="hc-qui" placeholder="ex. Mme Martin, recrutement" value="${esc(c.contact || "")}"></div>
+    <div class="field"><label for="hc-notes">Ce qui s'est dit (facultatif)</label><textarea id="hc-notes" rows="3" placeholder="questions posées, prochaines étapes…"></textarea></div>
+    <div class="row"><button type="button" class="primary" data-act="hc-save">Enregistrer et passer à la suite</button><button type="button" class="ghost" data-act="hc-cancel">Annuler</button></div></div>`;
+}
 const ROUND_TYPES = ["Téléphone", "Visio", "Sur place", "Technique sur place", "Avec le manager", "Avec les dirigeants", "RH / dernier entretien"];
 const roundTxt = (r) => [r.date ? fmt(r.date, { day: "numeric", month: "short" }) : "date ?", r.type].filter(Boolean).join(" · ");
 function archiveRound(c) {
@@ -4214,6 +4225,24 @@ $("#overlay").addEventListener("click", async (e) => {
     }
     if (act === "ap-msg-ai") return apMsgAI(t);
     if (act === "q-ai") return qPosteAI(t);
+    if (act === "hc-open" || act === "hc-cancel") { hadCallOpen = act === "hc-open"; drawCandSum(); if (hadCallOpen) $("#hc-box")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (act === "hc-save") {
+      const c = editing, today = todayISO(), d = $("#hc-date").value || today, type = $("#hc-type").value, qui = $("#hc-qui").value.trim(), notes = $("#hc-notes").value.trim();
+      const quoi = type === "Téléphone" ? "Appel" : "Entretien " + type.toLowerCase();
+      if (c.statut === "entretien" && c.dateEntretien && c.dateEntretien > d) {
+        // un entretien est déjà prévu plus tard : on range cet appel sans toucher au prochain
+        c.entretiens = [...(c.entretiens || []), { n: (c.entretiens || []).length + 1, date: d, heure: "", type, lieu: "", notes: [qui && "Avec " + qui, notes].filter(Boolean).join("\n"), merci: "" }];
+        c.historique.push({ date: today, texte: `${quoi} le ${fmt(d)}${qui ? " avec " + qui : ""}` });
+        hadCallOpen = false; if (await saveCand(c)) { toast("C'est noté dans « Mes entretiens passés »"); drawCandSum(); } return;
+      }
+      if (c.dateEntretien && c.dateEntretien < d) archiveRound(c);
+      Object.assign(c, { statut: "entretien", dateEntretien: d, heureEntretien: "", typeEntretien: type, lienVisio: "", lieuEntretien: "", avecQui: qui, notesEntretien: notes, prochaineRelance: "", attente: "", dateReponse: c.dateReponse || d });
+      if (qui && !c.contact) c.contact = qui;
+      c.historique.push({ date: today, texte: `${quoi} le ${fmt(d)}${qui ? " avec " + qui : ""}` });
+      hadCallOpen = false; suiteMode = "";
+      if (await saveCand(c)) { toast("C'est noté. Dis-moi la suite"); drawCandSum(); $("#apres-entretien")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      return;
+    }
     if (act === "go-suite") { const el = $("#apres-entretien"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (act === "suite-mode") { const sc = $("#overlay .sheet")?.scrollTop; editing.notesEntretien = $("#ni-notes")?.value ?? editing.notesEntretien; suiteMode = suiteMode === t.dataset.mode ? "" : t.dataset.mode; drawCandSum(); const sh = $("#overlay .sheet"); if (sh && sc != null) sh.scrollTop = sc; return; }
     if (act.startsWith("suite-") || act === "nr-save" || act === "nr-done" || act === "offre-ok" || act === "offre-non") {
