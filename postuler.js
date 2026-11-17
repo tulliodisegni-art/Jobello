@@ -66,9 +66,11 @@
   let cfg = { valider: false };
   let lien = null; // départ immédiat : état du lien téléphone ↔ ordi (fonction agents_status de la base)
   const relie = () => !!(lien && lien.relie);
+  const lancerMode = () => !!(lien && lien.lancer); // départ avec le bouton ⚡ (la tâche s'ouvre, « Exécuter maintenant »)
+  const occupe = () => lancerMode() && !!lien.enCours; // un passage des agents est en cours
   const cand = (id) => state.cands.find((c) => c.id === id);
   const nextSlot = () => { const m = parisMin(), s = AG_SLOTS.find((x) => x > m); return s != null ? hhmm(s) : "demain " + hhmm(AG_SLOTS[0]); };
-  const quand = () => relie() ? "tout de suite" : "vers " + nextSlot();
+  const quand = () => relie() ? "tout de suite" : lancerMode() ? (occupe() ? "pendant ce passage" : "dès que tu touches ⚡") : "vers " + nextSlot();
 
   /* ---------- File d'attente (écritures l'une après l'autre, pour ne rien perdre en swipant vite) ---------- */
   let chain = Promise.resolve();
@@ -190,13 +192,13 @@
       const c = d.candidature && cand(d.candidature);
       if (c) return; // la candidature existe : on la suit plus bas
       if (d.statut === "erreur") return L.push({ k: "ko", t: d.offre?.entreprise, s: d.offre?.titre, st: "Échec", d: d.raison || "Dossier non préparé", url: d.url });
-      L.push({ k: "wait", t: d.offre?.entreprise, s: d.offre?.titre, st: d.statut === "en_preparation" ? "CV et lettre…" : "En file", d: d.statut === "en_preparation" ? "Claude écrit ta lettre et adapte ton CV" : relie() ? "Les agents démarrent sur ton ordinateur" : `Prochain passage des agents vers ${nextSlot()}`, url: d.url, at: d.demandeLe });
+      L.push({ k: "wait", t: d.offre?.entreprise, s: d.offre?.titre, st: d.statut === "en_preparation" ? "CV et lettre…" : "En file", d: d.statut === "en_preparation" ? "Claude écrit ta lettre et adapte ton CV" : relie() ? "Les agents démarrent sur ton ordinateur" : lancerMode() ? (occupe() ? "Tes agents la prennent pendant ce passage" : "Touche ⚡ pour lancer tes agents") : `Prochain passage des agents vers ${nextSlot()}`, url: d.url, at: d.demandeLe });
     });
     state.cands.filter((c) => c.envoi && c.envoi.auto !== false).forEach((c) => {
       if (seen.has(c.id)) return; seen.add(c.id); const e = c.envoi;
       const recent = (iso) => iso && now - new Date(iso).getTime() < 3 * 864e5;
       if (e.statut === "envoyee" || c.statut !== "a_envoyer") { if (recent(e.fin || c.dateEnvoi)) L.push({ k: "ok", id: c.id, t: c.entreprise, s: c.poste, st: "Envoyée ✓", d: `Partie ${e.fin ? "le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) + " à " + new Date(e.fin).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}${e.via ? " via " + e.via : ""}`, at: e.fin }); return; }
-      if (e.statut === "bloquee") return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: "À finir toi-même", d: e.raison || "L'agent n'a pas pu terminer" });
+      if (e.statut === "bloquee") return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: "À toi de jouer", d: (e.raison || "L'agent n'a pas pu terminer").replace(/[.\s]+$/, "") + (e.page ? " · page ouverte sur ton ordi" : "") });
       if (e.statut === "en_cours") return L.push({ k: "run", id: c.id, t: c.entreprise, s: c.poste, st: "Agent au travail", d: e.etape || "Remplit le formulaire sur le site", at: e.debut });
       if (e.statut === "a_valider") return L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "À valider", d: "Touche pour relire et lancer l'envoi" });
       L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "Prête", d: `CV et lettre prêts${e.fichiers?.length ? "" : " (PDF en cours)"} · envoi ${quand()}` });
@@ -329,19 +331,31 @@
       const c = cand(id), e = c && c.envoi; if (!e) return r;
       const sh = document.querySelector("#overlay .sheet .sheet-head"); if (!sh) return r;
       const box = document.createElement("div"); box.className = "relance-box";
-      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.", valide: relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`, en_cours: "Un agent est en train de remplir le formulaire sur le site.", envoyee: `Envoyée par un agent${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via ? " via " + e.via : ""}.`, bloquee: `L'agent n'a pas pu finir : ${e.raison || "raison inconnue"}. Termine-la toi-même avec « Postuler » plus bas.` }[e.statut] || "";
+      const go = lancerMode() && !occupe(), raison = (e.raison || "raison inconnue").replace(/[.\s]+$/, "");
+      const ici = e.page ? "La page est restée ouverte dans Chrome sur ton ordi" : "Va sur ce site dans Chrome sur ton ordi";
+      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.",
+        valide: relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : occupe() ? "Prête : tes agents sont au travail sur ton ordi et la prennent pendant ce passage." : go ? `Prête : touche « Lancer maintenant » pour que tes agents l'envoient tout de suite, sinon elle partira au prochain passage (vers ${nextSlot()}).` : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`,
+        en_cours: "Un agent est en train de remplir le formulaire sur le site.",
+        envoyee: `Envoyée par un agent${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via ? " via " + e.via : ""}.`,
+        bloquee: lancerMode() ? `L'agent a besoin de toi : ${raison}. ${ici} : fais ce qui manque (créer ton compte ou te reconnecter), puis touche « Réessayer ».${go ? " Sur la page Claude qui s'ouvre, touche « Exécuter maintenant »." : ""}` : `L'agent n'a pas pu finir : ${raison}. ${e.page ? ici + " : f" : "F"}ais ce qui manque sur le site, puis touche « Réessayer », ou termine-la toi-même avec « Postuler » plus bas.` }[e.statut] || "";
+      const cid = esc(c.id), lancer = (txt, extra) => `<a class="btn small primary" href="${tacheURL()}" target="_blank" rel="noopener" data-lancer ${extra || ""}>${txt}</a>`;
       box.innerHTML = `<span class="lbl" style="font-weight:600">🤖 Agents Jobello</span><p style="margin:0">${esc(t)}</p>
-        <div class="row">${e.statut === "a_valider" ? `<button type="button" class="small primary" data-ag="ok" data-id="${esc(c.id)}">Envoyer</button>` : ""}${["a_valider", "valide", "bloquee"].includes(e.statut) ? `<button type="button" class="small ghost" data-ag="stop" data-id="${esc(c.id)}">${e.statut === "bloquee" ? "Je m'en occupe" : "Ne pas l'envoyer"}</button>` : ""}${e.statut === "bloquee" ? `<button type="button" class="small" data-ag="retry" data-id="${esc(c.id)}">Réessayer</button>` : ""}</div>`;
+        <div class="row">${e.statut === "a_valider" ? `<button type="button" class="small primary" data-ag="ok" data-id="${cid}">Envoyer</button>` : ""}${e.statut === "valide" && go ? lancer("⚡ Lancer maintenant") : ""}${["a_valider", "valide", "bloquee"].includes(e.statut) ? `<button type="button" class="small ghost" data-ag="stop" data-id="${cid}">${e.statut === "bloquee" ? "Je m'en occupe" : "Ne pas l'envoyer"}</button>` : ""}${e.statut === "bloquee" ? (go ? lancer("Réessayer ⚡", `data-agr="${cid}"`) : `<button type="button" class="small" data-ag="retry" data-id="${cid}">Réessayer</button>`) : ""}</div>`;
       sh.after(box);
     } catch (err) {}
     return r;
   };
-  async function agAction(a, id) {
+  // lance = « Réessayer ⚡ » : la page de la tâche Claude s'ouvre en même temps (lien), la fiche repasse en « valide »
+  async function agAction(a, id, lance) {
     const c = cand(id); if (!c || !c.envoi) return;
     if (a === "ok") c.envoi = { ...c.envoi, statut: "valide", valideLe: new Date().toISOString() };
-    if (a === "retry") c.envoi = { ...c.envoi, statut: "valide", raison: "", essais: (c.envoi.essais || 0) + 1 };
+    if (a === "retry") c.envoi = { ...c.envoi, statut: "valide", raison: "", page: "", essais: (c.envoi.essais || 0) + 1 };
     if (a === "stop") c.envoi = { ...c.envoi, statut: "annulee", auto: false };
-    if (await saveCand(c)) { toast(a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : `Les agents l'enverront vers ${nextSlot()}`); closeSheet(); render(); preparer(); }
+    if (await saveCand(c)) {
+      toast(a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : lance ? "C'est noté : sur la page Claude, touche « Exécuter maintenant »" : occupe() ? "C'est noté : tes agents la prennent pendant leur passage, sinon touche ⚡ quand ils ont fini" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`);
+      closeSheet(); render(); preparer();
+      if (lancerMode() && !lance && a !== "stop") setTimeout(() => { try { drawPanel(); document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {} }, 300);
+    }
   }
 
   /* ---------- Branchements ---------- */
@@ -358,7 +372,8 @@
     if (a === "undo") return undo();
   }, true);
   document.addEventListener("click", (e) => {
-    if (!(e.target.closest && e.target.closest("a[data-lancer]"))) return; // le lien s'ouvre normalement (nouvel onglet)
+    const l = e.target.closest && e.target.closest("a[data-lancer]"); if (!l) return; // le lien s'ouvre normalement (nouvel onglet)
+    if (l.dataset.agr) agAction("retry", l.dataset.agr, true); // « Réessayer ⚡ » : la fiche repart, pendant que la tâche s'ouvre
     localStorage.setItem("jb-lance", String(Date.now()));
     setTimeout(() => { try { drawPanel(); } catch {} }, 400);
     setTimeout(majLien, 75e3);
