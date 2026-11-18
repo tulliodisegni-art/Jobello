@@ -589,6 +589,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .annonce-t.ann{white-space:normal;max-height:none;overflow:visible}.ann h4{margin:12px 0 4px;font-size:.92rem;color:var(--accent)}.ann h4:first-child{margin-top:4px}.ann p{margin:0 0 6px}.ann ul{margin:0 0 6px;padding-left:18px;display:grid;gap:3px}
 .skills.sk-edit li{grid-template-columns:22px 1fr auto}.sk-b{margin-left:0;align-self:center;white-space:nowrap}.ia-wait{display:grid;gap:6px}
 .annonce{border-top:1px solid var(--line);padding-top:8px}.annonce summary{cursor:pointer;font-weight:600;font-size:.9rem}.annonce-t{white-space:pre-wrap;font-size:.88rem;line-height:1.5;max-height:60vh;overflow:auto;margin-top:6px}.brief-offre:empty{display:none}.rr-box .body{display:grid;gap:10px}.rr-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media (max-width:520px){.rr-who{grid-template-columns:1fr}}.rr-mail summary{cursor:pointer;font-weight:600;font-size:.9rem}.rr-mail[open]{display:grid;gap:8px}.rr-dt input{flex:1;min-width:0}.rr-slots input[list]{flex:1.3}.rp-alts{display:grid;gap:6px}.rp-alts .row{flex-wrap:nowrap;gap:6px}.rp-alts input{flex:1;min-width:0}.rp-alts span{font-size:.85rem}
+.soc-more{border-top:1px solid var(--line);padding-top:6px}.soc-more summary{cursor:pointer;font-weight:600;font-size:.9rem}.soc-more[open]{display:grid;gap:6px}.soc-more[open] summary{margin-bottom:2px}
 .stop-row{gap:6px;align-items:center;font-size:.85rem}.stop-row+.stop-row{margin-top:-4px}
 .ag-sec { display: flex; flex-direction: column; gap: 8px; }
 .ag-h { margin: 6px 2px 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
@@ -3158,7 +3159,7 @@ function drawCandSum() {
       ${next ? `<p style="margin:0"><b>${esc(next)}</b>${pc ? ` <button type="button" class="small" data-contact="${esc(pc.id)}">Ouvrir ${esc(firstName(pc.nom))}</button>` : ""}</p>` : ""}
       ${c.contact ? `<p class="muted" style="margin:0;font-size:.88rem">Contact : ${esc(c.contact)}</p>` : ""}
       ${afterInterview(c) ? `<div class="row"><button type="button" class="primary" data-act="go-suite">✅ Entretien fait → et ensuite ?</button></div>` : hadCallHTML(c)}
-      ${c.statut !== "a_envoyer" ? `<div class="row brief-offre">${c.description ? `<button type="button" class="small" data-act="sum-annonce">Relire l'annonce</button>` : ""}${offerLinks(c, false)}</div>` : ""}
+      <div class="row brief-offre"><button type="button" class="small" data-act="go-soc">🏢 Qui sont-ils ?</button>${c.statut !== "a_envoyer" ? `${c.description ? `<button type="button" class="small" data-act="sum-annonce">Relire l'annonce</button>` : ""}${offerLinks(c, false)}` : ""}</div>
       ${md === "prestataire" ? `<p class="muted" style="margin:0;font-size:.85rem">Société de prestation : tu serais salarié chez eux mais en mission chez un client. Deuxième choix, garde la priorité aux postes en direct.${(societeOf(c) || cibleOf(c))?.modeNote ? " " + esc((societeOf(c) || cibleOf(c)).modeNote) : ""}</p>` : ""}</div>
     ${replyBoxHTML(c)}
     ${archivedCand(c) && c.statut !== "refus" ? "" : rrHTML(c)}
@@ -3271,14 +3272,21 @@ function societeHTML(c) {
   const name = c.groupe || c.entreprise || "";
   const links = `<div class="row"><a class="btn small" href="https://www.glassdoor.fr/Search/results.htm?keyword=${enc(name)}" target="_blank" rel="noopener">Avis Glassdoor</a><a class="btn small" href="https://www.linkedin.com/search/results/companies/?keywords=${enc(name)}" target="_blank" rel="noopener">Page LinkedIn</a><a class="btn small" href="https://www.societe.com/cgi-bin/search?champs=${enc(name)}" target="_blank" rel="noopener">Chiffres (societe.com)</a></div>`;
   const li = (a) => (a || []).filter(Boolean).length ? `<ul>${a.filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
-  return `<details class="sec"><summary>La société <small>${esc(s ? s.nom : name)}</small></summary><div class="body soc">
-    ${s ? `${s.activite ? `<p>${esc(s.activite)}</p>` : ""}
-      ${s.produits?.length ? `<span class="lbl">Produits et métiers</span>${li(s.produits)}` : ""}
-      ${s.clients?.length ? `<span class="lbl">Clients</span><p>${esc(s.clients.join(", "))}</p>` : ""}
-      ${s.actualite?.length ? `<span class="lbl">Actualité</span>${li(s.actualite)}` : ""}
-      ${[s.taille && ["Taille", s.taille], s.sites && ["Sites", s.sites], s.salaire && ["Salaires constatés", s.salaire], s.avis && ["Avis des salariés", s.avis], s.entretien && ["Les entretiens", s.entretien]].filter(Boolean).map(([k, v]) => `<div class="kv"><span class="lbl">${k}</span><span>${esc(v)}</span></div>`).join("")}
-      <span class="muted" style="font-size:.78rem">${esc(s.origine || "Infos publiques")}${s.date ? " · " + fmt(s.date) : ""} · à vérifier</span>`
-      : `<p class="muted" style="margin:0">Pas encore de fiche pour cette société.</p><div class="row"><button type="button" class="small" data-act="soc-ai">Créer la fiche avec Claude</button></div>`}
+  const kv = (rows) => rows.filter((r) => r && r[1]).map(([k, v]) => `<div class="kv"><span class="lbl">${k}</span><span>${esc(v)}</span></div>`).join("");
+  const sub = (t, body) => body ? `<details class="soc-more"><summary>${t}</summary>${body}</details>` : "";
+  const majBtn = (label, primary) => iaBoutonHTML(c, "societe", label, `<button type="button" class="small${primary ? " primary" : ""}" data-act="soc-ai">${esc(label)}</button>`, primary);
+  const sources = (s && s.sources || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 6);
+  return `<details class="sec" id="sec-societe"><summary>🏢 Qui sont-ils ? <small>${esc(s ? s.nom : name)}</small></summary><div class="body soc">
+    ${s ? `${s.activite ? `<p style="margin:0">${esc(s.activite)}</p>` : ""}
+      ${kv([["Taille", s.taille], ["Création", s.histoire], ["Où", s.sites]])}
+      ${s.aRetenir?.length ? `<span class="lbl">À glisser en entretien</span>${li(s.aRetenir)}` : ""}
+      ${sub("Produits et clients", (s.produits?.length ? `<span class="lbl">Produits et métiers</span>${li(s.produits)}` : "") + (s.clients?.length ? `<span class="lbl">Clients</span><p>${esc(s.clients.join(", "))}</p>` : ""))}
+      ${sub("Actualité", li(s.actualite))}
+      ${sub("Ambiance, salaires et entretiens", kv([["Culture", s.culture], ["Avis des salariés", s.avis], ["Salaires constatés", s.salaire], ["Les entretiens", s.entretien]]))}
+      ${sources.length ? sub("Sources", `<ul>${sources.map((u) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a></li>`).join("")}</ul>`) : ""}
+      <span class="muted" style="font-size:.78rem">${esc(s.origine || "Infos publiques")}${s.date ? " · " + fmt(s.date) : ""} · à vérifier</span>
+      ${iaDemande(c.id, "societe") || !s.date || s.date < addDays(todayISO(), -30) || !s.aRetenir ? majBtn("Mettre à jour avec Claude", false) : ""}`
+      : `<p class="muted" style="margin:0">Claude cherche pour toi qui ils sont : activité, produits, taille, clients, actualité, ambiance et ce qu'il est bon de dire en entretien.</p>${majBtn("Demander à Claude qui ils sont", true)}`}
     ${ppl.length ? `<span class="lbl">Tes contacts</span><div class="row">${ppl.map((p) => `<button type="button" class="small" data-contact="${esc(p.id)}">${esc(p.nom)}${p.role ? " · " + esc(p.role.split(",")[0]) : ""}</button>`).join("")}</div>` : ""}
     ${links}</div></details>`;
 }
@@ -3319,7 +3327,7 @@ async function demanderIA(type, c) {
   if (!state.db || !c || !c.id) { toast("Enregistre d'abord la candidature"); return false; }
   let cur = state.ia || {};
   try { const sn = await state.db.doc("demandes/ia").get(); if (sn.exists) cur = sn.data(); } catch {}
-  const liste = (cur.liste || []).filter((d) => !(d.cand === c.id && d.type === type && d.statut !== "fait")).concat({ id: Math.random().toString(36).slice(2, 12), type, cand: c.id, entreprise: c.entreprise || "", poste: c.poste || "", statut: "en_attente", demandeLe: new Date().toISOString() }).slice(-40);
+  const liste = (cur.liste || []).filter((d) => !(d.cand === c.id && d.type === type && d.statut !== "fait")).concat({ id: Math.random().toString(36).slice(2, 12), type, cand: c.id, entreprise: c.entreprise || "", poste: c.poste || "", ...(type === "societe" ? { groupe: c.groupe || "", ville: c.ville || "", societeId: (societeOf(c) || {}).id || socKey(c.groupe || c.entreprise).replace(/ /g, "-") || "societe" } : {}), statut: "en_attente", demandeLe: new Date().toISOString() }).slice(-40);
   const doc = { ...cur, liste };
   try { await state.db.doc("demandes/ia").set(doc); state.ia = doc; return true; } catch { toast("La demande n'a pas pu partir. Réessaie."); return false; }
 }
@@ -3336,7 +3344,7 @@ function iaRafraichir() {
   if (sheetKind !== "candsum" || !editing || !editing.id) return;
   const f = state.cands.find((x) => x.id === editing.id); if (!f) return;
   const ks = ["prepa", "questionsEntretien", "annonce"].filter((k) => f[k] && JSON.stringify(f[k]) !== JSON.stringify(editing[k] || null));
-  const attente = !!(iaDemande(editing.id, "prepa") || iaDemande(editing.id, "questions")), affiche = !!$("#overlay .ia-wait");
+  const attente = !!(iaDemande(editing.id, "prepa") || iaDemande(editing.id, "questions") || iaDemande(editing.id, "societe")), affiche = !!$("#overlay .ia-wait");
   if (!ks.length && attente === affiche) return;
   ks.forEach((k) => { editing[k] = structuredClone(f[k]); });
   redessinerFiche(ks.includes("prepa") ? ["sec-prepa"] : ks.includes("questionsEntretien") ? ["sec-qposte"] : []);
@@ -3344,7 +3352,7 @@ function iaRafraichir() {
 document.addEventListener("click", (e) => {
   const a = e.target.closest && e.target.closest("a[data-ia]"); if (!a) return; // le lien ouvre la tâche Claude (nouvel onglet)
   const c = editing, type = a.dataset.ia; if (!c || !c.id) return;
-  demanderIA(type, c).then((ok) => { if (ok) { toast("C'est noté : sur la page Claude, touche « Exécuter maintenant »"); redessinerFiche([type === "prepa" ? "sec-prepa" : "sec-qposte"]); } });
+  demanderIA(type, c).then((ok) => { if (ok) { toast("C'est noté : sur la page Claude, touche « Exécuter maintenant »"); redessinerFiche([type === "prepa" ? "sec-prepa" : type === "societe" ? "sec-societe" : "sec-qposte"]); } });
 });
 
 /* ---------- L'annonce complète, rangée : l'entreprise, le poste, les missions, le profil, les plus, salaire et conditions ----------
@@ -4243,6 +4251,7 @@ $("#overlay").addEventListener("click", async (e) => {
       if (await saveCand(c)) { toast("C'est noté. Dis-moi la suite"); drawCandSum(); $("#apres-entretien")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
       return;
     }
+    if (act === "go-soc") { const el = $("#sec-societe"); if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); } return; }
     if (act === "go-suite") { const el = $("#apres-entretien"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (act === "suite-mode") { const sc = $("#overlay .sheet")?.scrollTop; editing.notesEntretien = $("#ni-notes")?.value ?? editing.notesEntretien; suiteMode = suiteMode === t.dataset.mode ? "" : t.dataset.mode; drawCandSum(); const sh = $("#overlay .sheet"); if (sh && sc != null) sh.scrollTop = sc; return; }
     if (act.startsWith("suite-") || act === "nr-save" || act === "nr-done" || act === "offre-ok" || act === "offre-non") {
@@ -4495,7 +4504,7 @@ render();
   db.collection("documents").onSnapshot((snap) => { state.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("cibles").onSnapshot((snap) => { state.cibles = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
-  db.collection("societes").onSnapshot((snap) => { state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); }, () => {});
+  db.collection("societes").onSnapshot((snap) => { const avant = editing ? JSON.stringify(societeOf(editing) || null) : ""; state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); if (editing && sheetKind === "candsum" && JSON.stringify(societeOf(editing) || null) !== avant) redessinerFiche(["sec-societe"]); }, () => {});
   db.doc("alertes/jour").onSnapshot((snap) => { if (!alertBusy) { state.alertes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); } }, () => {});
   db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderPrep(); renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
   db.doc("demandes/ia").onSnapshot((snap) => { state.ia = snap.exists ? snap.data() : null; iaRafraichir(); }, () => {});
