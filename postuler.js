@@ -207,10 +207,11 @@
     return L.sort((a, b) => ord[a.k] - ord[b.k]);
   }
   function panelHTML() {
-    const n = ready() ? aDefiler().length : 0, L = suivi(), cfgP = cfg.passage;
-    const run = L.filter((x) => x.k === "run").length, ok = L.filter((x) => x.k === "ok").length, enAttente = L.filter((x) => x.k === "wait").length;
+    // Une candidature partie sort de la liste : elle est déjà suivie plus bas (À faire, suivi). Il ne reste qu'un résumé « N envoyées ».
+    const n = ready() ? aDefiler().length : 0, tout = suivi(), L = tout.filter((x) => x.k !== "ok"), cfgP = cfg.passage;
+    const run = L.filter((x) => x.k === "run").length, ok = tout.length - L.length, enAttente = L.filter((x) => x.k === "wait").length;
     const go = `<button type="button" class="ag-go" data-sw="open"><span class="ic">👆</span><span class="tx"><b>${n ? `Swipe ${n} offre${n > 1 ? "s" : ""}` : "Swipe et ça part"}</b><small>${n ? "À droite : les agents postulent pour toi" : "Plus d'offre à trier pour l'instant"}</small></span><span class="ch">›</span></button>`;
-    if (!L.length) return go + lienHTML();
+    if (!L.length) return go + lienHTML() + (ok ? `<p class="ag-meta ag-sent">✓ ${ok} candidature${ok > 1 ? "s" : ""} envoyée${ok > 1 ? "s" : ""} par tes agents ces derniers jours : tu les suis plus bas.</p>` : "");
     const pc = cfgP && cfgP.le && Date.now() - new Date(cfgP.le).getTime() < 2 * 3600e3 ? (cfgP.chrome ? `Dernier passage ${new Date(cfgP.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} : Chrome connecté.` : `Dernier passage ${new Date(cfgP.le).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} : ton ordinateur n'était pas joignable. Allume-le, ouvre Chrome et l'extension Claude.`) : "";
     return go + lienHTML() + `<div class="row between" style="margin:4px 2px 8px"><h2 class="home-h" style="margin:0">Mes agents</h2><span class="home-more">${[run && run + " au travail", enAttente && enAttente + " en attente", ok && ok + " envoyée" + (ok > 1 ? "s" : "")].filter(Boolean).join(" · ")}</span></div>
       <div class="ag-list">${L.slice(0, 12).map((x) => `<div class="ag-it ${x.k}" ${x.id ? `data-open="${esc(x.id)}"` : ""}><span class="dot"></span><span class="t"><b>${esc(x.t || "Offre")}</b><span>${esc(x.s || "")}${x.d ? " · " + esc(x.d) : ""}</span></span><span class="st">${esc(x.st)}</span></div>`).join("")}</div>
