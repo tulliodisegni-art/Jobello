@@ -101,6 +101,17 @@ input, select, textarea { font: inherit; color: var(--fg); background: var(--sur
 textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
 /* iPhone : sous 16px, Safari zoome sur le champ et la page reste décalée */
 @media (max-width: 899px) { input, select, textarea, textarea.doc-text { font-size: 16px; } }
+/* Champs et cadres : jamais plus larges que leur cadre (iPhone, Safari) */
+input, select, textarea { max-width: 100%; }
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 42px; text-align: left; }
+input::-webkit-date-and-time-value { text-align: left; margin: 0; min-width: 0; }
+input::-webkit-datetime-edit { padding: 0; }
+textarea.short { min-height: 0; resize: none; }
+.grid2 > *, .field > * { min-width: 0; max-width: 100%; }
+.row > input, .row > select, .row > textarea { min-width: 0; max-width: 100%; }
+.sheet, .panel, .relance-box, .mail-card, .fold, .car, .offer, .cible { overflow-wrap: break-word; }
+img, video, canvas, svg { max-width: 100%; }
+.sheet table { display: block; max-width: 100%; overflow-x: auto; }
 html, body { overflow-x: clip; max-width: 100%; }
 .sheet { overflow-x: hidden; }
 .switch { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
@@ -314,7 +325,7 @@ details.group > summary .gcount { font-size: 0.8rem; color: var(--muted); }
 @media (max-width: 700px) { .search-grid { grid-template-columns: 1fr 1fr; } .search-grid .full { grid-column: 1 / -1; } }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field > label, .field > .lbl { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
 
 /* Sheet */
@@ -488,7 +499,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
   #v-plateformes .offers { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
   .kit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sheet { max-width: 760px; }
-  .sheet .grid2 { grid-template-columns: 1fr 1fr; }
+  .sheet .grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (min-width: 1500px) { .wrap { max-width: 1480px; } }
 
@@ -612,7 +623,8 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .pl-grid { display: flex; flex-direction: column; gap: 8px; }
 .pl-day { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; grid-template-columns: 62px minmax(0,1fr); gap: 10px; }
 .pl-day.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.pl-day.empty { padding: 6px 12px; opacity: .65; }
+.pl-day.empty { padding: 6px 12px; opacity: .65; grid-template-columns: 150px minmax(0,1fr); }
+.pl-day.empty .pl-dh { flex-wrap: wrap; }
 .pl-day.past:not(.today) .pl-dh { opacity: .6; }
 .pl-dh { display: flex; flex-direction: column; line-height: 1.1; }
 .pl-dh span { font-size: .74rem; color: var(--muted); text-transform: capitalize; }
@@ -704,6 +716,15 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .home-head::after { content: ""; position: absolute; right: -60px; top: -70px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,.12); pointer-events: none; }
 .home-head .date, .home-head .home-sum { color: var(--hero-muted); }
 .home-head h1 { color: #fff; }
+@media (max-width: 479px) {
+  .home-head { display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 10px; align-items: start; }
+  .home-head > div:first-child { display: contents; }
+  .home-head .date { grid-column: 1; grid-row: 1; align-self: center; }
+  .home-head .home-acts { grid-column: 2; grid-row: 1; }
+  .home-head h1, .home-head .home-sum { grid-column: 1 / -1; }
+  .home-head h1 { margin-top: 10px; }
+}
+@media (max-width: 359px) { .home-head .icon-btn { width: 38px; height: 38px; } .home-head .home-acts { gap: 6px; } }
 .home-head .icon-btn { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); color: #fff; }
 .home-head .icon-btn.primary { background: #fff; border-color: #fff; color: var(--accent); }
 .kpi { background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
@@ -3561,7 +3582,7 @@ function hadCallHTML(c) {
   return `<div class="relance-box" id="hc-box"><span class="lbl" style="font-weight:600">📞 J'ai eu un appel / un entretien</span>
     <div class="grid2"><div class="field"><label for="hc-date">Quand</label><input id="hc-date" type="date" value="${todayISO()}" max="${todayISO()}"></div>
       <div class="field"><label for="hc-type">Comment</label><select id="hc-type">${opts(["Téléphone", "Visio", "Sur place"], "Téléphone")}</select></div></div>
-    <div class="field"><label for="hc-qui">Avec qui</label><input id="hc-qui" placeholder="ex. Mme Martin, recrutement" value="${esc(c.contact || "")}"></div>
+    <div class="field"><label for="hc-qui">Avec qui</label><textarea id="hc-qui" class="short" rows="2" placeholder="ex. Mme Martin, recrutement">${esc(c.contact || "")}</textarea></div>
     <div class="field"><label for="hc-notes">Ce qui s'est dit (facultatif)</label><textarea id="hc-notes" rows="3" placeholder="questions posées, prochaines étapes…"></textarea></div>
     <div class="row"><button type="button" class="primary" data-act="hc-save">Enregistrer et passer à la suite</button><button type="button" class="ghost" data-act="hc-cancel">Annuler</button></div></div>`;
 }
@@ -4235,7 +4256,7 @@ $("#overlay").addEventListener("click", async (e) => {
     if (act === "q-ai") return qPosteAI(t);
     if (act === "hc-open" || act === "hc-cancel") { hadCallOpen = act === "hc-open"; drawCandSum(); if (hadCallOpen) $("#hc-box")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     if (act === "hc-save") {
-      const c = editing, today = todayISO(), d = $("#hc-date").value || today, type = $("#hc-type").value, qui = $("#hc-qui").value.trim(), notes = $("#hc-notes").value.trim();
+      const c = editing, today = todayISO(), d = $("#hc-date").value || today, type = $("#hc-type").value, qui = $("#hc-qui").value.replace(/\s+/g, " ").trim(), notes = $("#hc-notes").value.trim();
       const quoi = type === "Téléphone" ? "Appel" : "Entretien " + type.toLowerCase();
       if (c.statut === "entretien" && c.dateEntretien && c.dateEntretien > d) {
         // un entretien est déjà prévu plus tard : on range cet appel sans toucher au prochain
