@@ -5,7 +5,8 @@
      remplissent et envoient les candidatures en même temps dans Chrome, sur l'ordinateur.
    - L'appli prépare les PDF à joindre (lien temporaire) et montre l'avancement de chaque agent.
    Suivi d'une candidature : c.envoi = { statut: a_valider | valide | en_cours | envoyee | bloquee, auto, valideLe,
-     fichiers: [{ type, nom, url }], fichiersLe, debut, fin, raison, agent }.
+     fichiers: [{ type, nom, url }], fichiersLe, debut, fin, raison, agent,
+     action: compte | connexion | main (ce que Tullio doit faire), page: lien exact de la page à finir, reprise: page où l'agent repart après « Réessayer » }.
    Réglages : docs path demandes/envois = { valider: false, passage: { le, chrome, texte } }.
    Départ immédiat : une fois le téléphone et l'ordi reliés (jeton de la tâche collé ici, rangé dans Vault),
      la base réveille la tâche dès qu'une offre est swipée (fonctions agents_* de Supabase).
@@ -198,7 +199,7 @@
       if (seen.has(c.id)) return; seen.add(c.id); const e = c.envoi;
       const recent = (iso) => iso && now - new Date(iso).getTime() < 3 * 864e5;
       if (e.statut === "envoyee" || c.statut !== "a_envoyer") { if (recent(e.fin || c.dateEnvoi)) L.push({ k: "ok", id: c.id, t: c.entreprise, s: c.poste, st: "Envoyée ✓", d: `Partie ${e.fin ? "le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) + " à " + new Date(e.fin).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}${e.via ? " via " + e.via : ""}`, at: e.fin }); return; }
-      if (e.statut === "bloquee") return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: "À toi de jouer", d: (e.raison || "L'agent n'a pas pu terminer").replace(/[.\s]+$/, "") + (e.page ? " · page ouverte sur ton ordi" : "") });
+      if (e.statut === "bloquee") return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: e.action === "main" ? "À finir toi-même" : "À toi de jouer", d: (e.raison || "L'agent n'a pas pu terminer").replace(/[.\s]+$/, "") + (e.page ? " · touche pour ouvrir la page à finir" : "") });
       if (e.statut === "en_cours") return L.push({ k: "run", id: c.id, t: c.entreprise, s: c.poste, st: "Agent au travail", d: e.etape || "Remplit le formulaire sur le site", at: e.debut });
       if (e.statut === "a_valider") return L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "À valider", d: "Touche pour relire et lancer l'envoi" });
       L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "Prête", d: `CV et lettre prêts${e.fichiers?.length ? "" : " (PDF en cours)"} · envoi ${quand()}` });
@@ -333,15 +334,27 @@
       const sh = document.querySelector("#overlay .sheet .sheet-head"); if (!sh) return r;
       const box = document.createElement("div"); box.className = "relance-box";
       const go = lancerMode() && !occupe(), raison = (e.raison || "raison inconnue").replace(/[.\s]+$/, "");
-      const ici = e.page ? "La page est restée ouverte dans Chrome sur ton ordi" : "Va sur ce site dans Chrome sur ton ordi";
-      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.",
-        valide: relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : occupe() ? "Prête : tes agents sont au travail sur ton ordi et la prennent pendant ce passage." : go ? `Prête : touche « Lancer maintenant » pour que tes agents l'envoient tout de suite, sinon elle partira au prochain passage (vers ${nextSlot()}).` : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`,
-        en_cours: "Un agent est en train de remplir le formulaire sur le site.",
-        envoyee: `Envoyée par un agent${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via ? " via " + e.via : ""}.`,
-        bloquee: lancerMode() ? `L'agent a besoin de toi : ${raison}. ${ici} : fais ce qui manque (créer ton compte ou te reconnecter), puis touche « Réessayer ».${go ? " Sur la page Claude qui s'ouvre, touche « Exécuter maintenant »." : ""}` : `L'agent n'a pas pu finir : ${raison}. ${e.page ? ici + " : f" : "F"}ais ce qui manque sur le site, puis touche « Réessayer », ou termine-la toi-même avec « Postuler » plus bas.` }[e.statut] || "";
       const cid = esc(c.id), lancer = (txt, extra) => `<a class="btn small primary" href="${tacheURL()}" target="_blank" rel="noopener" data-lancer ${extra || ""}>${txt}</a>`;
+      const page = /^https?:\/\//.test(e.page || "") ? e.page : "", site = page ? new URL(page).hostname.replace(/^www\./, "") : "le site";
+      const ouvrir = page ? `<a class="btn small${e.statut === "bloquee" ? " primary" : ""}" href="${esc(page)}" target="_blank" rel="noopener">Ouvrir la page à finir ↗</a>` : "";
+      const pj = (e.fichiers || []).filter((f) => f.url).map((f) => `<a class="btn small" href="${esc(f.url + (f.url.includes("?") ? "&" : "?") + "download=" + encodeURIComponent(f.nom || f.type + ".pdf"))}" target="_blank" rel="noopener">${f.type === "cv" ? "📄 CV" : "📄 Lettre"}</a>`).join("");
+      const retry = (txt) => go ? lancer(txt, `data-agr="${cid}"`) : `<button type="button" class="small${e.action === "main" ? "" : " primary"}" data-ag="retry" data-id="${cid}">${txt.replace(" ⚡", "")}</button>`;
+      const apres = go ? " Sur la page Claude qui s'ouvre, touche « Exécuter maintenant »." : "";
+      const bloque = {
+        compte: `Le site ${site} demande de créer ton compte. L'agent a déjà rempli tes informations (nom, e-mail, téléphone, adresse…) dans l'onglet resté ouvert dans Chrome sur ton ordi. Toi, tu écris seulement ton mot de passe, tu coches les conditions et tu cliques sur « Créer un compte » (coche « Rester connecté » si on te le propose). Si l'onglet n'est plus là, touche « Ouvrir la page à finir » sur ton ordi, puis le favori « Remplir avec Jobello ». Ensuite, touche « Réessayer » : l'agent reprend sur cette page, connecté, et envoie ta candidature.${apres}`,
+        connexion: `Le site ${site} demande de te reconnecter. Sur ton ordi, touche « Ouvrir la page à finir », connecte-toi en cochant « Rester connecté », puis touche « Réessayer » : l'agent reprend sur cette page.${apres}`,
+        main: `L'agent ne peut pas finir celle-ci tout seul : ${raison}. Sur ton ordi, ouvre la page, joins ton CV et ta lettre (boutons ci-dessous), envoie, puis touche « C'est envoyé ✓ ».`
+      }[e.action] || (lancerMode() ? `L'agent a besoin de toi : ${raison}. ${page ? "Sur ton ordi, touche « Ouvrir la page à finir »" : "Va sur ce site dans Chrome sur ton ordi"} : fais ce qui manque (créer ton compte ou te reconnecter), puis touche « Réessayer ».${apres}` : `L'agent n'a pas pu finir : ${raison}. ${page ? "Ouvre la page à finir" : "Va sur le site"}, fais ce qui manque, puis touche « Réessayer », ou termine-la toi-même avec « Postuler » plus bas.`);
+      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.",
+        valide: (e.reprise ? "L'agent va reprendre sur la page où il s'était arrêté. " : "") + (relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : occupe() ? "Prête : tes agents sont au travail sur ton ordi et la prennent pendant ce passage." : go ? `Prête : touche « Lancer maintenant » pour que tes agents l'envoient tout de suite, sinon elle partira au prochain passage (vers ${nextSlot()}).` : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`),
+        en_cours: e.reprise ? "Un agent reprend la candidature sur la page où il s'était arrêté." : "Un agent est en train de remplir le formulaire sur le site.",
+        envoyee: `Envoyée${e.via === "toi" ? " par toi" : " par un agent"}${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via && e.via !== "toi" ? " via " + e.via : ""}.`,
+        bloquee: bloque }[e.statut] || "";
+      const B = e.statut !== "bloquee" ? "" : e.action === "main"
+        ? `${ouvrir}${pj}<button type="button" class="small primary" data-ag="fait" data-id="${cid}">C'est envoyé ✓</button>${retry("Réessayer quand même ⚡")}`
+        : `${ouvrir}${retry("Réessayer ⚡")}<button type="button" class="small ghost" data-ag="fait" data-id="${cid}">Je l'ai envoyée moi-même</button>`;
       box.innerHTML = `<span class="lbl" style="font-weight:600">🤖 Agents Jobello</span><p style="margin:0">${esc(t)}</p>
-        <div class="row">${e.statut === "a_valider" ? `<button type="button" class="small primary" data-ag="ok" data-id="${cid}">Envoyer</button>` : ""}${e.statut === "valide" && go ? lancer("⚡ Lancer maintenant") : ""}${["a_valider", "valide", "bloquee"].includes(e.statut) ? `<button type="button" class="small ghost" data-ag="stop" data-id="${cid}">${e.statut === "bloquee" ? "Je m'en occupe" : "Ne pas l'envoyer"}</button>` : ""}${e.statut === "bloquee" ? (go ? lancer("Réessayer ⚡", `data-agr="${cid}"`) : `<button type="button" class="small" data-ag="retry" data-id="${cid}">Réessayer</button>`) : ""}</div>`;
+        <div class="row">${e.statut === "a_valider" ? `<button type="button" class="small primary" data-ag="ok" data-id="${cid}">Envoyer</button>` : ""}${e.statut === "valide" && go ? lancer("⚡ Lancer maintenant") : ""}${B}${["a_valider", "valide", "bloquee"].includes(e.statut) ? `<button type="button" class="small ghost" data-ag="stop" data-id="${cid}">${e.statut === "bloquee" ? "Je m'en occupe" : "Ne pas l'envoyer"}</button>` : ""}</div>`;
       sh.after(box);
     } catch (err) {}
     return r;
@@ -350,12 +363,18 @@
   async function agAction(a, id, lance) {
     const c = cand(id); if (!c || !c.envoi) return;
     if (a === "ok") c.envoi = { ...c.envoi, statut: "valide", valideLe: new Date().toISOString() };
-    if (a === "retry") c.envoi = { ...c.envoi, statut: "valide", raison: "", page: "", essais: (c.envoi.essais || 0) + 1 };
+    // Réessayer : on GARDE la page où l'agent s'est arrêté (reprise) : l'agent repart de là, pas de l'annonce.
+    if (a === "retry") c.envoi = { ...c.envoi, statut: "valide", reprise: c.envoi.page || c.envoi.reprise || "", relanceLe: new Date().toISOString(), essais: (c.envoi.essais || 0) + 1 };
+    if (a === "fait") {
+      const d = todayISO(); c.statut = "envoyee"; c.dateEnvoi = d; c.prochaineRelance = addDays(d, 7);
+      c.historique = [...(c.historique || []), { date: d, texte: "Candidature envoyée par toi" + (c.envoi.page ? " sur " + new URL(c.envoi.page).hostname.replace(/^www\./, "") : "") }];
+      c.envoi = { ...c.envoi, statut: "envoyee", fin: new Date().toISOString(), via: "toi" };
+    }
     if (a === "stop") c.envoi = { ...c.envoi, statut: "annulee", auto: false };
     if (await saveCand(c)) {
-      toast(a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : lance ? "C'est noté : sur la page Claude, touche « Exécuter maintenant »" : occupe() ? "C'est noté : tes agents la prennent pendant leur passage, sinon touche ⚡ quand ils ont fini" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`);
+      toast(a === "fait" ? "Bravo, elle est envoyée. Je te rappelle de relancer dans 7 jours." : a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : lance ? "C'est noté : sur la page Claude, touche « Exécuter maintenant »" : occupe() ? "C'est noté : tes agents la prennent pendant leur passage, sinon touche ⚡ quand ils ont fini" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`);
       closeSheet(); render(); preparer();
-      if (lancerMode() && !lance && a !== "stop") setTimeout(() => { try { drawPanel(); document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {} }, 300);
+      if (lancerMode() && !lance && a !== "stop" && a !== "fait") setTimeout(() => { try { drawPanel(); document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {} }, 300);
     }
   }
 

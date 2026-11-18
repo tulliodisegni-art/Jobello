@@ -1660,6 +1660,7 @@ function jobelloFill(D) {
     [/nom complet|nom et prenom|full.?name|^name$/, "complet"],
     [/(^|[^a-z])nom([^a-z]|$)|last.?name|family.?name|surname|lname/, "nom"],
     [/code.?postal|zip|postal/, "cp"], [/ville|city|localite|town/, "ville"], [/pays|country/, "pays"],
+    [/complement|address.?line.?2|adresse.?2|ligne.?2/, "skip"], [/adresse|address|\brue\b|street|voie/, "adresse"],
     [/salaire|salary|pretention|remuneration/, "salaire"], [/disponib|availability|notice|preavis/, "dispo"]
   ];
   var setVal = function (el, v) {
@@ -1679,7 +1680,7 @@ function jobelloFill(D) {
       var f = ty === "email" ? "email" : ty === "tel" ? "tel" : null;
       if (!f) for (var i = 0; i < R.length; i++) if (R[i][0].test(k)) { f = R[i][1]; break; }
       if ((f === "nom" || f === "complet") && /entreprise|societe|company|employeur|ecole|school|universit|poste|job/.test(k)) f = null;
-      var v = f === "complet" ? (D.prenom + " " + D.nom).trim() : f === "pays" ? "France" : f ? D[f] : "";
+      var v = f === "skip" ? "" : f === "complet" ? (D.prenom + " " + D.nom).trim() : f === "pays" ? "France" : f ? D[f] : "";
       if (v) setVal(el, v);
     });
   });
@@ -1731,18 +1732,18 @@ function jobelloFill(D) {
 const favData = () => {
   const p = state.profil || {}, k = p.kit || {}, [prenom, ...nom] = String(p.nom || "").trim().split(/\s+/);
   return { prenom: prenom || "", nom: nom.join(" "), email: p.email || "", tel: p.telephone || "", linkedin: liUrl(),
-    ville: p.ville || String(p.mobilite || "").split(/[(·,]/)[0].trim(), cp: p.codePostal || "",
+    ville: p.ville || String(p.mobilite || "").split(/[(·,]/)[0].trim(), cp: p.codePostal || "", adresse: p.adresse || "",
     salaire: k.pretentions || p.salaire || "", dispo: dispo(), app: location.origin + location.pathname.replace(/[^/]*$/, "") };
 };
 const favUrl = () => "javascript:" + encodeURIComponent("(" + jobelloFill.toString().replace(/\n\s*/g, " ") + ")(" + JSON.stringify(favData()) + ")");
 /* Les infos à copier une par une, pour un formulaire sans le favori */
 function idChips(sfx) {
-  const d = favData(), L = [["Prénom", d.prenom], ["Nom", d.nom], ["E-mail", d.email], ["Téléphone", d.tel], ["Ville", d.ville], ["LinkedIn", d.linkedin], ["Prétentions", d.salaire], ["Disponibilité", d.dispo]];
+  const d = favData(), L = [["Prénom", d.prenom], ["Nom", d.nom], ["E-mail", d.email], ["Téléphone", d.tel], ["Adresse", d.adresse], ["Code postal", d.cp], ["Ville", d.ville], ["LinkedIn", d.linkedin], ["Prétentions", d.salaire], ["Disponibilité", d.dispo]];
   return `<div class="row id-chips">${L.filter((x) => x[1]).map(([l, v], i) => `<span id="idc-${sfx}-${i}" hidden>${esc(v)}</span><button type="button" class="small" data-copy="idc-${sfx}-${i}">${esc(l)}</button>`).join("")}</div>`;
 }
 function favBoxHTML() {
   return `<div class="fav-box">
-    <p style="margin:0">Un favori à installer une fois dans Safari (ou Chrome). Sur la page du formulaire, tu le touches : il remplit prénom, nom, e-mail, téléphone, ville, LinkedIn, prétentions et disponibilité, et colle le message de candidature que tu viens de copier dans Jobello. Il marche aussi dans une conversation LinkedIn ouverte. Toi, tu joins le CV, tu relis et tu envoies.</p>
+    <p style="margin:0">Un favori à installer une fois dans Safari (ou Chrome). Sur la page du formulaire, tu le touches : il remplit prénom, nom, e-mail, téléphone, adresse, code postal, ville, LinkedIn, prétentions et disponibilité, et colle le message de candidature que tu viens de copier dans Jobello. Il marche aussi dans une conversation LinkedIn ouverte. Toi, tu joins le CV, tu relis et tu envoies.</p>
     <p style="margin:0">Sur la page d'une offre (sans formulaire), le même favori propose <b>« Ajouter cette offre à Jobello »</b> : la candidature est créée avec le poste, la société, la ville et le texte de l'offre.</p>
     <details class="sec"><summary>Installer sur iPhone (Safari)</summary><div class="body"><ol class="chrome-steps">
       <li>Touche <b>« Copier le code du favori »</b> ci-dessous.</li>
@@ -1864,7 +1865,7 @@ function renderKit() {
   const blocks = (kind, title, list, render) => `<details class="sec"${kitEdit && kitEdit.startsWith(kind + ":") ? " open" : ""}><summary>${title} <small>${list.length}</small></summary><div class="body">${list.map(render).join("")}${kitEdit === kind + ":new" ? kitBlockForm(kind, "new", {}) : `<button type="button" class="small" data-kit-edit="${kind}:new">+ Ajouter</button>`}</div></details>`;
   const cv = state.docs.find((d) => d.type === "cv" && d.assetId);
   const texts = `<div class="kit-step">1. Tes textes, prêts à coller</div>
-    <div class="kit-grid">${item("Prénom", prenomP, false, "prenom")}${item("Nom", nomP.join(" "), false, "nom")}${item("E-mail", pr.email, false, "p:email")}${item("Téléphone", pr.telephone, false, "p:telephone")}${item("Ville", pr.mobilite, false, "p:mobilite")}${item("LinkedIn", kitEdit === "p:linkedin" ? pr.linkedin : pr.linkedin ? "https://www." + pr.linkedin.replace(/^https?:\/\/(www\.)?/, "") : "", false, "p:linkedin")}</div>
+    <div class="kit-grid">${item("Prénom", prenomP, false, "prenom")}${item("Nom", nomP.join(" "), false, "nom")}${item("E-mail", pr.email, false, "p:email")}${item("Téléphone", pr.telephone, false, "p:telephone")}${item("Adresse postale", [pr.adresse, [pr.codePostal, pr.ville].filter(Boolean).join(" ")].filter(Boolean).join(", "), false)}${item("Ville", pr.mobilite, false, "p:mobilite")}${item("LinkedIn", kitEdit === "p:linkedin" ? pr.linkedin : pr.linkedin ? "https://www." + pr.linkedin.replace(/^https?:\/\/(www\.)?/, "") : "", false, "p:linkedin")}</div>
     ${item("Titre du profil", k.titre || pr.titre, false, "k:titre")}${item("Titre court (champ limité)", k.titreCourt, false, "k:titreCourt")}
     ${item("Résumé / À propos", k.resume || pr.pitch, true, "k:resume")}${item("Résumé court (300 caractères)", k.resumeCourt, false, "k:resumeCourt")}
     ${item("Compétences", k.competences, true, "k:competences")}
@@ -2192,6 +2193,8 @@ function openProfil() {
       <div class="field"><label for="p-titre">Titre</label><input id="p-titre" value="${esc(p.titre)}" placeholder="ex. Ingénieur mécanique"></div>
       <div class="field"><label for="p-email">E-mail</label><input id="p-email" type="email" value="${esc(p.email)}"></div>
       <div class="field"><label for="p-tel">Téléphone</label><input id="p-tel" type="tel" value="${esc(p.telephone)}"></div>
+      <div class="field"><label for="p-adr">Adresse postale (n° et rue)</label><input id="p-adr" autocomplete="street-address" value="${esc(p.adresse)}" placeholder="ex. 12 rue de Fontenay"></div>
+      <div class="field"><label for="p-cp">Code postal et ville</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="p-cp" inputmode="numeric" autocomplete="postal-code" style="max-width:6.5em" value="${esc(p.codePostal)}" placeholder="94300"><input id="p-ville" autocomplete="address-level2" value="${esc(p.ville)}" placeholder="Vincennes"></div></div>
       <div class="field"><label for="p-dispo">Disponibilité</label><input id="p-dispo" value="${esc(p.disponibilite || dispo())}" placeholder="ex. Disponible sous 1 mois (préavis)"></div>
       <div class="field"><label for="p-salaire">Salaire visé</label><input id="p-salaire" value="${esc(p.salaire)}" placeholder="ex. 45 k€ brut / an"></div>
       <div class="field"><label for="p-mob">Mobilité</label><input id="p-mob" value="${esc(p.mobilite)}" placeholder="ex. Mobile en France"></div>
@@ -4104,7 +4107,7 @@ function chromePrompt(c, stop = true) {
   L.push(`Fais ma candidature à ma place, directement dans mon navigateur : ouvre l'offre dans un nouvel onglet, clique sur « Postuler » et remplis tout le formulaire toi-même. Je n'interviens que pour les identifiants, les codes reçus et le fichier du CV. Offre : ${c.poste || "le poste"} chez ${c.entreprise || "cette société"}${c.ville ? " (" + c.ville + ")" : ""}.`);
   L.push(url ? `Lien : ${url}${isIndeed(c.lien) ? `\n(C'est une recherche Indeed : ouvre l'annonce de ${c.groupe || c.entreprise || "cette société"} qui correspond à ce poste.${c.lien ? " Lien court d'origine : " + c.lien : ""})` : ""}` : `Lien : je n'ai pas le lien, cherche l'offre sur le site carrière de ${c.entreprise || "la société"}.`);
   L.push(`\nÉtapes :\n1. Ouvre l'offre et clique sur « Postuler ». Si le site demande de me connecter ou de créer un compte, arrête-toi et laisse-moi le faire.\n2. Remplis le formulaire avec mes informations ci-dessous. Ne pré-remplis rien depuis un ancien profil du site s'il diffère de ces infos.\n3. CV : ${cv ? `quand il faut joindre le CV, arrête-toi et demande-moi de sélectionner le fichier « ${docFileName(cv)} » (dans Téléchargements)` : "demande-moi quel fichier joindre"}. N'utilise pas le CV déjà enregistré sur le site.${lt ? `\n4. Lettre de motivation : si on peut joindre un fichier, demande-moi « ${docFileName(lt)} » ; si c'est un champ texte, colle le « Message de candidature » qui est à la fin de cette consigne.` : "\n4. Lettre ou champ « message » : colle le « Message de candidature » qui est à la fin de cette consigne."}\n5. Questions supplémentaires : réponds seulement avec mes informations. Si tu ne sais pas, demande-moi, n'invente rien.\n6. ${stop ? "Arrête-toi AVANT le bouton final « Envoyer » / « Postuler » : montre-moi le récapitulatif et attends que je valide moi-même." : "Vérifie le récapitulatif puis clique sur le bouton final « Envoyer » / « Postuler », et dis-moi quand c'est fait."}\n7. ${c.id ? `Dès que la candidature est partie, même si c'est moi qui ai cliqué sur le bouton final, note-la tout de suite dans Jobello pour qu'il ne me la propose plus : la candidature n° ${c.id} passe en « Envoyée », avec la date d'aujourd'hui et une relance dans 7 jours. Si tu n'as pas accès à Jobello, rappelle-moi de toucher « C'est envoyé » sur sa fiche.` : "Une fois la candidature partie, rappelle-moi de l'ajouter à Jobello comme envoyée, pour qu'il ne me la propose plus."}`);
-  L.push(`\nMes informations :\n- Prénom : ${prenomP || ""}\n- Nom : ${nomP.join(" ")}\n- E-mail : ${p.email || ""}\n- Téléphone : ${p.telephone || ""}${p.linkedin ? "\n- LinkedIn : " + p.linkedin : ""}\n- Poste actuel / titre : ${p.titre || "Ingénieur mécanique"}\n- Disponibilité : ${dispo()}\n- Prétentions : ${/brut/i.test(p.salaire || "") ? p.salaire + " minimum" : (p.salaire || "45 k€") + " brut annuel minimum"}\n- Type de contrat recherché : CDI${p.mobilite ? "\n- Mobilité : " + p.mobilite : ""}`);
+  L.push(`\nMes informations :\n- Prénom : ${prenomP || ""}\n- Nom : ${nomP.join(" ")}\n- E-mail : ${p.email || ""}\n- Téléphone : ${p.telephone || ""}${p.adresse ? "\n- Adresse : " + [p.adresse, [p.codePostal, p.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ") : ""}${p.linkedin ? "\n- LinkedIn : " + p.linkedin : ""}\n- Poste actuel / titre : ${p.titre || "Ingénieur mécanique"}\n- Disponibilité : ${dispo()}\n- Prétentions : ${/brut/i.test(p.salaire || "") ? p.salaire + " minimum" : (p.salaire || "45 k€") + " brut annuel minimum"}\n- Type de contrat recherché : CDI${p.mobilite ? "\n- Mobilité : " + p.mobilite : ""}`);
   L.push(`\nMessage de candidature (à coller tel quel dans le champ message ou lettre) :\n"""\n${msg}\n"""`);
   if (lt?.contenu) L.push(`\nLettre de motivation complète (si le site demande une lettre en texte et non en fichier) :\n"""\n${lt.contenu}\n"""`);
   L.push(`\nNe paie rien, n'accepte aucune newsletter ni offre commerciale, et ne modifie pas mes autres candidatures.`);
@@ -4378,7 +4381,7 @@ $("#overlay").addEventListener("click", async (e) => {
     if (!state.db) return toast("Connecte-toi à Jobello pour enregistrer");
     const p0 = state.profil || {};
     const { id: _pid, ...prevP } = state.profil || {};
-    const data = { ...prevP, disponibilite: $("#p-dispo").value.trim(), nom: $("#p-nom").value.trim(), titre: $("#p-titre").value.trim(), email: $("#p-email").value.trim(), telephone: $("#p-tel").value.trim(), salaire: $("#p-salaire").value.trim(), mobilite: $("#p-mob").value.trim(),
+    const data = { ...prevP, disponibilite: $("#p-dispo").value.trim(), nom: $("#p-nom").value.trim(), titre: $("#p-titre").value.trim(), email: $("#p-email").value.trim(), telephone: $("#p-tel").value.trim(), adresse: $("#p-adr").value.trim(), codePostal: $("#p-cp").value.trim(), ville: $("#p-ville").value.trim(), salaire: $("#p-salaire").value.trim(), mobilite: $("#p-mob").value.trim(),
       pitch: $("#p-pitch").value.trim(), linkedin: $("#p-li").value.trim(), postes: $("#p-postes").value.split("\n").map((x) => x.trim()).filter(Boolean), updatedAt: new Date().toISOString() };
     try { await state.db.doc("profil/main").set(data); toast("Profil enregistré"); closeSheet(); } catch { toast("Enregistrement refusé, réessaie."); }
   }
