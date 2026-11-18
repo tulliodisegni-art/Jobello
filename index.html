@@ -111,7 +111,7 @@ textarea.short { min-height: 0; resize: none; }
 .row > input, .row > select, .row > textarea { min-width: 0; max-width: 100%; }
 .sheet, .panel, .relance-box, .mail-card, .fold, .car, .offer, .cible { overflow-wrap: break-word; }
 img, video, canvas, svg { max-width: 100%; }
-.sheet table { display: block; max-width: 100%; overflow-x: auto; }
+.sheet table, table.dash-t, table.cb-tab { display: block; max-width: 100%; overflow-x: auto; }
 html, body { overflow-x: clip; max-width: 100%; }
 .sheet { overflow-x: hidden; }
 .switch { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
@@ -148,7 +148,7 @@ html, body { overflow-x: clip; max-width: 100%; }
 .plat .acc { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; }
 .plat .acc input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
 .plat.done { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-.copy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.copy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 8px; }
 .copy-item { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
 .copy-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .88rem; }
 .copy-item b { display: block; font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
@@ -553,9 +553,12 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .fav-box .fav-drag { background: var(--accent); color: var(--accent-ink); }
 .id-chips { gap: 6px; }
 .kit-step { font-weight: 700; font-family: var(--display); margin-top: 6px; }
-.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+@media (max-width: 559px) { .kit-grid { grid-template-columns: minmax(0, 1fr); } }
 .kit-item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.kit-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.kit-h { display: flex; justify-content: space-between; align-items: center; gap: 4px 8px; flex-wrap: wrap; min-width: 0; }
+.kit-h > b { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.kit-h > .row { flex: 0 1 auto; margin-left: auto; max-width: 100%; }
 .kit-h b { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .kit-t { font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .kit-item.big .kit-t { max-height: 8.5em; overflow: auto; }
