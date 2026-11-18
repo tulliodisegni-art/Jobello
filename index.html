@@ -659,6 +659,79 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 }
 #agenda-list .hl { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+
+/* ---------- Agenda clair (v56) : l'essentiel en haut, la semaine repliable ---------- */
+#v-agenda { max-width: 720px; }
+.ag2-top { display: flex; flex-direction: column; gap: 12px; }
+.ag2-hero { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 3px; padding: 16px 18px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, #5b2fa8, var(--s-interview)); box-shadow: 0 6px 18px color-mix(in srgb, var(--s-interview) 30%, transparent); }
+.ag2-hero-l { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; opacity: .85; }
+.ag2-hero-t { font-family: var(--display); font-size: 1.45rem; line-height: 1.15; overflow-wrap: anywhere; }
+.ag2-hero-w { font-size: 1.02rem; font-weight: 700; }
+.ag2-hero-s { font-size: .86rem; opacity: .9; overflow-wrap: anywhere; }
+.ag2-hero-s:empty { display: none; }
+.ag2-hero-go { display: inline-flex; align-items: center; gap: 2px; margin-top: 8px; font-size: .84rem; font-weight: 700; align-self: flex-start; padding: 6px 12px; border-radius: 99px; background: rgba(255,255,255,.18); }
+.ag2-hero:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ag2-today { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.ag2-today-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ag2-today-h > div { display: flex; flex-direction: column; min-width: 0; }
+.ag2-kicker { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--accent); }
+.ag2-today-h b { font-family: var(--display); font-size: 1.25rem; line-height: 1.2; }
+.ag2-count { flex: none; font-size: .78rem; font-weight: 700; padding: 5px 10px; border-radius: 99px; background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, transparent)); color: var(--accent); white-space: nowrap; }
+.ag2-count.hot { background: color-mix(in srgb, var(--s-refused) 12%, transparent); color: var(--s-refused); }
+.ag2-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ag2-free { margin: 0; color: var(--muted); font-size: .9rem; }
+.ag2-sub { margin: 4px 2px 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
+.ag2-it { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; min-height: 52px; display: grid; grid-template-columns: 44px minmax(0,1fr) 16px; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--c, var(--accent)) 9%, transparent); color: inherit; text-decoration: none; }
+.ag2-it:hover { background: color-mix(in srgb, var(--c, var(--accent)) 15%, transparent); }
+.ag2-it:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ag2-it .chev { color: var(--muted); }
+.ag2-ic { width: 44px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--c, var(--accent)); color: #fff; font-weight: 800; font-size: .74rem; text-align: center; line-height: 1.05; padding: 0 2px; box-sizing: border-box; }
+.ag2-tx { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.ag2-tx b { font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag2-tx span { font-size: .82rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag2-it.late .ag2-tx span { white-space: normal; }
+.ag2-tx em { font-style: normal; font-weight: 700; color: var(--s-refused); }
+.ag2-date { font-style: normal; font-size: .74rem; font-weight: 700; color: var(--c, var(--accent)); }
+.ag2-it.ent { --c: var(--s-interview); } .ag2-it.rel { --c: var(--s-follow); } .ag2-it.rel.late { --c: var(--s-refused); } .ag2-it.li { --c: #0a66c2; }
+.ag2-it.ent .ag2-ic { font-size: .7rem; }
+.ag2-it.rel .ag2-ic, .ag2-it.done .ag2-ic { font-size: 1.05rem; }
+.ag2-it.done { --c: var(--muted); background: transparent; border: 1px dashed var(--line); min-height: 46px; opacity: .8; grid-template-columns: 44px minmax(0,1fr); }
+.ag2-it.done .ag2-ic { background: color-mix(in srgb, var(--s-offer) 18%, transparent); color: var(--s-offer); }
+.ag2-done > summary, .ag2-past > summary { list-style: none; cursor: pointer; font-size: .86rem; font-weight: 600; color: var(--muted); padding: 6px 2px; display: flex; align-items: center; gap: 6px; }
+.ag2-done > summary::-webkit-details-marker, .ag2-past > summary::-webkit-details-marker, .ag2-day > summary::-webkit-details-marker { display: none; }
+.ag2-done > summary small, .ag2-past > summary small { font-weight: 500; opacity: .85; }
+.ag2-done > summary::after, .ag2-past > summary::after, .ag2-day > summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin-left: auto; flex: none; transition: transform .15s; }
+.ag2-done[open] > summary::after, .ag2-past[open] > summary::after, .ag2-day[open] > summary::after { transform: rotate(-135deg); }
+.ag2-done[open] > .ag2-list { margin-top: 4px; }
+.ag2-week { display: flex; flex-direction: column; gap: 4px; }
+.ag2-week .pl-nav { margin: 4px 0 6px; flex-wrap: wrap; }
+.ag2-week .pl-nav .small { margin-left: 0; }
+.ag2-week #pl-today { margin-left: auto; }
+.ag2-week #pl-today[hidden] + #ag-all { margin-left: auto; }
+.ag2-days { display: flex; flex-direction: column; gap: 6px; }
+.ag2-day { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+.ag2-day > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 52px; box-sizing: border-box; }
+.ag2-day.free { display: flex; align-items: center; gap: 12px; padding: 6px 14px; min-height: 40px; background: transparent; border-style: dashed; opacity: .75; }
+.ag2-day.free .ag2-dn b { font-size: 1rem; }
+.ag2-day[open] { box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+.ag2-day[open] > .ag2-list { padding: 0 10px 10px; }
+.ag2-day.past { opacity: .85; }
+.ag2-dn { display: flex; align-items: baseline; gap: 6px; width: 64px; flex: none; }
+.ag2-dn span { font-size: .78rem; color: var(--muted); text-transform: capitalize; }
+.ag2-dn b { font-size: 1.25rem; font-family: var(--display); }
+.ag2-chips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.ag2-chip { font-size: .76rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); white-space: nowrap; }
+.ag2-chip.ent { --c: var(--s-interview); } .ag2-chip.rel { --c: var(--s-follow); } .ag2-chip.li { --c: #0a66c2; } .ag2-chip.done { --c: var(--muted); font-weight: 600; }
+.ag2-none { font-size: .84rem; color: var(--muted); }
+.ag2-past { margin-top: 4px; }
+.ag2-past > .ag2-days { margin-top: 4px; }
+@media (max-width: 560px) { #docs-lettre .doc .excerpt, #docs-arch .doc .excerpt { display: none; } #docs-lettre .doc, #docs-arch .doc { padding: 11px 14px; } }
+#docs-arch .doc { opacity: .8; }
+#ag-later { display: flex; flex-direction: column; gap: 10px; }
+#ag-later:empty { display: none; }
+.ag2-it.hl, .ag2-day.hl, .ag2-today.hl { outline: 2px solid var(--accent); outline-offset: 2px; }
+[data-theme="dark"] .ag2-hero { background: linear-gradient(135deg, #3f1f7a, #6d3cc0); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ag2-hero { background: linear-gradient(135deg, #3f1f7a, #6d3cc0); } }
 /* ---------- v58 : accueil tableau de bord ---------- */
 @media (min-width: 1024px) { #v-accueil { max-width: 1080px !important; } }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
@@ -829,10 +902,13 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077
 
   <!-- AGENDA -->
   <section class="view" id="v-agenda" hidden>
-    <div class="row between"><div><h2 style="font-size:1.4rem">Mon planning</h2><p class="muted" id="fs-agenda" style="margin-top:2px"></p></div></div>
-    <div class="pl-nav"><button type="button" class="pl-arrow" data-plweek="-1" aria-label="Semaine précédente">‹</button><b id="pl-title"></b><button type="button" class="pl-arrow" data-plweek="1" aria-label="Semaine suivante">›</button><button type="button" class="small" data-plweek="0" id="pl-today">Aujourd'hui</button></div>
-    <div class="pl-legend"><span><i style="--c:var(--s-interview)"></i>Entretien</span><span><i style="--c:var(--s-follow)"></i>Relance</span><span><i style="--c:var(--accent)"></i>LinkedIn</span><span><i style="--c:var(--muted)"></i>Fait</span></div>
-        <div class="groups" id="agenda-list"></div>
+    <div><h2 style="font-size:1.4rem">Mon planning</h2><p class="muted" id="fs-agenda" style="margin-top:2px"></p></div>
+    <div id="ag-top" class="ag2-top"></div>
+    <section class="ag2-week">
+      <div class="pl-nav"><button type="button" class="pl-arrow" data-plweek="-1" aria-label="Semaine précédente">‹</button><b id="pl-title"></b><button type="button" class="pl-arrow" data-plweek="1" aria-label="Semaine suivante">›</button><button type="button" class="small" data-plweek="0" id="pl-today">Revenir</button><button type="button" class="small ghost" id="ag-all" data-agall>Tout ouvrir</button></div>
+      <div class="groups" id="agenda-list"></div>
+    </section>
+    <div id="ag-later"></div>
   </section>
 
   <!-- DOCUMENTS -->
@@ -851,6 +927,11 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077
       <div class="panel-head"><h2>Mes lettres de motivation</h2><button type="button" class="small" data-action="new-doc" data-type="lettre">+ Nouvelle lettre</button></div>
       <div class="doc-grid" id="docs-lettre"></div>
     </div>
+    <details class="fold" id="docs-arch" hidden><summary><span class="fold-t">Archives</span><span class="fold-s" id="fs-arch"></span></summary><div class="fold-b">
+      <p class="muted" style="margin:0;font-size:.86rem">Les CV et lettres des candidatures refusées, abandonnées ou de plus d'un mois sans suite. Rien n'est supprimé : ils restent ouvrables ici.</p>
+      <h3 class="ag-h">CV</h3><div class="doc-grid" id="docs-arch-cv"></div>
+      <h3 class="ag-h">Lettres</h3><div class="doc-grid" id="docs-arch-lettre"></div>
+    </div></details>
   </section>
 
   <!-- PLATEFORMES / OFFRES -->
@@ -941,7 +1022,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const mondayOf = (d) => { const n = (new Date(d + "T12:00:00").getDay() + 6) % 7; return addDays(d, -n); };
-let plWeek = null;
+let plWeek = null, focusDay = "";
 const fmt = (iso, o = { day: "numeric", month: "short" }) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", o) : "";
 const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
 /* Teams : msteams: ouvre directement l'appli sur iPhone / ordinateur ; le lien https reste en secours */
@@ -991,9 +1072,10 @@ function showTab(t) {
   TABS.forEach((x) => { $("#v-" + x).hidden = x !== t; });
   document.querySelectorAll("nav.tabs a").forEach((a) => a.dataset.tab === t ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
   window.scrollTo(0, 0);
+  focusDay = focus.startsWith("d-") ? focus.slice(2) : "";
   if (focus.startsWith("d-")) { plWeek = mondayOf(focus.slice(2)); renderAgenda(); }
   else if (t === "agenda" && !focus) { plWeek = mondayOf(todayISO()); renderAgenda(); }
-  if (focus) setTimeout(() => { const e = document.getElementById("ev-" + focus); if (e) { e.scrollIntoView({ block: "center" }); e.classList.add("hl"); setTimeout(() => e.classList.remove("hl"), 2400); } }, 60);
+  if (focus) setTimeout(() => { const e = document.getElementById("ev-" + focus); if (e) { for (let x = e; x; x = x.parentElement?.closest("details")) if (x.tagName === "DETAILS") x.open = true; e.scrollIntoView({ block: "center" }); e.classList.add("hl"); setTimeout(() => e.classList.remove("hl"), 2400); } }, 60);
 }
 if (matchMedia("(min-width: 1024px)").matches) document.querySelectorAll(".home-side > details.fold").forEach((d, i) => { if (i < 1) d.open = true; });
 let satProbe = null;
@@ -1264,38 +1346,75 @@ function agendaEvents() {
 const evKey = (k) => String(k).replace(/[^\w-]/g, "_");
 function renderAgenda() {
   const today = todayISO(), ev = agendaEvents(), wk0 = plWeek || (plWeek = mondayOf(today)), days = [...Array(7)].map((_, i) => addDays(wk0, i)), wkEnd = days[6];
-  const isCur = wk0 === mondayOf(today);
+  const isCur = wk0 === mondayOf(today), tomorrow = addDays(today, 1);
+  const hm = (h) => h ? h.replace(":", " h ") : "";
+  const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`, cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
   const late = ev.filter((e) => e.date < today && e.st !== "entretien");
-  // ce qui est déjà fait, tiré des historiques
-  const done = [];
-  state.cands.forEach((c) => (c.historique || []).forEach((h) => { if (h.date >= wk0 && h.date <= wkEnd && h.date <= today && !/^Dossier créé/i.test(h.texte || "")) done.push({ date: h.date, c, texte: h.texte }); }));
-  state.cands.forEach((c) => { if (c.dateEntretien && c.dateEntretien < today && c.dateEntretien >= wk0 && c.dateEntretien <= wkEnd) done.push({ date: c.dateEntretien, c, texte: "Entretien" + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : ""), ent: true }); });
-  const liDone = {};
-  state.contacts.forEach((p) => (p.historique || []).forEach((h) => { if (h.date >= wk0 && h.date <= wkEnd && h.date <= today && !/^Ajouté/i.test(h.texte || "")) liDone[h.date] = (liDone[h.date] || 0) + 1; }));
+  // ce qui est déjà fait, tiré des historiques (semaine affichée + aujourd'hui)
+  const doneOf = (from, to) => {
+    const out = [];
+    state.cands.forEach((c) => (c.historique || []).forEach((h) => { if (h.date >= from && h.date <= to && h.date <= today && !/^Dossier créé/i.test(h.texte || "")) out.push({ date: h.date, c, texte: h.texte }); }));
+    state.cands.forEach((c) => { if (c.dateEntretien && c.dateEntretien < today && c.dateEntretien >= from && c.dateEntretien <= to) out.push({ date: c.dateEntretien, c, texte: "Entretien" + (c.heureEntretien ? " à " + hm(c.heureEntretien) : ""), ent: true }); });
+    state.contacts.forEach((p) => (p.historique || []).forEach((h) => { if (h.date >= from && h.date <= to && h.date <= today && !/^Ajouté/i.test(h.texte || "")) out.push({ date: h.date, li: true }); }));
+    return out;
+  };
+  const dayName = (d) => d === today ? "Aujourd'hui" : d === tomorrow ? "Demain" : cap(fmt(d, { weekday: "long", day: "numeric", month: "long" }));
+  const ago = (d) => { const n = Math.round((new Date(today + "T12:00:00") - new Date(d + "T12:00:00")) / 864e5); return n <= 1 ? "depuis hier" : `depuis ${n} jours`; };
+  const item = (e) => {
+    if (e.st === "entretien") { const c = e.c; return `<button type="button" class="ag2-it ent" id="ev-${evKey(e.key)}" data-open="${esc(c.id)}"><span class="ag2-ic">${esc(hm(c.heureEntretien) || "Entretien")}</span><span class="ag2-tx"><b>${esc(c.entreprise || "")}</b><span>${esc(["Entretien", c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span></span>${ICON.chev}</button>`; }
+    if (e.p) return `<button type="button" class="ag2-it li" id="ev-${evKey(e.key)}" data-contact="${esc(e.p.id)}"><span class="ag2-ic">in</span><span class="ag2-tx"><b>${esc(e.p.nom || e.p.entreprise || "Contact")}</b><span>${esc(e.kind)}</span></span>${ICON.chev}</button>`;
+    const lt = e.date < today;
+    return `<button type="button" class="ag2-it rel${lt ? " late" : ""}" id="ev-${evKey(e.key)}" data-open="${esc(e.c.id)}"${e.task ? ` data-task="${e.task}"` : ""}><span class="ag2-ic">${lt ? "!" : "↻"}</span><span class="ag2-tx"><b>${esc(e.c.entreprise || "")}</b><span>${esc(e.kind === "Relance" ? "Relancer" : e.kind)}${lt ? ` <em>en retard ${ago(e.date)}</em>` : ""}</span></span>${ICON.chev}</button>`;
+  };
+  const liGroup = (li, sub) => li.length > 2 ? `<a class="ag2-it li" href="#contacts"><span class="ag2-ic">in</span><span class="ag2-tx"><b>${li.length} messages LinkedIn</b><span>${esc(sub || [...new Set(li.map((e) => e.p.entreprise).filter(Boolean))].slice(0, 3).join(", "))}</span></span>${ICON.chev}</a>` : li.map(item).join("");
+  const doneList = (dn) => { const li = dn.filter((x) => x.li).length; return dn.filter((x) => !x.li).map((x) => `<button type="button" class="ag2-it done" data-open="${esc(x.c.id)}"><span class="ag2-ic">✓</span><span class="ag2-tx"><b>${esc(x.c.entreprise || "")}</b><span>${esc(x.texte)}</span></span></button>`).join("") + (li ? `<a class="ag2-it done" href="#contacts"><span class="ag2-ic">✓</span><span class="ag2-tx"><b>LinkedIn</b><span>${plural(li, "action")} faite${li > 1 ? "s" : ""}</span></span></a>` : ""); };
+  const sortDay = (list) => [...list.filter((e) => e.st === "entretien").sort((a, b) => (a.c.heureEntretien || "").localeCompare(b.c.heureEntretien || "")), ...list.filter((e) => e.st !== "entretien" && !e.p)];
+  const chips = (list, dn) => {
+    const ne = list.filter((e) => e.st === "entretien").length, nr = list.filter((e) => e.st !== "entretien" && !e.p).length, nl = list.filter((e) => e.p).length, nd = dn.length;
+    return [ne && `<span class="ag2-chip ent">${plural(ne, "entretien")}</span>`, nr && `<span class="ag2-chip rel">${plural(nr, "relance")}</span>`, nl && `<span class="ag2-chip li">${nl} LinkedIn</span>`, nd && `<span class="ag2-chip done">${nd} fait${nd > 1 ? "s" : ""}</span>`].filter(Boolean).join("");
+  };
+
+  /* 1. En haut, toujours : le prochain entretien et la carte du jour */
+  const nextEnt = ev.find((e) => e.st === "entretien" && e.date >= today);
+  const hero = nextEnt ? (() => { const c = nextEnt.c; return `<button type="button" class="ag2-hero" id="ev-hero" data-open="${esc(c.id)}"><span class="ag2-hero-l">Prochain entretien</span><b class="ag2-hero-t">${esc(c.entreprise || "")}</b><span class="ag2-hero-w">${esc(dayName(nextEnt.date))}${c.heureEntretien ? " à " + esc(hm(c.heureEntretien)) : ""}</span><span class="ag2-hero-s">${esc([c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span><span class="ag2-hero-go">Ouvrir la fiche ${ICON.chev}</span></button>`; })() : "";
+  const tList = ev.filter((e) => e.date === today), tDone = doneOf(today, today);
+  const tItems = sortDay(tList.filter((e) => e.st === "entretien")).map(item).join("") + late.filter((e) => !e.p).map(item).join("") + sortDay(tList.filter((e) => e.st !== "entretien")).map(item).join("") + liGroup([...late, ...tList].filter((e) => e.p));
+  const nToday = tList.length + late.length;
+  const todayCard = `<div class="ag2-today" id="ev-d-${today}"><div class="ag2-today-h"><div><span class="ag2-kicker">Aujourd'hui</span><b>${esc(cap(fmt(today, { weekday: "long", day: "numeric", month: "long" })))}</b></div><span class="ag2-count${late.length ? " hot" : ""}">${nToday ? plural(nToday, "chose") + " à faire" : "Rien à faire"}</span></div>
+    <div class="ag2-list">${tItems || `<p class="ag2-free">Journée libre. Tu peux chercher de nouvelles offres ou préparer tes entretiens.</p>`}</div>
+    ${tDone.length ? `<details class="ag2-done"><summary>✓ Déjà fait aujourd'hui <small>${tDone.length}</small></summary><div class="ag2-list">${doneList(tDone)}</div></details>` : ""}</div>`;
+  $("#ag-top").innerHTML = hero + todayCard;
+
+  /* 2. La semaine : un jour par ligne, repliable */
   const nEnt = ev.filter((e) => e.st === "entretien" && e.date >= wk0 && e.date <= wkEnd).length, nRel = ev.filter((e) => e.st !== "entretien" && !e.p && e.date >= wk0 && e.date <= wkEnd).length;
+  $("#fs-agenda").textContent = [nEnt + ev.filter((e) => e.st === "entretien" && e.date > wkEnd).length ? plural(ev.filter((e) => e.st === "entretien" && e.date >= today).length, "entretien") + " à venir" : "Aucun entretien prévu", late.length && `${late.length} en retard`].filter(Boolean).join(" · ");
   $("#pl-title").textContent = isCur ? "Cette semaine" : `Semaine du ${fmt(wk0, { day: "numeric", month: "long" })}`;
   $("#pl-today").hidden = isCur;
-  $("#fs-agenda").textContent = [`Du ${fmt(wk0, { day: "numeric", month: "short" })} au ${fmt(wkEnd, { day: "numeric", month: "short" })}`, nEnt && `${nEnt} entretien${nEnt > 1 ? "s" : ""}`, nRel && `${nRel} relance${nRel > 1 ? "s" : ""}`, isCur && late.length && `${late.length} en retard`].filter(Boolean).join(" · ");
-  const hm = (h) => h ? h.replace(":", " h ") : "";
-  const item = (e) => {
-    if (e.st === "entretien") { const c = e.c; return `<button type="button" class="pl-it ent" id="ev-${evKey(e.key)}" data-open="${esc(c.id)}"><span class="pl-time">${esc(hm(c.heureEntretien) || "Entretien")}</span><b>${esc(c.entreprise || "")}</b><span>${esc([c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · ") || "Entretien")}</span></button>`; }
-    if (e.p) return `<button type="button" class="pl-it li" id="ev-${evKey(e.key)}" data-contact="${esc(e.p.id)}"><b>${esc(e.p.nom || e.p.entreprise || "Contact")}</b><span>${esc(e.kind)}</span></button>`;
-    return `<button type="button" class="pl-it rel" id="ev-${evKey(e.key)}" data-open="${esc(e.c.id)}"${e.task ? ` data-task="${e.task}"` : ""}><b>${esc(e.c.entreprise || "")}</b><span>${esc(e.kind === "Relance" ? "Relancer" : e.kind)}</span></button>`;
+  const dn = doneOf(wk0, wkEnd);
+  const dayRow = (d) => {
+    const list = d < today ? [] : ev.filter((e) => e.date === d), ddn = dn.filter((x) => x.date === d), head = `<span class="ag2-dn"><span>${esc(fmt(d, { weekday: "short" }).replace(".", ""))}</span><b>${new Date(d + "T12:00:00").getDate()}</b></span>`;
+    if (!list.length && !ddn.length) return `<div class="ag2-day free${d === today ? " is-today" : ""}" id="ev-d-${d}">${head}<span class="ag2-chips"><span class="ag2-none">Libre</span></span></div>`;
+    const open = list.some((e) => e.st === "entretien") || d === focusDay;
+    const items = sortDay(list).map(item).join("") + liGroup(list.filter((e) => e.p)) + (ddn.length ? (list.length ? `<p class="ag2-sub">Déjà fait</p>` : "") + doneList(ddn) : "");
+    return `<details class="ag2-day${d === today ? " is-today" : ""}${d < today ? " past" : ""}" id="ev-d-${d}"${open ? " open" : ""}><summary>${head}<span class="ag2-chips">${chips(list, ddn)}</span></summary><div class="ag2-list">${items}</div></details>`;
   };
-  const dayHTML = (d) => {
-    const past = d < today, list = past ? [] : ev.filter((e) => e.date === d);
-    const ents = list.filter((e) => e.st === "entretien").sort((a, b) => (a.c.heureEntretien || "").localeCompare(b.c.heureEntretien || "")), rel = list.filter((e) => e.st !== "entretien" && !e.p), li = list.filter((e) => e.p);
-    const liHTML = li.length > 2 ? `<a class="pl-it li" href="#contacts"><b>${li.length} messages LinkedIn</b><span>${esc([...new Set(li.map((e) => e.p.entreprise).filter(Boolean))].slice(0, 3).join(", "))}</span></a>` : li.map(item).join("");
-    const dn = done.filter((x) => x.date === d), ldn = liDone[d] || 0;
-    const doneHTML = dn.map((x) => `<button type="button" class="pl-it done${x.ent ? " ent" : ""}" data-open="${esc(x.c.id)}"><b>${esc(x.c.entreprise || "")}</b><span>${esc(x.texte)}</span></button>`).join("") + (ldn ? `<a class="pl-it done" href="#contacts"><b>LinkedIn</b><span>${ldn} action${ldn > 1 ? "s" : ""} faite${ldn > 1 ? "s" : ""}</span></a>` : "");
-    const lateHTML = d === today && isCur && late.length ? `<div class="pl-late"><b>En retard · ${late.length}</b>${late.filter((e) => !e.p).map(item).join("")}${late.some((e) => e.p) ? `<a class="pl-it li" href="#contacts"><b>${late.filter((e) => e.p).length} messages LinkedIn</b><span>à rattraper</span></a>` : ""}</div>` : "";
-    const body = lateHTML + ents.map(item).join("") + rel.map(item).join("") + liHTML + doneHTML;
-    return `<div class="pl-day${d === today ? " today" : ""}${past ? " past" : ""}${body ? "" : " empty"}" id="ev-d-${d}"><div class="pl-dh"><span>${esc(fmt(d, { weekday: "long" }))}</span><b>${new Date(d + "T12:00:00").getDate()}</b>${d === today ? `<em>Aujourd'hui</em>` : ""}</div><div class="pl-items">${body || `<span class="pl-none">Libre</span>`}</div></div>`;
-  };
-  const next = ev.filter((e) => e.st === "entretien" && e.date > wkEnd);
-  $("#agenda-list").innerHTML = `<div class="pl-grid">${days.map(dayHTML).join("")}</div>` + (next.length ? `<section class="ag-sec"><h3 class="ag-h">Entretiens à venir <small>${next.length}</small></h3><div class="tasks">${next.map((e) => `<button type="button" class="task st-entretien" data-open="${esc(e.c.id)}"><span class="task-dot"></span><span class="task-txt"><b>${esc(e.c.entreprise || "")}</b><span>${esc(fmt(e.date, { weekday: "long", day: "numeric", month: "long" }))}${e.c.heureEntretien ? " à " + esc(hm(e.c.heureEntretien)) : ""}</span></span>${ICON.chev}</button>`).join("")}</div></section>` : "");
+  let rows;
+  if (isCur) {
+    const before = days.filter((d) => d < today), after = days.filter((d) => d > today), bdn = dn.filter((x) => x.date < today);
+    rows = after.map(dayRow).join("") || `<p class="ag2-free">C'est la fin de la semaine. Regarde la suivante avec ›.</p>`;
+    if (before.length) rows += `<details class="ag2-past"><summary>Début de semaine <small>${bdn.length ? `${bdn.length} fait${bdn.length > 1 ? "s" : ""}` : "rien de noté"}</small></summary><div class="ag2-days">${before.map(dayRow).join("")}</div></details>`;
+  } else rows = days.map(dayRow).join("");
+  $("#agenda-list").innerHTML = `<div class="ag2-days">${rows}</div>`;
+
+  /* 3. Plus tard */
+  const next = ev.filter((e) => e.st === "entretien" && e.date > wkEnd && e !== nextEnt);
+  const nextRel = isCur ? ev.filter((e) => e.st !== "entretien" && e.date > wkEnd) : [];
+  $("#ag-later").innerHTML = (next.length ? `<details class="fold" open><summary><span class="fold-t">Entretiens plus tard</span><span class="fold-s">${next.length}</span></summary><div class="fold-b ag2-list">${next.map((e) => item(e).replace('<span class="ag2-tx"><b>', `<span class="ag2-tx"><i class="ag2-date">${esc(cap(fmt(e.date, { weekday: "long", day: "numeric", month: "long" })))}</i><b>`)).join("")}</div></details>` : "")
+    + (nextRel.length ? `<details class="fold"><summary><span class="fold-t">Relances plus tard</span><span class="fold-s">${nextRel.length}</span></summary><div class="fold-b ag2-list">${nextRel.filter((e) => !e.p).map((e) => item(e).replace('<span class="ag2-tx"><b>', `<span class="ag2-tx"><i class="ag2-date">${esc(cap(fmt(e.date, { weekday: "long", day: "numeric", month: "long" })))}</i><b>`)).join("")}${liGroup(nextRel.filter((e) => e.p), "dans les semaines à venir")}</div></details>` : "");
+  const all = $("#ag-all"); all.textContent = "Tout ouvrir"; all.hidden = !document.querySelector("#agenda-list details");
   renderRappels(ev);
 }
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-agall]"); if (!b) return; const ds = [...document.querySelectorAll("#agenda-list details")], open = !ds.every((d) => d.open); ds.forEach((d) => (d.open = open)); b.textContent = open ? "Tout replier" : "Tout ouvrir"; });
 /* Rappels de l'accueil : en retard, aujourd'hui et les 2 prochains jours */
 function renderRappels(ev) {
   if (!$("#rappels")) return;
@@ -1554,15 +1673,34 @@ function renderDocs() {
       <button type="button" class="small" data-action="edit-profil">Modifier</button></div>
       <div class="tags">${(p.postes || []).map((x) => `<span class="tag">${esc(x)}</span>`).join("")}${p.salaire ? `<span class="tag">À partir de ${esc(p.salaire)}</span>` : ""}${p.linkedin ? `<a class="tag" href="${esc(safeUrl(p.linkedin))}" target="_blank" rel="noopener">Mon LinkedIn</a>` : ""}${p.mobilite ? `<span class="tag">${esc(p.mobilite)}</span>` : ""}</div>`
     : `<div class="row between"><div><h2>Mon profil</h2><p class="muted">Ton nom, les postes que tu vises et tes coordonnées servent aux lettres et aux relances.</p></div><button type="button" class="primary small" data-action="edit-profil">Remplir</button></div>`;
+  /* Seuls les CV et lettres utiles restent à la vue : modèles et candidatures en cours.
+     Ceux des candidatures refusées, abandonnées ou trop anciennes vont dans « Archives » (rien n'est supprimé). */
+  const norm = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const candsOf = (d) => { const l = state.cands.filter((c) => c.cv === d.id || c.lettre === d.id || c.cvAdapte === d.id); if (l.length || !d.societe) return l; const n = norm(d.societe); return n ? state.cands.filter((c) => { const e = norm(c.entreprise); return e && (e === n || e.startsWith(n + " ") || n.startsWith(e + " ")); }) : []; };
+  const old = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const docCard = (d, type, cs, modele) => {
+    const live = cs.filter((c) => !archivedCand(c)), shown = live.length ? live : cs;
+    const st = !modele && shown.length === 1 ? LABEL[shown[0].statut] || "" : "";
+    return `<button type="button" class="doc" data-doc="${esc(d.id)}"><span class="head"><span class="ic">${type === "cv" ? "CV" : "LM"}</span><span style="min-width:0"><strong>${esc(d.nom)}</strong>${d.domaine ? `<br><span class="meta">${esc(d.domaine)}</span>` : ""}</span></span>
+        ${d.contenu ? `<span class="excerpt">${esc(d.contenu.slice(0, 220))}</span>` : `<span class="excerpt">${d.assetId ? "Fichier joint, sans texte" : "Vide"}</span>`}
+        <span class="meta">${d.assetId ? "Fichier joint · " : ""}${cs.length ? `Utilisé${type === "lettre" ? "e" : ""} pour ${cs.length} candidature${cs.length > 1 ? "s" : ""}${st ? " · " + esc(st) : ""}` : "Pas encore utilisé" + (type === "lettre" ? "e" : "")}</span></button>`;
+  };
+  let nArch = 0;
   ["cv", "lettre"].forEach((type) => {
     const docs = state.docs.filter((d) => d.type === type && !d.adapte).sort((a, b) => (a.ordre ?? 99) - (b.ordre ?? 99) || (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
-    $("#docs-" + type).innerHTML = docs.length ? docs.map((d) => {
-      const used = state.cands.filter((c) => c.cv === d.id || c.lettre === d.id).length;
-      return `<button type="button" class="doc" data-doc="${esc(d.id)}"><span class="head"><span class="ic">${type === "cv" ? "CV" : "LM"}</span><span style="min-width:0"><strong>${esc(d.nom)}</strong>${d.domaine ? `<br><span class="meta">${esc(d.domaine)}</span>` : ""}</span></span>
-        ${d.contenu ? `<span class="excerpt">${esc(d.contenu.slice(0, 220))}</span>` : `<span class="excerpt">${d.assetId ? "Fichier joint, sans texte" : "Vide"}</span>`}
-        <span class="meta">${d.assetId ? "Fichier joint · " : ""}${used ? `Utilisé${type === "lettre" ? "e" : ""} pour ${used} candidature${used > 1 ? "s" : ""}` : "Pas encore utilisé" + (type === "lettre" ? "e" : "")}</span></button>`;
-    }).join("") : `<div class="empty" style="grid-column:1/-1">Aucun${type === "cv" ? " CV" : "e lettre"} pour l'instant.</div>`;
+    const keep = [], arch = [];
+    docs.forEach((d) => {
+      const cs = candsOf(d), modele = !d.societe && (d.ordre != null || !cs.length || cs.length > 1);
+      const archived = !modele && (cs.length ? cs.every(archivedCand) : String(d.updatedAt || d.createdAt || "") < old);
+      (archived ? arch : keep).push([d, cs, modele]);
+    });
+    nArch += arch.length;
+    $("#docs-" + type).innerHTML = keep.length ? keep.map(([d, cs, m]) => docCard(d, type, cs, m)).join("") : `<div class="empty" style="grid-column:1/-1">${arch.length ? `Aucun${type === "cv" ? " CV" : "e lettre"} pour une candidature en cours.` : `Aucun${type === "cv" ? " CV" : "e lettre"} pour l'instant.`}</div>`;
+    $("#docs-arch-" + type).innerHTML = arch.map(([d, cs, m]) => docCard(d, type, cs, m)).join("");
+    $("#docs-arch-" + type).previousElementSibling.hidden = !arch.length;
   });
+  $("#docs-arch").hidden = !nArch;
+  $("#fs-arch").textContent = nArch ? `${nArch} document${nArch > 1 ? "s" : ""} rangé${nArch > 1 ? "s" : ""}` : "";
 }
 
 /* ---------- Rendu : plateformes ---------- */
