@@ -70,6 +70,12 @@
   const lancerMode = () => !!(lien && lien.lancer); // départ avec le bouton ⚡ (la tâche s'ouvre, « Exécuter maintenant »)
   const occupe = () => lancerMode() && !!lien.enCours; // un passage des agents est en cours
   const cand = (id) => state.cands.find((c) => c.id === id);
+  /* Sociétés prioritaires (Safran d'abord) : profil/main.prioritaires, sinon ["Safran"].
+     Leur dossier est relu par Claude « comme un recruteur Safran » (c.prio) et ne part qu'après le OK de Tullio. */
+  const prioListe = () => { const l = state.profil && state.profil.prioritaires; return Array.isArray(l) && l.length ? l : ["Safran"]; };
+  const sansAcc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const prioDe = (nom) => prioListe().find((p) => p && sansAcc(nom).includes(sansAcc(p))) || "";
+  window.jbPrioDe = prioDe;
   const nextSlot = () => { const m = parisMin(), s = AG_SLOTS.find((x) => x > m); return s != null ? hhmm(s) : "demain " + hhmm(AG_SLOTS[0]); };
   const quand = () => relie() ? "tout de suite" : lancerMode() ? (occupe() ? "pendant ce passage" : "dès que tu touches ⚡") : "vers " + nextSlot();
 
@@ -85,7 +91,8 @@
     const cur = (await reread("demandes/dossiers")) || state.demandes || { liste: [] };
     const liste = (cur.liste || []).filter((d) => !(d.url === o.url && d.statut === "erreur"));
     const d = liste.find((x) => x.url === o.url || x.cle === offerKey(o));
-    if (d) d.auto = true; else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: true, demandeLe: new Date().toISOString() });
+    const prio = prioDe(o.entreprise);
+    if (d) { d.auto = true; if (prio) d.prio = prio; } else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: true, ...(prio ? { prio } : {}), demandeLe: new Date().toISOString() });
     const doc = { ...cur, liste: liste.slice(-60) };
     await state.db.doc("demandes/dossiers").set(doc); state.demandes = doc;
   });
@@ -102,7 +109,7 @@
 
   /* ---------- Les offres à faire défiler ---------- */
   const isP = (o) => (o.mode || guessMode(o.entreprise, o.titre)) === "prestataire";
-  const aDefiler = () => openOffers().filter((o) => !demandeOf(o)).sort((x, y) => isP(x) - isP(y) || (y.score ?? 50) - (x.score ?? 50));
+  const aDefiler = () => openOffers().filter((o) => !demandeOf(o)).sort((x, y) => !!prioDe(y.entreprise) - !!prioDe(x.entreprise) || isP(x) - isP(y) || (y.score ?? 50) - (x.score ?? 50));
 
   /* ---------- Le deck ---------- */
   let deck = null;
@@ -126,6 +133,7 @@
     return `<div class="sw-card${back ? " back" : ""}">
       ${back ? "" : `<span class="sw-stamp yes">POSTULER</span><span class="sw-stamp no">NON</span>`}
       <span class="inf">${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? `<span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score} % pour toi</span>` : ""}${ageTag(o)}</span>
+      ${prioDe(o.entreprise) ? `<span class="why" style="background:var(--warn-bg);color:var(--warn-fg)">⭐ Prioritaire : dossier taillé sur mesure et relu par Claude, il ne part qu'après ton OK.</span>` : ""}
       <span class="ent">${esc(o.entreprise || "Société ?")}</span>
       <span class="pst">${esc(o.titre || "")}</span>
       <span class="inf">${esc([o.ville, sal, o.type].filter(Boolean).join(" · "))}</span>
@@ -345,7 +353,7 @@
         connexion: `Le site ${site} demande de te reconnecter. Sur ton ordi, touche « Ouvrir la page à finir », connecte-toi en cochant « Rester connecté », puis touche « Réessayer » : l'agent reprend sur cette page.${apres}`,
         main: `L'agent ne peut pas finir celle-ci tout seul : ${raison}. Sur ton ordi, ouvre la page, joins ton CV et ta lettre (boutons ci-dessous), envoie, puis touche « C'est envoyé ✓ ».`
       }[e.action] || (lancerMode() ? `L'agent a besoin de toi : ${raison}. ${page ? "Sur ton ordi, touche « Ouvrir la page à finir »" : "Va sur ce site dans Chrome sur ton ordi"} : fais ce qui manque (créer ton compte ou te reconnecter), puis touche « Réessayer ».${apres}` : `L'agent n'a pas pu finir : ${raison}. ${page ? "Ouvre la page à finir" : "Va sur le site"}, fais ce qui manque, puis touche « Réessayer », ou termine-la toi-même avec « Postuler » plus bas.`);
-      const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.",
+      const t = { a_valider: prioDe(c.entreprise) ? `Candidature ${prioDe(c.entreprise)} : relis ton CV et ta lettre (et le bloc ⭐ juste en dessous), puis touche « Envoyer ». Rien ne part sans ton OK.` : "Les agents attendent ton OK pour envoyer cette candidature.",
         valide: (e.reprise ? "L'agent va reprendre sur la page où il s'était arrêté. " : "") + (relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : occupe() ? "Prête : tes agents sont au travail sur ton ordi et la prennent pendant ce passage." : go ? `Prête : touche « Lancer maintenant » pour que tes agents l'envoient tout de suite, sinon elle partira au prochain passage (vers ${nextSlot()}).` : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`),
         en_cours: e.reprise ? "Un agent reprend la candidature sur la page où il s'était arrêté." : "Un agent est en train de remplir le formulaire sur le site.",
         envoyee: `Envoyée${e.via === "toi" ? " par toi" : " par un agent"}${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via && e.via !== "toi" ? " via " + e.via : ""}.`,
@@ -356,6 +364,31 @@
       box.innerHTML = `<span class="lbl" style="font-weight:600">🤖 Agents Jobello</span><p style="margin:0">${esc(t)}</p>
         <div class="row">${e.statut === "a_valider" ? `<button type="button" class="small primary" data-ag="ok" data-id="${cid}">Envoyer</button>` : ""}${e.statut === "valide" && go ? lancer("⚡ Lancer maintenant") : ""}${B}${["a_valider", "valide", "bloquee"].includes(e.statut) ? `<button type="button" class="small ghost" data-ag="stop" data-id="${cid}">${e.statut === "bloquee" ? "Je m'en occupe" : "Ne pas l'envoyer"}</button>` : ""}</div>`;
       sh.after(box);
+    } catch (err) {}
+    return r;
+  };
+  /* Bloc ⭐ des sociétés prioritaires (Safran) sur la fiche : relecture « recruteur Safran » écrite par Claude (c.prio),
+     message réseau à copier, recherche LinkedIn. c.prio = { societe, relu, controles:[{nom, ok, detail}], conseil, messageReseau } */
+  const _openCandP = openCand;
+  openCand = function (id) {
+    const r = _openCandP.apply(this, arguments);
+    try {
+      const c = cand(id), soc = c && prioDe(c.entreprise); if (!soc) return r;
+      const sh = document.querySelector("#overlay .sheet .sheet-head"); if (!sh) return r;
+      const P = c.prio || {}, ctl = (P.controles || []).filter((x) => x && x.nom);
+      const ent = c.entreprise || soc, envoyee = c.statut !== "a_envoyer";
+      const li = "https://www.linkedin.com/search/results/people/?keywords=" + encodeURIComponent(`${ent} ingénieur conception mécanique`);
+      const box = document.createElement("div"); box.className = "relance-box"; box.style.borderColor = "#E9B949";
+      const liste = ctl.length ? `<ul style="margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px">${ctl.map((x) => `<li>${x.ok ? "✅" : "⚠️"} <b>${esc(x.nom)}</b>${x.detail ? ` <span class="muted">· ${esc(x.detail)}</span>` : ""}</li>`).join("")}</ul>`
+        : `<p class="muted" style="margin:0">${envoyee ? "Cette candidature est partie avant la relecture spéciale." : "La relecture « recruteur " + esc(soc) + " » sera faite par Claude avec le dossier."}</p>`;
+      const msg = P.messageReseau ? `<span class="lbl" style="font-weight:600">Message pour un ingénieur de ${esc(ent)} (LinkedIn)</span>
+        <p style="margin:0;white-space:pre-line" id="prio-msg">${esc(P.messageReseau)}</p>` : "";
+      box.innerHTML = `<span class="lbl" style="font-weight:600">⭐ ${esc(soc)} : candidature soignée${P.relu ? ` <small class="muted">relue le ${esc(fmt(P.relu, { day: "numeric", month: "long" }))}</small>` : ""}</span>
+        ${liste}${P.conseil ? `<p style="margin:0">${esc(P.conseil)}</p>` : ""}${msg}
+        <p class="muted" style="margin:0;font-size:.84rem">Chez ${esc(soc)}, un contact dans l'équipe compte souvent plus que le CV : écris à un ingénieur ou à un responsable du bureau d'études du site, et demande-lui 15 minutes pour parler du métier. S'il propose de transmettre ton CV (cooptation), ta candidature passe en haut de la pile.</p>
+        <div class="row">${P.messageReseau ? `<button type="button" class="small primary" data-prio-copy>Copier le message</button>` : ""}<a class="btn small" href="${esc(li)}" target="_blank" rel="noopener">Trouver un contact sur LinkedIn ↗</a></div>`;
+      const after = document.querySelector("#overlay .sheet .relance-box") || sh; after.after(box);
+      const b = box.querySelector("[data-prio-copy]"); if (b) b.addEventListener("click", (e) => { e.preventDefault(); copyText(P.messageReseau, box.querySelector("#prio-msg"), b, "Message copié : colle-le sur LinkedIn"); });
     } catch (err) {}
     return r;
   };
