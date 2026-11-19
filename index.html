@@ -544,6 +544,17 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .task .chev { color: var(--muted); }
 .task-w { font-size: .78rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .task-w.hot { color: var(--s-refused); }
+.news .tasks { border-left: 4px solid var(--s-refused); }
+.news-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--line); }
+.tasks > .news-row:last-child, .task-more > .news-row:last-child { border-bottom: 0; }
+.news-row .task { border-bottom: 0; grid-template-columns: 10px minmax(0, 1fr) auto; }
+.news-row.st-refus { background: color-mix(in srgb, var(--s-refused) 9%, transparent); }
+.news-row .task-txt span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.task-txt .news-k { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--st); }
+.news-vu { all: unset; cursor: pointer; margin-right: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: .82rem; font-weight: 600; color: var(--muted); background: var(--surface); }
+.news-vu:hover, .news-all:hover { color: var(--accent); border-color: var(--accent); }
+.news-all { all: unset; cursor: pointer; font-size: .88rem; font-weight: 600; color: var(--accent); }
+.news-note { margin: 0; font-size: .8rem; color: var(--muted); }
 .task-more > summary { list-style: none; cursor: pointer; padding: 12px 14px; color: var(--accent); font-weight: 600; font-size: .9rem; border-top: 1px solid var(--line); }
 .task-more > summary::-webkit-details-marker { display: none; }
 .task-more[open] > summary { border-bottom: 1px solid var(--line); }
@@ -854,6 +865,7 @@ button.primary, .btn.primary { background-image: linear-gradient(135deg, #17a077
     </header>
     <div class="row" id="hero-join" hidden></div>
     <div class="kpis" id="kpis"></div>
+    <section class="home-block news" id="news-panel" hidden><div class="row between"><h2 class="home-h">Nouvelles réponses</h2><button type="button" class="news-all" data-news-vu="*">Tout vu</button></div><div class="tasks" id="news"></div><p class="news-note">Elles restent ici 12 h, puis tu les retrouves dans Suivi.</p></section>
     <div id="focus" hidden></div>
     <section class="home-block prep-panel" id="prep-panel" hidden><div class="row between"><h2 class="home-h">Dossiers demandés à Claude</h2><span class="home-more" id="prep-meta"></span></div><div class="prep-list" id="prep-list"></div></section>
     <div class="home-grid">
@@ -1265,9 +1277,56 @@ function renderHome() {
   const counts = STATUTS.map(([k, l]) => [k, l, all.filter((c) => c.statut === k).length]).filter((x) => x[2]);
   $("#pipe").innerHTML = counts.map(([k, l, n]) => `<span class="st-${k}" style="flex:${n}" title="${l} : ${n}"></span>`).join("");
   $("#legend").innerHTML = counts.map(([k, l, n]) => `<span class="st-${k}"><i></i>${l} ${n}</span>`).join("") || "<span>Pas encore de candidature</span>";
+  renderNews();
   const n = all.filter(isDue).length + state.contacts.filter(contactDue).length; $("#due-dot").hidden = !n; $("#due-dot").textContent = n;
   $("#fs-stats").textContent = all.length ? `${all.length} candidatures · ${sentN ? Math.round(rep / sentN * 100) : 0} % de réponses` : "";
 }
+
+/* ---------- Accueil : nouvelles réponses (restent 12 h, puis seulement dans Suivi) ---------- */
+const NEWS_H = 12;
+const NEWS_ORD = { refus: 0, offre: 1, entretien: 2, demande: 3, relance: 4, autre: 5, accuse: 6 };
+const NEWS_K = { refus: "Refus", offre: "Offre", entretien: "Entretien", demande: "Demande d'infos", relance: "Nouvelles", autre: "Mail reçu", accuse: "Accusé de réception" };
+const NEWS_ST = { refus: "refus", offre: "offre", entretien: "entretien", demande: "relancee", relance: "relancee", autre: "envoyee", accuse: "envoyee" };
+function newsEvent(c) {
+  const m = (c.mails || []).slice(-1)[0];
+  let ev = m && m.date ? { date: m.date, type: NEWS_K[m.type] ? m.type : "autre", txt: m.resume || "", key: m.gmailId || m.hash || m.date + m.type } : null;
+  const h = [...(c.historique || [])].reverse().find((x) => /^Statut : (Entretien|Offre reçue|Refus)/.test(x.texte || ""));
+  if (h && h.date && (!ev || h.date > ev.date)) { const t = /Refus/.test(h.texte) ? "refus" : /Offre/.test(h.texte) ? "offre" : "entretien"; ev = { date: h.date, type: t, txt: "", key: h.date + t }; }
+  if (!ev) return null;
+  // Heure de l'évolution : la dernière mise à jour de la fiche si elle suit le mail (mail rangé à midi), sinon midi le jour du mail
+  const ua = c.updatedAt || "", uaDay = ua.slice(0, 10);
+  ev.at = ua && uaDay >= ev.date && daysBetween(ev.date, uaDay) <= 1 ? ua : ev.date + "T12:00:00";
+  return ev;
+}
+function newsList() {
+  const now = Date.now(), vus = state.vus || {};
+  return state.cands.map((c) => ({ c, ev: newsEvent(c) })).filter(({ c, ev }) => {
+    if (!ev) return false;
+    const t = Date.parse(ev.at); if (isNaN(t) || now - t > NEWS_H * 3600e3 || t - now > 3600e3) return false;
+    return vus[c.id] !== ev.key;
+  }).sort((a, b) => NEWS_ORD[a.ev.type] - NEWS_ORD[b.ev.type] || b.ev.at.localeCompare(a.ev.at));
+}
+function newsAgo(at) { const h = Math.floor((Date.now() - Date.parse(at)) / 3600e3); return h < 1 ? "à l'instant" : `il y a ${h} h`; }
+function renderNews() {
+  const box = $("#news"), panel = $("#news-panel"); if (!box) return;
+  const L = state.loaded ? newsList() : [];
+  panel.hidden = !L.length; if (!L.length) { box.innerHTML = ""; return; }
+  const row = ({ c, ev }) => `<div class="news-row st-${NEWS_ST[ev.type]}"><button type="button" class="task st-${NEWS_ST[ev.type]}" data-open="${esc(c.id)}"><span class="task-dot"></span><span class="task-txt"><span class="news-k">${NEWS_K[ev.type]}</span><b>${esc(c.entreprise || "Société ?")}</b><span>${esc(ev.txt || c.poste || "")}</span></span><span class="task-w">${newsAgo(ev.at)}</span></button><button type="button" class="news-vu" data-news-vu="${esc(c.id)}" aria-label="Vu : retirer ${esc(c.entreprise || "")} de l'accueil">Vu</button></div>`;
+  const big = L.filter((x) => x.ev.type !== "accuse"), acc = L.filter((x) => x.ev.type === "accuse");
+  box.innerHTML = big.map(row).join("") + (acc.length ? (acc.length <= 2 && big.length < 3 ? acc.map(row).join("") : `<details class="task-more"><summary>${acc.length} accusé${acc.length > 1 ? "s" : ""} de réception</summary>${acc.map(row).join("")}</details>`) : "");
+  panel.querySelector(".tasks").style.borderLeftColor = big.some((x) => x.ev.type === "refus") ? "" : "var(--accent)";
+}
+async function newsVu(id) {
+  const L = newsList(), vus = {};
+  // on ne garde que les clés encore utiles (fiches encore dans la fenêtre de 12 h)
+  const keep = new Set(state.cands.map((c) => c.id));
+  Object.entries(state.vus || {}).forEach(([k, v]) => { if (keep.has(k)) { const ev = newsEvent(state.cands.find((c) => c.id === k)); if (ev && ev.key === v) vus[k] = v; } });
+  L.forEach(({ c, ev }) => { if (id === "*" || id === c.id) vus[c.id] = ev.key; });
+  state.vus = vus; renderNews();
+  try { await state.db.doc("accueil/vus").set({ vus, updatedAt: new Date().toISOString() }); } catch { toast("Pas enregistré, réessaie."); }
+}
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-news-vu]"); if (!t) return; e.preventDefault(); e.stopPropagation(); newsVu(t.dataset.newsVu); }, true);
+setInterval(() => { try { renderNews(); } catch {} }, 10 * 60e3);
 
 /* ---------- Rendu : candidatures ---------- */
 const GROUPS = [["statut", "Étape"], ["entreprise", "Société"], ["mode", "Direct / presta"], ["canal", "Canal"], ["domaine", "Domaine"]];
@@ -4687,6 +4746,7 @@ render();
   db.doc("alertes/sites").onSnapshot((snap) => { state.sites = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); }, () => {});
   setTimeout(autoAlerts, 2500);
   db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; state.profilVu = true; render(); }, () => {});
+  db.doc("accueil/vus").onSnapshot((snap) => { state.vus = snap.exists ? (snap.data().vus || {}) : {}; renderNews(); }, () => {});
   db.doc("entrainement/main").onSnapshot((snap) => { state.entr = snap.exists ? snap.data() : null; if (!entrEdit) renderEntr(); }, () => {});
 })();
 </script>
