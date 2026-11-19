@@ -1932,7 +1932,7 @@ function renderComp() {
 async function compSave(list, msg) { const ok = await saveProfil({ competencesDetail: list }, msg); renderComp(); return ok; }
 async function compAI(btn) {
   if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
-  const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte && d.contenu);
+  const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
   if (!cvs.length) return toast("Ajoute d'abord un CV dans « Mes CV »");
   btn.disabled = true; btn.textContent = "Claude lit tes CV…";
   try {
@@ -2352,7 +2352,7 @@ function aiError(e) {
 const dispo = () => state.profil?.disponibilite || "Disponible sous 1 mois (préavis)";
 function profileText() {
   const p = state.profil || {};
-  const cv = state.docs.find((d) => d.id === editing?.cv) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
+  const cv = state.docs.find((d) => d.id === editing?.cv) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
   return `CANDIDAT : ${p.nom || ""}, ${p.titre || ""}. Postes visés : ${(p.postes || []).join(", ")}. Disponibilité : ${dispo()}.\n\n${compText()}\n\nCV :\n${(cv?.contenu || "").slice(0, 6000)}`;
 }
 /* Ce qui trahit un texte écrit par une IA : à éviter dans tout ce que Tullio envoie */
@@ -2507,7 +2507,7 @@ function docBlocks(text, type) {
     if (l.length <= 48 && /[A-ZÀ-Ý]{3}/.test(l) && l === l.toUpperCase()) { head = false; sec = l; afterRole = false; return out.push({ k: "h", t: l }); }
     if (head) return out.push({ k: "contact", t: l });
     const exp = /EXP[ÉE]RIENCE|PARCOURS/.test(sec);
-    if (exp && / · | - | – /.test(l) && /(19|20)\d{2}|aujourd/i.test(l) && l.length < 110) { afterRole = true; return out.push({ k: "role", t: l }); }
+    if (exp && / · | - | – /.test(l) && /(19|20)\d{2}|aujourd|present/i.test(l) && l.length < 110) { afterRole = true; return out.push({ k: "role", t: l }); }
     // Sous l'intitulé : l'entreprise (« Société — Contrat · … »), sinon une phrase de description (ex. année sabbatique), en italique gris
     if (exp && afterRole) { afterRole = false;
       if (!/^_/.test(l) && (/ — /.test(l) || (l.length <= 70 && !/ : |;/.test(l)))) return out.push({ k: "org", t: l });
@@ -2516,9 +2516,9 @@ function docBlocks(text, type) {
     if (exp && /^_/.test(l)) return out.push({ k: "desc", t: l.replace(/^_|_$/g, "") });
     const b = l.replace(/^(?:[-•–]|\*(?!\*))\s*/, "");
     if (exp || b !== l) return out.push({ k: "li", t: b });
-    if (/COMP[ÉE]TENCE/.test(sec)) { const m = l.match(/^(.{3,42}?)(?: · |: )(.+)$/); if (m) return out.push({ k: "kv", a: m[1], t: m[2] }); const m2 = l.match(/^(\S+ & \S+) (.+)$/); if (m2) return out.push({ k: "kv", a: m2[1], t: m2[2] }); }
-    if (/PROFIL|R[ÉE]SUM|PROPOS/.test(sec) && last?.k === "p" && !/[.!?]$/.test(last.t)) { last.t += " " + l; return; }
-    out.push({ k: /PROFIL|R[ÉE]SUM|PROPOS/.test(sec) ? "p" : "line", t: l });
+    if (/COMP[ÉE]TENCE|SKILLS/.test(sec)) { const m = l.match(/^(.{3,42}?)(?: · |: )(.+)$/); if (m) return out.push({ k: "kv", a: m[1], t: m[2] }); const m2 = l.match(/^(\S+ & \S+) (.+)$/); if (m2) return out.push({ k: "kv", a: m2[1], t: m2[2] }); }
+    if (/PROFIL|R[ÉE]SUM|PROPOS|SUMMARY|ABOUT/.test(sec) && last?.k === "p" && !/[.!?]$/.test(last.t)) { last.t += " " + l; return; }
+    out.push({ k: /PROFIL|R[ÉE]SUM|PROPOS|SUMMARY|ABOUT/.test(sec) ? "p" : "line", t: l });
   });
   return out;
 }
@@ -2534,26 +2534,30 @@ function paperHTML(d) {
 }
 const pdfSafe = (s) => String(s).replace(/[→⇒➜]/g, "›").replace(/≤/g, "<=").replace(/≥/g, ">=").replace(/[‐‑−]/g, "-").replace(/ | /g, " ")
   .replace(/[^\x00-\xFF€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/g, "");
-const SALUT_RE = /^(madame|monsieur|mesdames|messieurs|cher|chère|bonjour)\b/i;
+const SALUT_RE = /^(madame|monsieur|mesdames|messieurs|cher|chère|bonjour|dear|hello|to whom)\b/i;
+/* Candidatures en anglais (sites en anglais) : le document porte langue "en", sinon on le reconnaît à son texte */
+const cvEnglish = (d) => d.langue ? d.langue === "en" : /^(PROFESSIONAL EXPERIENCE|WORK EXPERIENCE|EDUCATION|KEY SKILLS|SKILLS)\b/m.test(d.contenu || "");
+const letterEnglish = (d) => d.langue ? d.langue === "en" : /^(dear|hello|to whom)\b/im.test(d.contenu || "");
 function letterParts(d) {
   const p = state.profil || {}, raw = String(d.contenu || "").replace(/\r/g, "").split("\n").map((l) => l.trim());
   let objet = d.objet || "";
   let i = raw.findIndex((l) => SALUT_RE.test(l));
   const head = i > 0 ? raw.slice(0, i) : [];
-  const ob = head.find((l) => /^objet\s*:/i.test(l)); if (ob && !objet) objet = ob.replace(/^objet\s*:\s*/i, "");
-  let body = i >= 0 ? raw.slice(i) : raw.filter((l) => !/^objet\s*:/i.test(l));
+  const ob = head.find((l) => /^(objet|subject|re)\s*:/i.test(l)); if (ob && !objet) objet = ob.replace(/^(objet|subject|re)\s*:\s*/i, "");
+  let body = i >= 0 ? raw.slice(i) : raw.filter((l) => !/^(objet|subject)\s*:/i.test(l));
   const nom = (p.nom || "").toLowerCase(), digits = (s) => s.replace(/\D/g, "");
   const isSig = (l) => !l || (nom && l.toLowerCase().replace(/\s+/g, " ") === nom) || /@|linkedin\.com/i.test(l) || (digits(l).length >= 9 && l.length < 60) || /^(tullio|signature)\b/i.test(l) && l.length < 30;
   while (body.length && isSig(body[body.length - 1])) body.pop();
-  const salut = SALUT_RE.test(body[0] || "") ? body.shift() : "Madame, Monsieur,";
+  const en = letterEnglish(d), salut = SALUT_RE.test(body[0] || "") ? body.shift() : en ? "Dear Hiring Manager," : "Madame, Monsieur,";
   const hasGaps = body.some((l, k) => !l && k > 0);
   const paras = [];
   if (hasGaps) { let cur = []; for (const l of body) { if (!l) { if (cur.length) paras.push(cur.join(" ")); cur = []; } else cur.push(l); } if (cur.length) paras.push(cur.join(" ")); }
   else body.filter(Boolean).forEach((l) => paras.push(l));
   const c = state.cands.find((x) => x.lettre === d.id && d.id) || {};
   const societe = d.societe || c.entreprise || (/\[soci[ée]t[ée]\]/i.test(d.contenu || "") ? "[Société]" : ""), poste = d.poste || c.poste || "", ville = d.ville || c.ville || "";
+  if (!objet && en && poste) objet = `Application for the ${poste} position${c.ref ? " (ref. " + c.ref + ")" : ""}`;
   if (!objet) objet = poste ? letterObjet({ poste, ref: c.ref }) : /\[poste\]/i.test(d.contenu || "") ? "Candidature au poste de [Poste]" : "Candidature spontanée";
-  return { salut, paras, objet, societe, ville, groupe: c.groupe || "" };
+  return { salut, paras, objet, societe, ville, groupe: c.groupe || "", en };
 }
 async function buildPdf(d) {
   await lib(JSPDF);
@@ -2628,17 +2632,18 @@ async function drawCV(pdf, d) {
     return lines.length * lh;
   };
   // Coordonnées : les étiquettes (Tél., E-mail…) en bleu clair, un peu d'air entre chaque information
-  const CONTACT_LAB = /(T[ée]l\.|T[ée]l[ée]phone|E-mail|Email|Lieu|Nationalit[ée]|LinkedIn|Permis|Mobilit[ée]|Adresse|Site web)(?=\s)/;
+  const CONTACT_LAB = /(T[ée]l\.|T[ée]l[ée]phone|E-mail|Email|Lieu|Nationalit[ée]|LinkedIn|Permis|Mobilit[ée]|Adresse|Site web|Phone|Location|Nationality|Address)(?=\s)/;
   const contactSegs = (c, WHITE, LIGHT) => { const P = String(c).split(CONTACT_LAB); if (P.length < 3 || P[0].trim()) return segs(c, "normal", WHITE); const out = []; P.forEach((x, i) => { if (!x.trim()) return; if (i % 2) out.push({ t: x, st: "bold", col: LIGHT, gap: out.length ? 3.2 : 0 }); else out.push({ t: x, st: "normal", col: WHITE }); }); return out; };
   // « Intitulé · Sept. 2025 – aujourd'hui · 1 an » : les dates (et la durée qui suit) partent à droite
-  const roleParts = (t) => { const P = t.split(" · "), i = P.findIndex((x, k) => k > 0 && /(19|20)\d{2}|aujourd/i.test(x)); return i > 0 ? [P.slice(0, i).join(" · "), P.slice(i).join(" · ")] : [t, ""]; };
+  const roleParts = (t) => { const P = t.split(" · "), i = P.findIndex((x, k) => k > 0 && /(19|20)\d{2}|aujourd|present/i.test(x)); return i > 0 ? [P.slice(0, i).join(" · "), P.slice(i).join(" · ")] : [t, ""]; };
   // FORMATION et LANGUES côte à côte, comme sur le CV d'origine (aussi pour l'ancienne rubrique « FORMATION · LANGUES »)
-  const LANG_RE = /^(Fran[çc]ais|Anglais|Espagnol|Italien|Allemand|Portugais|Arabe|Chinois|Japonais|Russe|N[ée]erlandais)\b/i;
+  const LANG_RE = /^(Fran[çc]ais|Anglais|Espagnol|Italien|Allemand|Portugais|Arabe|Chinois|Japonais|Russe|N[ée]erlandais|French|English|Spanish|Italian|German|Portuguese|Arabic|Chinese|Japanese|Russian|Dutch)\b/i;
+  const EN = cvEnglish(d);
   const cols = []; for (let k = 0; k < body.length; k++) {
-    const b = body[k]; if (b.k !== "h" || !/^FORMATIONS?\b/.test(b.t)) continue;
+    const b = body[k]; if (b.k !== "h" || !/^(FORMATIONS?|EDUCATION)\b/.test(b.t)) continue;
     let j = k + 1; const fo = [], la = []; while (j < body.length && body[j].k !== "h") { if (String(body[j].t || "").trim()) fo.push(body[j].t); j++; }
-    if (/LANGUES?/.test(b.t)) { fo.forEach((t, n) => { const P = t.split(" · "), q = P.findIndex((x) => LANG_RE.test(x)); if (q > 0) { fo[n] = P.slice(0, q).join(" · "); la.push(P.slice(q).join(" · ")); } }); }
-    else if (body[j] && /^LANGUES?\b/.test(body[j].t)) { let e = j + 1; while (e < body.length && body[e].k !== "h") { if (String(body[e].t || "").trim()) String(body[e].t).split(" · ").forEach((x) => { if (LANG_RE.test(x) || !la.length) la.push(x); else la[la.length - 1] += " · " + x; }); e++; } j = e; }
+    if (/LANGUES?|LANGUAGES?/.test(b.t)) { fo.forEach((t, n) => { const P = t.split(" · "), q = P.findIndex((x) => LANG_RE.test(x)); if (q > 0) { fo[n] = P.slice(0, q).join(" · "); la.push(P.slice(q).join(" · ")); } }); }
+    else if (body[j] && /^(LANGUES?|LANGUAGES?)\b/.test(body[j].t)) { let e = j + 1; while (e < body.length && body[e].k !== "h") { if (String(body[e].t || "").trim()) String(body[e].t).split(" · ").forEach((x) => { if (LANG_RE.test(x) || !la.length) la.push(x); else la[la.length - 1] += " · " + x; }); e++; } j = e; }
     if (!la.length) continue;
     body.splice(k, j - k, { k: "cols", fo, la: la.map((t) => t.replace(/^([^,·]+),\s*/, "$1 · ")) });
   }
@@ -2664,13 +2669,13 @@ async function drawCV(pdf, d) {
       if (b.k === "kv") { const lw = LW(s); h = f("normal", s, INK) * 1.32; const hh = rich(segs(b.t, "normal", INK), M + lw, y, W - lw, s, h, draw); f("bold", s, BLUE); T(pdfSafe(b.a), M, y + h * 0.75); y += hh + 0.3; continue; }
       if (b.k === "role") { y += s * 0.28; const [r, dt] = roleParts(b.t); h = f("bold", s * 1.08, b.noOrg ? BLUE : INK); T(pdfSafe(r), M, y + h * 0.8); if (dt) { f("normal", s * 0.95, GRAY); T(pdfSafe(dt), M + W, y + h * 0.8, { align: "right" }); } y += h * 1.3; continue; }
       // « Société — Contrat » en bleu, puis le détail (« · dispositifs médicaux implantables ») en italique gris ; « · en mission chez … » reste en bleu
-      if (b.k === "org") { h = f("bold", s * 0.98, BLUE) * 1.32; const P = b.t.split(" · "), q = P.findIndex((x, k) => k > 0 && !/^(en mission|chez|pour le compte)\b/i.test(x));
+      if (b.k === "org") { h = f("bold", s * 0.98, BLUE) * 1.32; const P = b.t.split(" · "), q = P.findIndex((x, k) => k > 0 && !/^(en mission|chez|pour le compte|on assignment|at|for)\b/i.test(x));
         const sg = q > 0 ? [{ t: P.slice(0, q).join(" · "), st: "bold", col: BLUE }, { t: " · ", st: "normal", col: GRAY }, { t: P.slice(q).join(" · "), st: "italic", col: GRAY }] : [{ t: b.t, st: "bold", col: BLUE }];
         y += rich(sg, M, y, W, s * 0.98, h, draw); continue; }
       if (b.k === "desc") { h = f("italic", s, GRAY) * 1.32; y += rich(segs(b.t, "italic", GRAY), M, y, W, s, h, draw); y += 0.2; continue; }
       if (b.k === "cols") { const g = 8, wl = (W - g) * 0.62, xr = M + wl + g, wr = W - wl - g; let yl = y, yr = y;
         const head = (t, x, w, yy) => { h = f("bold", s * 1.15, INK); if (draw) { pdf.setFillColor(...BLUE); pdf.rect(x, yy + s * 0.5 + h * 0.18, h * 0.62, h * 0.62, "F"); pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.3); pdf.line(x, yy + s * 0.5 + h * 1.3, x + w, yy + s * 0.5 + h * 1.3); } pdf.setCharSpace(0.9); T(t, x + h * 1.05, yy + s * 0.5 + h * 0.8); pdf.setCharSpace(0); return yy + s * 0.5 + h * 1.3 + s * 0.3; };
-        yl = head("FORMATION", M, wl, yl); yr = head("LANGUES", xr, wr, yr);
+        yl = head(EN ? "EDUCATION" : "FORMATION", M, wl, yl); yr = head(EN ? "LANGUAGES" : "LANGUES", xr, wr, yr);
         b.fo.forEach((t) => { const q = t.indexOf(" — "), a = q > 0 ? t.slice(0, q) : t, c = q > 0 ? t.slice(q) : ""; h = f("bold", s, INK) * 1.36; const aw = pdf.getTextWidth(pdfSafe(a)); f("normal", s, INK);
           if (c && aw + pdf.getTextWidth(pdfSafe(c)) <= wl) { f("bold", s, INK); T(pdfSafe(a), M, yl + h * 0.75); f("normal", s, INK); T(pdfSafe(c), M + aw, yl + h * 0.75); yl += h; }
           else split(t, wl).forEach((l) => { T(l, M, yl + h * 0.75); yl += h; }); });
@@ -2691,21 +2696,23 @@ function drawLetter(pdf, d, { ACC, INK, GRAY }) {
   // En-tête classique, comme une lettre écrite à la main dans un traitement de texte : nom et coordonnées en noir, sans filet ni couleur
   font("bold", 11.5, INK); pdf.text(pdfSafe(p.nom || ""), M, y + 4); y += 5.6;
   font("normal", 10, INK);
-  [(p.mobilite || "").split("·")[0].trim(), p.telephone || p.tel, p.email].filter(Boolean).forEach((l) => { pdf.text(pdfSafe(l), M, y + 3.5); y += 4.8; });
+  const tel = p.telephone || p.tel || "", telI = L.en && /^0\d/.test(tel.replace(/\s/g, "")) ? "+33 " + tel.trim().slice(1) : tel;
+  [(p.mobilite || "").split("·")[0].trim(), telI, p.email].filter(Boolean).forEach((l) => { pdf.text(pdfSafe(l), M, y + 3.5); y += 4.8; });
   y += 10;
   // Destinataire, à droite
   const X = 122;
-  font("normal", 10, INK); pdf.text("Service recrutement", X, y); y += 5;
+  font("normal", 10, INK); pdf.text(L.en ? "Recruitment Team" : "Service recrutement", X, y); y += 5;
   if (L.societe) { font("normal", 10.5, INK); pdf.splitTextToSize(pdfSafe(L.societe + (L.groupe && !L.societe.includes(L.groupe) ? " (" + L.groupe + ")" : "")), 210 - M - X).forEach((l) => { pdf.text(l, X, y); y += 5; }); }
   if (L.ville) { font("normal", 10, INK); pdf.text(pdfSafe(L.ville), X, y); y += 5; }
   y += 6;
   // Lieu et date
   const lieu = (p.mobilite || "").split(/[(·,]/)[0].trim() || "Paris";
-  const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  font("normal", 10, INK); pdf.text(pdfSafe(`${lieu}, le ${date}`), M + W, y, { align: "right" }); y += 11;
+  const date = new Date().toLocaleDateString(L.en ? "en-GB" : "fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  font("normal", 10, INK); pdf.text(pdfSafe(L.en ? `${lieu}, France, ${date}` : `${lieu}, le ${date}`), M + W, y, { align: "right" }); y += 11;
   // Objet
-  font("bold", 10.5, INK); const ow = pdf.getTextWidth("Objet : ");
-  pdf.text("Objet : ", M, y); font("normal", 10.5, INK);
+  const OBJ = L.en ? "Subject: " : "Objet : ";
+  font("bold", 10.5, INK); const ow = pdf.getTextWidth(OBJ);
+  pdf.text(OBJ, M, y); font("normal", 10.5, INK);
   pdf.splitTextToSize(pdfSafe(L.objet), W - ow).forEach((l, k) => { pdf.text(l, M + ow, y + k * 5); }); y += 5 * pdf.splitTextToSize(pdfSafe(L.objet), W - ow).length + 6;
   // Corps : on réduit un peu la police si la lettre dépasse une page
   const top = y, closing = L.paras.length > 1 && L.paras[L.paras.length - 1].length < 220 ? L.paras[L.paras.length - 1] : "";
@@ -2757,7 +2764,7 @@ async function downloadDoc(id, btn) {
   } catch (e) { if (e?.code !== "declined") toast(e?.code === "empty" ? "Ce document n'a pas encore de texte" : "Téléchargement impossible ici. Utilise « Ouvrir le PDF » puis Partager › Enregistrer dans Fichiers."); }
   if (btn) { btn.disabled = false; btn.textContent = lbl; }
 }
-const docFileName = (d) => fileName(`${d.type === "cv" ? "CV" : "Lettre"} ${state.profil?.nom || ""} ${String(d.nom || "").replace(/^(CV|Lettre)\s*/i, "")}`);
+const docFileName = (d) => fileName(`${d.type === "cv" ? (cvEnglish(d) ? "Resume" : "CV") : letterEnglish(d) ? "Cover letter" : "Lettre"} ${state.profil?.nom || ""} ${String(d.nom || "").replace(/^(CV|Lettre|Resume|Cover letter)\s*/i, "")}`);
 const dlBtn = (d, cls = "small") => d ? `<button type="button" class="${cls}" data-dl="${esc(d.id)}">⬇ Télécharger le PDF</button>` : "";
 function viewDoc(d) {
   editing = structuredClone(d);
@@ -2834,7 +2841,7 @@ const LI_EDIT = { titre: "https://www.linkedin.com/in/me/edit/intro/", infos: "h
 let liKind = "poste", liRes = null;
 async function openLiMaj() {
   mailImgs = []; liRes = null; liKind = "poste";
-  const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte);
+  const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte && d.langue !== "en");
   const last = (state.profil?.linkedinMaj || []).slice(-1)[0];
   openSheet(`
     <div class="sheet-head"><div style="min-width:0"><span class="label">LinkedIn</span><h2>Mettre à jour mon profil</h2></div><button type="button" class="ghost" data-act="close">Fermer</button></div>
@@ -2854,7 +2861,7 @@ async function runLiMaj(btn) {
   const txt = $("#lm-text").value.trim(); if (!txt && !mailImgs.length) return toast("Écris ce qui change, en 2 lignes");
   if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
   const p = state.profil || {}, kit = p.kit || {}, cvId = $("#lm-cv")?.value || "";
-  const cv = state.docs.find((d) => d.id === cvId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
+  const cv = state.docs.find((d) => d.id === cvId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
   const post = $("#lm-post").checked, out = $("#lm-out");
   btn.disabled = true; btn.textContent = "Claude prépare tes textes…"; out.innerHTML = `<p class="muted">Claude relit ton profil et rédige…</p>`;
   const kinds = { poste: "un nouveau poste", projet: "un nouveau projet dans son poste actuel", competence: "une nouvelle compétence, certification ou formation" };
@@ -3798,7 +3805,7 @@ async function aiThanks(btn) {
 /* ---------- CV et lettre en un clic ---------- */
 async function oneClick(btn) {
   if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
-  const c = editing, cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte);
+  const c = editing, cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte && d.langue !== "en");
   btn.disabled = true; btn.textContent = "Claude choisit ton CV et écrit la lettre…";
   try {
     const r = await state.sample.json(`Un candidat postule. Choisis le CV le plus adapté parmi ses versions et écris sa lettre de motivation (dans la conclusion, indique sa disponibilité : ${dispo()}).
@@ -4106,7 +4113,7 @@ async function prepDossier(url, btn) {
     const words = desc.split(/\s+/).filter(Boolean).length;
     liveStep("read", { text: full ? `Offre complète lue sur Indeed : ${words} mots.` : desc ? `Description enregistrée utilisée : ${words} mots.` : "Texte complet indisponible : je me base sur le titre du poste." });
     btn.textContent = "Je prépare CV, lettre et message…";
-    const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte);
+    const cvs = state.docs.filter((d) => d.type === "cv" && !d.adapte && d.langue !== "en");
     liveStep("poste", { text: `Claude lit l'offre et tes ${cvs.length} CV…` });
     const r = await state.sample.json(`Prépare la candidature complète d'un ingénieur à cette offre, en français. Réponds uniquement en JSON :
 {"resume":"ce que fait le poste en 2 phrases simples","motsCles":["5 à 8 mots-clés de l'offre"],"ville":"","contrat":"CDI…","salaire":"si indiqué","domaine":"Dispositifs médicaux|Automobile et industrie|Défense, aéronautique et spatial|Énergie|Autre","employeur":"direct|prestataire","score":75,"verdict":"fonce|tente|bof","adequation":"2 phrases en tutoiement : ce qui joue pour lui, ce qui manque, faut-il postuler","competences":[{"nom":"","niveau":"oui|partiel|non","preuve":"4 à 12 mots du CV"}],"cv":"id du CV le plus adapté","pourquoiCV":"1 phrase","lettre":"lettre complète","message":"message court au recruteur","invitation":"invitation LinkedIn","cvTitre":"titre du CV adapté à ce poste, une ligne","cvProfil":"paragraphe PROFIL du CV réécrit pour ce poste"}
@@ -4214,7 +4221,7 @@ ${cv.contenu.slice(0, 6000)}`, { cache: false });
 async function apMsgAI(btn) {
   const c = editing, ta = $("#ap-msg"); if (!ta) return;
   if (!state.sample) return toast("Demande-le à Claude dans ton projet Jobello");
-  const cv = state.docs.find((d) => d.id === c.cv) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
+  const cv = state.docs.find((d) => d.id === c.cv) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
   btn.disabled = true; btn.textContent = "Claude écrit…";
   try {
     const { text } = await state.sample(`Écris en français le message de candidature pour cette offre. Réponds uniquement avec le message.\n\n${messageRules(c)}\n\n${socText(c)}\n\nOFFRE : ${c.poste || ""} chez ${c.entreprise || ""}, ${c.ville || ""}. Recruteur : ${c.contact || "inconnu"}.\nRésumé : ${c.resume || ""}\n${(c.description || c.notes || "").slice(0, 4000)}\n\n${compText()}\n\nCV DU CANDIDAT :\n${(cv?.contenu || "").slice(0, 5000)}`,
@@ -4245,6 +4252,8 @@ function chromePrompt(c, stop = true) {
   L.push(`Fais ma candidature à ma place, directement dans mon navigateur : ouvre l'offre dans un nouvel onglet, clique sur « Postuler » et remplis tout le formulaire toi-même. Je n'interviens que pour les identifiants, les codes reçus et le fichier du CV. Offre : ${c.poste || "le poste"} chez ${c.entreprise || "cette société"}${c.ville ? " (" + c.ville + ")" : ""}.`);
   L.push(url ? `Lien : ${url}${isIndeed(c.lien) ? `\n(C'est une recherche Indeed : ouvre l'annonce de ${c.groupe || c.entreprise || "cette société"} qui correspond à ce poste.${c.lien ? " Lien court d'origine : " + c.lien : ""})` : ""}` : `Lien : je n'ai pas le lien, cherche l'offre sur le site carrière de ${c.entreprise || "la société"}.`);
   L.push(`\nÉtapes :\n1. Ouvre l'offre et clique sur « Postuler ». Si le site demande de me connecter ou de créer un compte, arrête-toi et laisse-moi le faire.\n2. Remplis le formulaire avec mes informations ci-dessous. Ne pré-remplis rien depuis un ancien profil du site s'il diffère de ces infos.\n3. CV : ${cv ? `quand il faut joindre le CV, arrête-toi et demande-moi de sélectionner le fichier « ${docFileName(cv)} » (dans Téléchargements)` : "demande-moi quel fichier joindre"}. N'utilise pas le CV déjà enregistré sur le site.${lt ? `\n4. Lettre de motivation : si on peut joindre un fichier, demande-moi « ${docFileName(lt)} » ; si c'est un champ texte, colle le « Message de candidature » qui est à la fin de cette consigne.` : "\n4. Lettre ou champ « message » : colle le « Message de candidature » qui est à la fin de cette consigne."}\n5. Questions supplémentaires : réponds seulement avec mes informations. Si tu ne sais pas, demande-moi, n'invente rien.\n6. ${stop ? "Arrête-toi AVANT le bouton final « Envoyer » / « Postuler » : montre-moi le récapitulatif et attends que je valide moi-même." : "Vérifie le récapitulatif puis clique sur le bouton final « Envoyer » / « Postuler », et dis-moi quand c'est fait."}\n7. ${c.id ? `Dès que la candidature est partie, même si c'est moi qui ai cliqué sur le bouton final, note-la tout de suite dans Jobello pour qu'il ne me la propose plus : la candidature n° ${c.id} passe en « Envoyée », avec la date d'aujourd'hui et une relance dans 7 jours. Si tu n'as pas accès à Jobello, rappelle-moi de toucher « C'est envoyé » sur sa fiche.` : "Une fois la candidature partie, rappelle-moi de l'ajouter à Jobello comme envoyée, pour qu'il ne me la propose plus."}`);
+  const enC = c.langue === "en" || (c.langueDocs === "en" && c.langue !== "fr");
+  L.push(enC ? `\nLangue : je postule EN ANGLAIS. Remplis tous les champs et réponds aux questions en anglais (Country: France ; availability: within 1 month (notice period) ; salary expectations: annual gross ; contract: permanent (CDI)). Mon CV et ma lettre sont en anglais.` : c.langue === "fr" ? `\nLangue : je postule en français, même si le site est en anglais (dans ce cas, réponds aux questions en anglais mais joins mon CV et ma lettre en français).` : `\nLangue : si le site est en anglais, remplis les champs et réponds aux questions en anglais (traduis mes informations ci-dessous, sans rien inventer).`);
   L.push(`\nMes informations :\n- Prénom : ${prenomP || ""}\n- Nom : ${nomP.join(" ")}\n- E-mail : ${p.email || ""}\n- Téléphone : ${p.telephone || ""}${p.adresse ? "\n- Adresse : " + [p.adresse, [p.codePostal, p.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ") : ""}${p.linkedin ? "\n- LinkedIn : " + p.linkedin : ""}\n- Poste actuel / titre : ${p.titre || "Ingénieur mécanique"}\n- Disponibilité : ${dispo()}\n- Prétentions : ${/brut/i.test(p.salaire || "") ? p.salaire + " minimum" : (p.salaire || "45 k€") + " brut annuel minimum"}\n- Type de contrat recherché : CDI${p.mobilite ? "\n- Mobilité : " + p.mobilite : ""}`);
   L.push(`\nMessage de candidature (à coller tel quel dans le champ message ou lettre) :\n"""\n${msg}\n"""`);
   if (lt?.contenu) L.push(`\nLettre de motivation complète (si le site demande une lettre en texte et non en fichier) :\n"""\n${lt.contenu}\n"""`);
@@ -4581,7 +4590,7 @@ document.addEventListener("click", (e) => {
   const ch = e.target.closest("[data-chrome]"); if (ch) {
     const o = offerByUrl(ch.dataset.chrome); if (!o) return;
     const cand = state.cands.find((c) => c.lien === o.url || (norm(c.entreprise) === norm(o.entreprise) && norm(c.poste) === norm(o.titre)));
-    const cv = state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
+    const cv = state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
     const txt = chromePrompt(cand || { poste: o.titre, entreprise: o.entreprise, ville: o.ville, lien: o.url, cv: cv?.id }, true);
     markLancee(cand);
     return copyText(txt, null, ch, cand ? "Consigne copiée : colle-la dans Claude, dans Chrome" : "Consigne copiée. Astuce : « Préparer mon dossier » d'abord donne une lettre et un message sur mesure.");
@@ -4685,6 +4694,7 @@ render();
 <script src="ciblage.js"></script>
 <script src="accueil.js"></script>
 <script src="postuler.js"></script>
+<script src="langue.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>
