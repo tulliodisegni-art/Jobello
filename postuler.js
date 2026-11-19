@@ -92,8 +92,8 @@
     const liste = (cur.liste || []).filter((d) => !(d.url === o.url && d.statut === "erreur"));
     const d = liste.find((x) => x.url === o.url || x.cle === offerKey(o));
     const prio = prioDe(o.entreprise);
-    // Société prioritaire (Safran) : dossier préparé et relu par la tâche des dossiers, PAS d'envoi automatique ;
-    // Tullio relit puis touche « C'est relu : envoie-la » sur la fiche (envoi.statut valide → les agents l'envoient).
+    // Société prioritaire (Safran) : dossier préparé et relu « recruteur Safran » par la tâche des dossiers (auto:false + prio),
+    // qui met ensuite envoi.statut = valide : les agents l'envoient tout seuls au passage suivant (choix de Tullio, 19/11).
     if (d) { if (prio) d.prio = prio; else d.auto = true; } else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: !prio, ...(prio ? { prio } : {}), demandeLe: new Date().toISOString() });
     const doc = { ...cur, liste: liste.slice(-60) };
     await state.db.doc("demandes/dossiers").set(doc); state.demandes = doc;
@@ -135,7 +135,7 @@
     return `<div class="sw-card${back ? " back" : ""}">
       ${back ? "" : `<span class="sw-stamp yes">POSTULER</span><span class="sw-stamp no">NON</span>`}
       <span class="inf">${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? `<span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score} % pour toi</span>` : ""}${ageTag(o)}</span>
-      ${prioDe(o.entreprise) ? `<span class="why" style="background:var(--warn-bg);color:var(--warn-fg)">⭐ Prioritaire : Claude taille et relit ton dossier, puis il attend ton OK avant de partir.</span>` : ""}
+      ${prioDe(o.entreprise) ? `<span class="why" style="background:var(--warn-bg);color:var(--warn-fg)">⭐ Prioritaire : Claude taille ton CV et ta lettre, les relit comme un recruteur Safran, puis tes agents l'envoient.</span>` : ""}
       <span class="ent">${esc(o.entreprise || "Société ?")}</span>
       <span class="pst">${esc(o.titre || "")}</span>
       <span class="inf">${esc([o.ville, sal, o.type].filter(Boolean).join(" · "))}</span>
@@ -355,7 +355,7 @@
         connexion: `Le site ${site} demande de te reconnecter. Sur ton ordi, touche « Ouvrir la page à finir », connecte-toi en cochant « Rester connecté », puis touche « Réessayer » : l'agent reprend sur cette page.${apres}`,
         main: `L'agent ne peut pas finir celle-ci tout seul : ${raison}. Sur ton ordi, ouvre la page, joins ton CV et ta lettre (boutons ci-dessous), envoie, puis touche « C'est envoyé ✓ ».`
       }[e.action] || (lancerMode() ? `L'agent a besoin de toi : ${raison}. ${page ? "Sur ton ordi, touche « Ouvrir la page à finir »" : "Va sur ce site dans Chrome sur ton ordi"} : fais ce qui manque (créer ton compte ou te reconnecter), puis touche « Réessayer ».${apres}` : `L'agent n'a pas pu finir : ${raison}. ${page ? "Ouvre la page à finir" : "Va sur le site"}, fais ce qui manque, puis touche « Réessayer », ou termine-la toi-même avec « Postuler » plus bas.`);
-      const t = { a_valider: prioDe(c.entreprise) ? `Candidature ${prioDe(c.entreprise)} : relis ton CV et ta lettre (et le bloc ⭐ juste en dessous), puis touche « Envoyer ». Rien ne part sans ton OK.` : "Les agents attendent ton OK pour envoyer cette candidature.",
+      const t = { a_valider: prioDe(c.entreprise) ? `Candidature ${prioDe(c.entreprise)} : relis ton CV et ta lettre (et le bloc ⭐ juste en dessous), puis touche « Envoyer ».` : "Les agents attendent ton OK pour envoyer cette candidature.",
         valide: (e.reprise ? "L'agent va reprendre sur la page où il s'était arrêté. " : "") + (relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : occupe() ? "Prête : tes agents sont au travail sur ton ordi et la prennent pendant ce passage." : go ? `Prête : touche « Lancer maintenant » pour que tes agents l'envoient tout de suite, sinon elle partira au prochain passage (vers ${nextSlot()}).` : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`),
         en_cours: e.reprise ? "Un agent reprend la candidature sur la page où il s'était arrêté." : "Un agent est en train de remplir le formulaire sur le site.",
         envoyee: `Envoyée${e.via === "toi" ? " par toi" : " par un agent"}${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via && e.via !== "toi" ? " via " + e.via : ""}.`,
@@ -388,14 +388,8 @@
       box.innerHTML = `<span class="lbl" style="font-weight:600">⭐ ${esc(soc)} : candidature soignée${P.relu ? ` <small class="muted">relue le ${esc(fmt(P.relu, { day: "numeric", month: "long" }))}</small>` : ""}</span>
         ${liste}${P.conseil ? `<p style="margin:0">${esc(P.conseil)}</p>` : ""}${msg}
         <p class="muted" style="margin:0;font-size:.84rem">Chez ${esc(soc)}, un contact dans l'équipe compte souvent plus que le CV : écris à un ingénieur ou à un responsable du bureau d'études du site, et demande-lui 15 minutes pour parler du métier. S'il propose de transmettre ton CV (cooptation), ta candidature passe en haut de la pile.</p>
-        ${!envoyee && !c.envoi && c.dossierPret ? `<p style="margin:0"><b>Rien ne part sans toi.</b> Relis ton CV et ta lettre, corrige si besoin, puis touche le bouton : tes agents l'enverront.</p><div class="row"><button type="button" class="small primary" data-prio-go>✅ C'est relu : envoie-la</button></div>` : ""}
         <div class="row">${P.messageReseau ? `<button type="button" class="small${!c.envoi && !envoyee ? "" : " primary"}" data-prio-copy>Copier le message</button>` : ""}<a class="btn small" href="${esc(li)}" target="_blank" rel="noopener">Trouver un contact sur LinkedIn ↗</a></div>`;
       const after = document.querySelector("#overlay .sheet .relance-box") || sh; after.after(box);
-      const g = box.querySelector("[data-prio-go]");
-      if (g) g.addEventListener("click", async (e) => {
-        e.preventDefault(); c.envoi = { statut: "valide", auto: true, prio: true, valideLe: new Date().toISOString() };
-        if (await saveCand(c)) { toast(relie() ? "C'est parti : un agent l'envoie tout de suite" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`); closeSheet(); render(); preparer(); }
-      });
       const b = box.querySelector("[data-prio-copy]"); if (b) b.addEventListener("click", (e) => { e.preventDefault(); copyText(P.messageReseau, box.querySelector("#prio-msg"), b, "Message copié : colle-le sur LinkedIn"); });
     } catch (err) {}
     return r;
