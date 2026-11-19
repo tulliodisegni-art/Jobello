@@ -315,7 +315,7 @@ ${text.slice(0, 12000)}`, { cache: false });
 
   /* ---------- Refaire le CV ---------- */
   function cvPropre() {
-    const p = state.profil || {}, f = p.fiche || {}, base = state.docs.find((d) => d.id === f.cvDocId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
+    const p = state.profil || {}, f = p.fiche || {}, base = state.docs.find((d) => d.id === f.cvDocId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
     const sec = base ? sections(base.contenu.replace(/\*\*|^_|_$/gm, "")) : {};
     const bloc = (k) => (sec[k] || []).filter(Boolean).join("\n");
     const contact = [p.telephone && "Tél. : " + p.telephone, p.email && "E-mail : " + p.email, (f.ville || p.mobilite) && "Lieu : " + (f.ville || p.mobilite), p.linkedin && "LinkedIn : " + p.linkedin.replace(/^https?:\/\/(www\.)?/, "")].filter(Boolean).join(" · ");
@@ -327,7 +327,7 @@ ${text.slice(0, 12000)}`, { cache: false });
     if (!state.db) return toast("Connecte-toi à Jobello pour enregistrer");
     let texte = cvPropre();
     if (aiKey() && state.sample) {
-      const p = state.profil || {}, f = p.fiche || {}, base = state.docs.find((d) => d.id === f.cvDocId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.contenu);
+      const p = state.profil || {}, f = p.fiche || {}, base = state.docs.find((d) => d.id === f.cvDocId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
       if (base) {
         btn.disabled = true; btn.textContent = "Claude refait ton CV…";
         try {

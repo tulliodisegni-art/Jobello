@@ -57,6 +57,9 @@
   .sw-help{text-align:center;font-size:.8rem;color:var(--muted);margin-top:8px}
   .sw-end{margin:auto;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;max-width:380px}
   .sw-end .big{font-size:2.6rem}
+  .sw-lang{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
+  .sw-lang button{padding:3px 10px;border-radius:99px;font-size:.8rem;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);min-height:0}
+  .sw-lang button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
   `;
   const stEl = document.createElement("style"); stEl.textContent = css; document.head.appendChild(stEl);
 
@@ -81,11 +84,17 @@
   function offreOf(o) {
     return { titre: o.titre || "", entreprise: o.entreprise || "", ville: o.ville || "", url: o.url || "", jobId: o.jobId || "", type: o.type || "", salaire: o.salaire || "", source: o.source || "", description: String(o.description || "").slice(0, 8000), score: o.score ?? null, pourquoi: o.pourquoi || "", mode: o.mode || "" };
   }
-  const postuler = (o) => queue(async () => {
+  /* Langue de la candidature : "" = Claude choisit d'après le site (anglais si le site ou l'annonce est en anglais), "fr", "en" */
+  const LANGS = [["", "Auto"], ["fr", "🇫🇷 Français"], ["en", "🇬🇧 English"]];
+  const langueAnnonce = (o) => { const t = " " + String((o.titre || "") + " " + (o.description || "")).toLowerCase().replace(/[^a-zà-ÿ' ]+/g, " ") + " ";
+    const n = (ws) => ws.reduce((a, w) => a + (t.split(" " + w + " ").length - 1), 0);
+    const en = n(["the", "and", "with", "you", "your", "we", "our", "of", "to", "for", "will", "experience", "skills", "engineer", "requirements"]), fr = n(["le", "la", "les", "et", "des", "vous", "nous", "avec", "pour", "une", "du", "est", "dans", "ingénieur", "poste"]);
+    return en > fr * 1.5 && en >= 4 ? "en" : "fr"; };
+  const postuler = (o, lg = "") => queue(async () => {
     const cur = (await reread("demandes/dossiers")) || state.demandes || { liste: [] };
     const liste = (cur.liste || []).filter((d) => !(d.url === o.url && d.statut === "erreur"));
     const d = liste.find((x) => x.url === o.url || x.cle === offerKey(o));
-    if (d) d.auto = true; else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: true, demandeLe: new Date().toISOString() });
+    if (d) { d.auto = true; if (lg) d.langue = lg; } else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: true, ...(lg ? { langue: lg } : {}), demandeLe: new Date().toISOString() });
     const doc = { ...cur, liste: liste.slice(-60) };
     await state.db.doc("demandes/dossiers").set(doc); state.demandes = doc;
   });
@@ -109,7 +118,7 @@
   function openDeck() {
     if (!ready()) return toast("Connecte-toi d'abord");
     const list = aDefiler();
-    deck = { list, i: 0, hist: [], oui: 0 };
+    deck = { list, i: 0, hist: [], oui: 0, langue: {} };
     let ov = document.getElementById("sw-ov");
     if (!ov) { ov = document.createElement("div"); ov.id = "sw-ov"; ov.className = "sw-ov"; document.body.appendChild(ov); }
     ov.hidden = false; try { lockScroll(); } catch {}
@@ -131,8 +140,14 @@
       <span class="inf">${esc([o.ville, sal, o.type].filter(Boolean).join(" · "))}</span>
       ${o.pourquoi ? `<span class="why">${esc(o.pourquoi)}</span>` : ""}
       <div class="desc">${esc(String(o.description || "").slice(0, 2500)) || "<i>Description complète sur l'annonce.</i>"}</div>
+      ${back ? "" : langRow(o)}
       <a class="lnk" href="${esc(offerHref(o))}" target="_blank" rel="noopener">Voir l'annonce ›</a>
     </div>`;
+  }
+  function langRow(o) {
+    const v = (deck && deck.langue[o.url]) || "", an = langueAnnonce(o) === "en";
+    return `<div class="sw-lang"><span>Postuler en :</span>${LANGS.map(([k, l]) => `<button type="button" class="${v === k ? "on" : ""}" data-sw="lang" data-lang="${k}">${l}</button>`).join("")}
+      <span>${v === "en" ? "CV, lettre et formulaire en anglais" : v === "fr" ? "tout en français" : an ? "annonce en anglais : Claude postulera en anglais" : "Claude choisit d'après le site (anglais si le site est en anglais)"}</span></div>`;
   }
   function drawDeck() {
     const ov = document.getElementById("sw-ov"); if (!ov || !deck) return;
@@ -156,7 +171,7 @@
   function bindSwipe(el) {
     if (!el) return; let x0 = null, y0 = 0, dx = 0, drag = false;
     const yes = el.querySelector(".sw-stamp.yes"), no = el.querySelector(".sw-stamp.no");
-    el.addEventListener("pointerdown", (e) => { if (e.target.closest("a")) return; x0 = e.clientX; y0 = e.clientY; dx = 0; drag = false; el.style.transition = "none"; });
+    el.addEventListener("pointerdown", (e) => { if (e.target.closest("a,button")) return; x0 = e.clientX; y0 = e.clientY; dx = 0; drag = false; el.style.transition = "none"; });
     el.addEventListener("pointermove", (e) => {
       if (x0 == null) return; dx = e.clientX - x0; const dy = e.clientY - y0;
       if (!drag && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { drag = true; try { el.setPointerCapture(e.pointerId); } catch {} }
@@ -177,7 +192,7 @@
     if (el) { el.style.transition = "transform .25s ease-in, opacity .25s"; el.style.transform = `translateX(${oui ? 600 : -600}px) rotate(${oui ? 25 : -25}deg)`; el.style.opacity = "0"; }
     try { navigator.vibrate && navigator.vibrate(oui ? 18 : 8); } catch {}
     deck.hist.push({ o, oui }); if (oui) deck.oui++;
-    (oui ? postuler(o) : marquerVu(o)).catch(() => toast("Pas enregistré : vérifie ta connexion"));
+    (oui ? postuler(o, deck.langue[o.url] || "") : marquerVu(o)).catch(() => toast("Pas enregistré : vérifie ta connexion"));
     setTimeout(() => { if (!deck) return; deck.i++; drawDeck(); }, 210);
   }
   function undo() {
@@ -390,6 +405,7 @@
     if (a === "yes") return decide(true);
     if (a === "no") return decide(false);
     if (a === "undo") return undo();
+    if (a === "lang" && deck) { const o = deck.list[deck.i]; if (!o) return; deck.langue[o.url] = s.dataset.lang || ""; const row = s.closest(".sw-lang"); if (row) row.outerHTML = langRow(o); return; }
   }, true);
   document.addEventListener("click", (e) => {
     const l = e.target.closest && e.target.closest("a[data-lancer]"); if (!l) return; // le lien s'ouvre normalement (nouvel onglet)

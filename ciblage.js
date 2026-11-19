@@ -47,7 +47,7 @@
   let cib = null, dem = null, subscribed = false, vue = (() => { try { return localStorage.getItem("offresVue") || "cartes"; } catch { return "cartes"; } })(), sept = false;
   const nt = (s) => " " + normTxt(s) + " ";
   const has = (txt, k) => [k.mot, ...(k.variantes || [])].some((v) => v && txt.includes(" " + normTxt(v) + " "));
-  const baseCVs = () => state.docs.filter((d) => d.type === "cv" && !d.adapte && d.contenu);
+  const baseCVs = () => state.docs.filter((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
   const cvTxt = () => nt(baseCVs().map((d) => d.contenu).join("\n"));
   const save = async (patch, msg) => {
     if (!state.db) return toast("Connecte-toi à Jobello pour enregistrer");
