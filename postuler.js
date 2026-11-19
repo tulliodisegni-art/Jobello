@@ -92,7 +92,9 @@
     const liste = (cur.liste || []).filter((d) => !(d.url === o.url && d.statut === "erreur"));
     const d = liste.find((x) => x.url === o.url || x.cle === offerKey(o));
     const prio = prioDe(o.entreprise);
-    if (d) { d.auto = true; if (prio) d.prio = prio; } else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: true, ...(prio ? { prio } : {}), demandeLe: new Date().toISOString() });
+    // Société prioritaire (Safran) : dossier préparé et relu par la tâche des dossiers, PAS d'envoi automatique ;
+    // Tullio relit puis touche « C'est relu : envoie-la » sur la fiche (envoi.statut valide → les agents l'envoient).
+    if (d) { if (prio) d.prio = prio; else d.auto = true; } else liste.push({ url: o.url, cle: offerKey(o), offre: offreOf(o), statut: "en_attente", auto: !prio, ...(prio ? { prio } : {}), demandeLe: new Date().toISOString() });
     const doc = { ...cur, liste: liste.slice(-60) };
     await state.db.doc("demandes/dossiers").set(doc); state.demandes = doc;
   });
@@ -133,7 +135,7 @@
     return `<div class="sw-card${back ? " back" : ""}">
       ${back ? "" : `<span class="sw-stamp yes">POSTULER</span><span class="sw-stamp no">NON</span>`}
       <span class="inf">${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? `<span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score} % pour toi</span>` : ""}${ageTag(o)}</span>
-      ${prioDe(o.entreprise) ? `<span class="why" style="background:var(--warn-bg);color:var(--warn-fg)">⭐ Prioritaire : dossier taillé sur mesure et relu par Claude, il ne part qu'après ton OK.</span>` : ""}
+      ${prioDe(o.entreprise) ? `<span class="why" style="background:var(--warn-bg);color:var(--warn-fg)">⭐ Prioritaire : Claude taille et relit ton dossier, puis il attend ton OK avant de partir.</span>` : ""}
       <span class="ent">${esc(o.entreprise || "Société ?")}</span>
       <span class="pst">${esc(o.titre || "")}</span>
       <span class="inf">${esc([o.ville, sal, o.type].filter(Boolean).join(" · "))}</span>
@@ -386,8 +388,14 @@
       box.innerHTML = `<span class="lbl" style="font-weight:600">⭐ ${esc(soc)} : candidature soignée${P.relu ? ` <small class="muted">relue le ${esc(fmt(P.relu, { day: "numeric", month: "long" }))}</small>` : ""}</span>
         ${liste}${P.conseil ? `<p style="margin:0">${esc(P.conseil)}</p>` : ""}${msg}
         <p class="muted" style="margin:0;font-size:.84rem">Chez ${esc(soc)}, un contact dans l'équipe compte souvent plus que le CV : écris à un ingénieur ou à un responsable du bureau d'études du site, et demande-lui 15 minutes pour parler du métier. S'il propose de transmettre ton CV (cooptation), ta candidature passe en haut de la pile.</p>
-        <div class="row">${P.messageReseau ? `<button type="button" class="small primary" data-prio-copy>Copier le message</button>` : ""}<a class="btn small" href="${esc(li)}" target="_blank" rel="noopener">Trouver un contact sur LinkedIn ↗</a></div>`;
+        ${!envoyee && !c.envoi && c.dossierPret ? `<p style="margin:0"><b>Rien ne part sans toi.</b> Relis ton CV et ta lettre, corrige si besoin, puis touche le bouton : tes agents l'enverront.</p><div class="row"><button type="button" class="small primary" data-prio-go>✅ C'est relu : envoie-la</button></div>` : ""}
+        <div class="row">${P.messageReseau ? `<button type="button" class="small${!c.envoi && !envoyee ? "" : " primary"}" data-prio-copy>Copier le message</button>` : ""}<a class="btn small" href="${esc(li)}" target="_blank" rel="noopener">Trouver un contact sur LinkedIn ↗</a></div>`;
       const after = document.querySelector("#overlay .sheet .relance-box") || sh; after.after(box);
+      const g = box.querySelector("[data-prio-go]");
+      if (g) g.addEventListener("click", async (e) => {
+        e.preventDefault(); c.envoi = { statut: "valide", auto: true, prio: true, valideLe: new Date().toISOString() };
+        if (await saveCand(c)) { toast(relie() ? "C'est parti : un agent l'envoie tout de suite" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`); closeSheet(); render(); preparer(); }
+      });
       const b = box.querySelector("[data-prio-copy]"); if (b) b.addEventListener("click", (e) => { e.preventDefault(); copyText(P.messageReseau, box.querySelector("#prio-msg"), b, "Message copié : colle-le sur LinkedIn"); });
     } catch (err) {}
     return r;
