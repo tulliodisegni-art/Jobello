@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jobello : Claude avec ton compte</title>
+<style>
+:root { --bg:#f4f8f7; --surface:#fff; --line:#d5e5df; --fg:#0e1f2b; --muted:#56697a; --accent:#0e7a5a; --accent-ink:#fff; --accent-soft:#dff3ea;
+  --hero:linear-gradient(135deg,#0b2e6b 0%,#11557a 55%,#0e7a5a 100%); --warn-bg:#fff1dc; --warn-fg:#7a4a00; --err:#b3261e; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0e191e; --surface:#15232a; --line:#29414a; --fg:#e6f1ef; --muted:#9db4b1; --accent:#3fcf9b; --accent-ink:#04231a; --accent-soft:#15382f;
+  --hero:linear-gradient(135deg,#0a2557 0%,#0e4766 55%,#0b6a4e 100%); --warn-bg:#3d2a14; --warn-fg:#f6d08f; --err:#ff8a80; color-scheme:dark; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 "Instrument Sans","Segoe UI",system-ui,sans-serif; }
+header { background:var(--hero); color:#fff; padding:22px 20px 26px; }
+header h1 { margin:0; font:700 1.35rem/1.2 "Avenir Next",system-ui,sans-serif; }
+header p { margin:6px 0 0; opacity:.85; font-size:.95rem; }
+main { max-width:640px; margin:-14px auto 40px; padding:0 14px; }
+.card { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:14px; }
+.card h2 { margin:0 0 6px; font-size:1.05rem; }
+.muted { color:var(--muted); font-size:.92rem; }
+button { font:inherit; font-weight:600; border-radius:12px; border:1px solid var(--line); background:var(--surface); color:var(--fg); padding:12px 16px; cursor:pointer; min-height:46px; }
+button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+button:disabled { opacity:.55; cursor:default; }
+.row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.row button { flex:1 1 200px; }
+textarea { width:100%; min-height:110px; border:1px dashed var(--accent); border-radius:12px; background:var(--accent-soft); color:var(--fg); padding:12px; font:14px/1.4 ui-monospace,Menlo,monospace; resize:vertical; }
+.steps { margin:8px 0 0; padding-left:20px; }
+.steps li { margin:4px 0; }
+.status { display:flex; gap:12px; align-items:center; }
+.spin { width:22px; height:22px; border-radius:50%; border:3px solid var(--accent-soft); border-top-color:var(--accent); animation:s 1s linear infinite; flex:none; }
+@keyframes s { to { transform:rotate(360deg); } }
+.apercu { white-space:pre-wrap; max-height:220px; overflow:auto; font-size:.88rem; color:var(--muted); background:var(--bg); border-radius:10px; padding:10px; margin-top:10px; }
+.ok { color:var(--accent); font-weight:700; }
+.warn { background:var(--warn-bg); color:var(--warn-fg); border-radius:12px; padding:12px; font-size:.92rem; }
+.err { color:var(--err); }
+[hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude pour Jobello</h1>
+  <p>Ta lettre, ton CV adapté ou ta préparation, faits par Claude avec ton propre compte Claude.</p>
+</header>
+<main>
+  <section class="card" id="v-attente">
+    <h2>Colle ici la demande de Jobello</h2>
+    <p class="muted">Jobello l'a déjà copiée pour toi. Appuie longuement dans le cadre puis « Coller » (ou Ctrl+V sur ordinateur) : Claude démarre tout seul.</p>
+    <textarea id="colle" placeholder="Appuie ici puis « Coller »" aria-label="Demande de Jobello"></textarea>
+    <p class="muted err" id="colle-err" hidden></p>
+  </section>
+
+  <section class="card" id="v-recue" hidden>
+    <h2 id="r-titre">Demande reçue</h2>
+    <p class="muted" id="r-sous">Claude va s'en occuper avec ton compte.</p>
+    <div class="row"><button class="primary" id="lancer">Lancer avec mon Claude</button></div>
+  </section>
+
+  <section class="card" id="v-travail" hidden>
+    <div class="status"><div class="spin"></div><div><b>Claude travaille…</b><div class="muted">Garde cette page ouverte, ça prend en général moins d'une minute.</div></div></div>
+    <div class="apercu" id="apercu" hidden></div>
+  </section>
+
+  <section class="card" id="v-fini" hidden>
+    <h2 class="ok">C'est prêt ✓</h2>
+    <p id="f-auto" hidden>La réponse est déjà repartie dans Jobello. Tu peux fermer cette page et y retourner.</p>
+    <div id="f-manuel">
+      <ol class="steps">
+        <li>Touche « Copier la réponse ».</li>
+        <li>Retourne dans Jobello et touche « Coller la réponse de Claude ».</li>
+      </ol>
+    </div>
+    <div class="row"><button class="primary" id="copier">Copier la réponse</button></div>
+    <p class="muted" id="copie-ok" hidden>Copiée ✓ Retourne dans Jobello.</p>
+    <textarea id="copie-secours" readonly hidden aria-label="Réponse à copier"></textarea>
+  </section>
+
+  <section class="card" id="v-erreur" hidden>
+    <h2 class="err">Ça n'a pas marché</h2>
+    <p id="e-msg"></p>
+    <div class="row"><button class="primary" id="reessayer">Réessayer</button></div>
+  </section>
+
+  <section class="card" id="v-indispo" hidden>
+    <div class="warn">Claude n'est pas disponible sur cette page. Ouvre-la depuis <b>claude.ai</b> en étant connecté à ton compte Claude (un compte gratuit suffit), puis réessaie.</div>
+  </section>
+
+  <p class="muted" style="text-align:center;font-size:.8rem">Jobello n'envoie rien ailleurs : la demande passe de Jobello à ton Claude, puis revient dans Jobello.</p>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const VUES = ["v-attente", "v-recue", "v-travail", "v-fini", "v-erreur", "v-indispo"];
+  const voir = (v) => VUES.forEach((x) => { $(x).hidden = x !== v; });
+  const PRE_D = "JOBELLO-DEMANDE ", PRE_R = "JOBELLO-REPONSE ";
+  let demande = null, reponseTexte = "", ouvreur = null, envoyeAuto = false, enCours = false;
+
+  // La fenêtre Jobello qui a ouvert cette page (quand le navigateur le permet)
+  try { ouvreur = (window.top && window.top.opener) || window.opener || null; } catch (e) { ouvreur = null; }
+  const versJobello = (msg) => { if (!ouvreur || !demande) return false; try { ouvreur.postMessage(msg, demande.origin || "*"); return true; } catch (e) { return false; } };
+
+  function lireDemande(t) {
+    t = String(t || "").trim(); const i = t.indexOf(PRE_D); if (i < 0) return null;
+    try { const d = JSON.parse(t.slice(i + PRE_D.length)); return d && d.id && d.input ? d : null; } catch (e) { return null; }
+  }
+  function recevoir(d, auto) {
+    if (!d || enCours) return;
+    demande = d;
+    $("r-titre").textContent = d.titre || "Demande reçue de Jobello";
+    if (auto) lancer(); else voir("v-recue");
+  }
+  const enBlob = (u) => { const [h, b] = u.split(","); const type = (h.match(/data:([^;]+)/) || [])[1] || "image/png"; const s = atob(b), a = new Uint8Array(s.length); for (let k = 0; k < s.length; k++) a[k] = s.charCodeAt(k); return new Blob([a], { type }); };
+  const MSG_ERR = { not_granted: "Tu n'as pas autorisé cette page à utiliser Claude. Touche « Réessayer » et accepte.", rate_limited: "Ton compte Claude a atteint sa limite pour le moment. Réessaie un peu plus tard.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", refused: "Claude n'a pas pu traiter cette demande." };
+
+  async function lancer() {
+    if (!demande || enCours) return; enCours = true;
+    voir("v-travail"); $("apercu").hidden = true;
+    let sample = null; try { sample = await window.claude.use("sample"); } catch (e) {}
+    if (!sample) { enCours = false; voir("v-indispo"); versJobello({ jobello: "erreur", id: demande.id, code: "sampling_disabled", message: "Claude n'est pas disponible sur la page" }); return; }
+    const opts = { cache: false, onText: ({ text }) => { const a = $("apercu"); a.hidden = false; a.textContent = text.slice(-1500); a.scrollTop = a.scrollHeight; } };
+    if (demande.tier) opts.modelTier = demande.tier;
+    if (demande.images && demande.images.length) { try { const lim = await sample.limits(); if (lim && lim.images) opts.images = demande.images.map(enBlob); } catch (e) {} }
+    try {
+      const r = await sample(demande.input, opts);
+      reponseTexte = PRE_R + JSON.stringify({ v: 1, id: demande.id, text: r.text, truncated: !!r.truncated });
+      envoyeAuto = versJobello({ jobello: "reponse", id: demande.id, text: r.text, truncated: !!r.truncated });
+      $("f-auto").hidden = !envoyeAuto; $("f-manuel").hidden = envoyeAuto; $("copier").textContent = envoyeAuto ? "Copier la réponse (au cas où)" : "Copier la réponse";
+      voir("v-fini");
+    } catch (e) {
+      const code = e && e.code; $("e-msg").textContent = MSG_ERR[code] || (e && e.message) || "Claude s'est interrompu. Réessaie.";
+      voir("v-erreur");
+      if (code !== "not_granted") versJobello({ jobello: "erreur", id: demande.id, code: code || "error", message: $("e-msg").textContent });
+    } finally { enCours = false; }
+  }
+
+  // 1) Jobello répond directement quand il a ouvert cette page
+  window.addEventListener("message", (e) => {
+    const m = e.data; if (!m || typeof m !== "object" || m.jobello !== "demande" || !m.demande) return;
+    if (m.demande.origin && e.origin !== m.demande.origin) return;
+    ouvreur = e.source || ouvreur; recevoir(m.demande, true);
+  });
+  if (ouvreur) { try { ouvreur.postMessage({ jobello: "pret" }, "*"); } catch (e) {} }
+
+  // 2) Sinon : copier-coller
+  const zone = $("colle");
+  const essayer = (t) => { const d = lireDemande(t); if (d) { $("colle-err").hidden = true; recevoir(d, false); } else if (String(t || "").trim()) { $("colle-err").textContent = "Ce n'est pas une demande de Jobello. Retourne dans Jobello et touche à nouveau « Ouvrir Claude »."; $("colle-err").hidden = false; } };
+  zone.addEventListener("paste", (e) => { const t = e.clipboardData && e.clipboardData.getData("text"); if (t) { e.preventDefault(); zone.value = t.slice(0, 200) + (t.length > 200 ? "…" : ""); essayer(t); } });
+  zone.addEventListener("input", () => essayer(zone.value));
+
+  $("lancer").onclick = lancer;
+  $("reessayer").onclick = lancer;
+  $("copier").onclick = async () => {
+    try { await navigator.clipboard.writeText(reponseTexte); $("copie-ok").hidden = false; $("copie-secours").hidden = true; }
+    catch (e) { const s = $("copie-secours"); s.hidden = false; s.value = reponseTexte; s.focus(); s.select(); $("copie-ok").textContent = "Sélectionne tout le texte ci-dessous, copie-le, puis retourne dans Jobello."; $("copie-ok").hidden = false; }
+  };
+})();
+</script>
+</body>
+</html>

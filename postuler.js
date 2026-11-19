@@ -115,14 +115,28 @@
 
   /* ---------- Le deck ---------- */
   let deck = null;
+  // Utilisateur sans agents (pas le propriétaire) : à droite = Claude prépare le dossier avec SON compte Claude (relais.js)
+  const parRelais = () => { try { return !!(window.jobelloParRelais && window.jobelloParRelais()); } catch { return false; } };
   function openDeck() {
     if (!ready()) return toast("Connecte-toi d'abord");
     const list = aDefiler();
-    deck = { list, i: 0, hist: [], oui: 0, langue: {} };
+    deck = { list, i: 0, hist: [], oui: 0, langue: {}, garde: [] };
     let ov = document.getElementById("sw-ov");
     if (!ov) { ov = document.createElement("div"); ov.id = "sw-ov"; ov.className = "sw-ov"; document.body.appendChild(ov); }
     ov.hidden = false; try { lockScroll(); } catch {}
     drawDeck();
+  }
+  /* Prépare un par un les dossiers des offres gardées, avec le Claude de la personne */
+  async function preparerGardees() {
+    const liste = deck ? deck.garde.slice() : []; closeDeck();
+    for (let k = 0; k < liste.length; k++) {
+      const o = liste[k], btn = document.createElement("button");
+      if (typeof prepDossier !== "function") break;
+      if (liste.length > 1) toast(`Dossier ${k + 1} sur ${liste.length} : ${o.entreprise || o.titre || "offre"}`);
+      if (state.cands.some((c) => c.lien === o.url)) continue; // déjà un dossier
+      try { await prepDossier(o.url, btn); } catch {}
+      if (!btn.disabled) break; // annulé ou en erreur : on s'arrête là, les autres offres restent à trier
+    }
   }
   function closeDeck() {
     const ov = document.getElementById("sw-ov"); if (ov) { ov.hidden = true; ov.innerHTML = ""; }
@@ -153,6 +167,15 @@
     const ov = document.getElementById("sw-ov"); if (!ov || !deck) return;
     const o = deck.list[deck.i], nx = deck.list[deck.i + 1], reste = deck.list.length - deck.i;
     const head = `<div class="sw-top"><div><h2>Swipe et ça part</h2><span class="n">${o ? `${reste} offre${reste > 1 ? "s" : ""} · ${deck.oui} envoyée${deck.oui > 1 ? "s" : ""} aux agents` : ""}</span></div><button type="button" class="ghost" data-sw="close">Fermer</button></div>`;
+    if (!o && parRelais()) {
+      const n = deck.garde.length;
+      ov.innerHTML = head + `<div class="sw-end"><span class="big">${n ? "📝" : "✨"}</span>
+        <b>${n ? `${n} offre${n > 1 ? "s" : ""} gardée${n > 1 ? "s" : ""}` : "Plus d'offre à trier pour l'instant"}</b>
+        <span class="muted">${n ? "Claude prépare maintenant ton CV adapté et ta lettre pour chacune, avec ton compte Claude. Tu envoies ensuite toi-même ta candidature." : "De nouvelles offres arrivent chaque matin d'après ta fiche. Reviens demain !"}</span>
+        ${n ? `<button type="button" class="primary" data-sw="preparer">Préparer ${n > 1 ? "mes dossiers" : "mon dossier"} avec Claude</button>` : ""}
+        <button type="button" class="${n ? "ghost" : "primary"}" data-sw="close">${n ? "Plus tard" : "Fermer"}</button></div>`;
+      return;
+    }
     if (!o) {
       const lc = !!(deck.oui && lien && lien.lancer), lanc = lc && !lien.enCours;
       const depart = relie() ? "Ça part tout de suite." : lc && lien.enCours ? "Tes agents sont déjà au travail : ils prennent aussi ces offres." : lanc ? `Pour qu'ils partent tout de suite, touche ⚡ ci-dessous, puis « Exécuter maintenant » sur la page qui s'ouvre. Sinon, ils partent vers ${nextSlot()}.` : `Prochain passage vers ${nextSlot()}.`;
@@ -165,7 +188,7 @@
     }
     ov.innerHTML = head + `<div class="sw-stack">${nx ? cardHTML(nx, true) : ""}${cardHTML(o)}</div>
       <div class="sw-btns"><button type="button" class="no" data-sw="no" aria-label="Pas pour moi">✕</button><button type="button" class="undo" data-sw="undo" aria-label="Annuler le dernier" ${deck.hist.length ? "" : "disabled"}>↶</button><button type="button" class="yes" data-sw="yes" aria-label="Postuler">✓</button></div>
-      <p class="sw-help">À droite : je postule (les agents envoient tout seuls). À gauche : pas pour moi.</p>`;
+      <p class="sw-help">${parRelais() ? "À droite : je la garde, Claude prépare CV et lettre. À gauche : pas pour moi." : "À droite : je postule (les agents envoient tout seuls). À gauche : pas pour moi."}</p>`;
     bindSwipe(ov.querySelector(".sw-card:not(.back)"));
   }
   function bindSwipe(el) {
@@ -192,12 +215,14 @@
     if (el) { el.style.transition = "transform .25s ease-in, opacity .25s"; el.style.transform = `translateX(${oui ? 600 : -600}px) rotate(${oui ? 25 : -25}deg)`; el.style.opacity = "0"; }
     try { navigator.vibrate && navigator.vibrate(oui ? 18 : 8); } catch {}
     deck.hist.push({ o, oui }); if (oui) deck.oui++;
-    (oui ? postuler(o, deck.langue[o.url] || "") : marquerVu(o)).catch(() => toast("Pas enregistré : vérifie ta connexion"));
+    if (oui && parRelais()) deck.garde.push(o);
+    else (oui ? postuler(o, deck.langue[o.url] || "") : marquerVu(o)).catch(() => toast("Pas enregistré : vérifie ta connexion"));
     setTimeout(() => { if (!deck) return; deck.i++; drawDeck(); }, 210);
   }
   function undo() {
     if (!deck || !deck.hist.length) return; const h = deck.hist.pop();
-    if (h.oui) { deck.oui--; annulerDemande(h.o).catch(() => {}); } else marquerVu(h.o, true).catch(() => {});
+    if (h.oui && parRelais()) { deck.oui--; deck.garde = deck.garde.filter((x) => x !== h.o); }
+    else if (h.oui) { deck.oui--; annulerDemande(h.o).catch(() => {}); } else marquerVu(h.o, true).catch(() => {});
     deck.i = Math.max(0, deck.i - 1); drawDeck();
   }
 
@@ -402,6 +427,7 @@
     if (a === "lien-ok" || a === "lien-off") return lienAction(a);
     if (a === "open") return openDeck();
     if (a === "close") { const vers = deck && deck.oui; closeDeck(); if (vers) document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (a === "preparer") return preparerGardees();
     if (a === "yes") return decide(true);
     if (a === "no") return decide(false);
     if (a === "undo") return undo();
