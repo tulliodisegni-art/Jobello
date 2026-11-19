@@ -326,7 +326,7 @@ ${text.slice(0, 12000)}`, { cache: false });
   async function refaireCV(btn) {
     if (!state.db) return toast("Connecte-toi à Jobello pour enregistrer");
     let texte = cvPropre();
-    if (aiKey() && state.sample) {
+    if ((aiKey() || (window.jobelloParRelais && window.jobelloParRelais())) && state.sample) {
       const p = state.profil || {}, f = p.fiche || {}, base = state.docs.find((d) => d.id === f.cvDocId) || state.docs.find((d) => d.type === "cv" && !d.adapte && d.langue !== "en" && d.contenu);
       if (base) {
         btn.disabled = true; btn.textContent = "Claude refait ton CV…";

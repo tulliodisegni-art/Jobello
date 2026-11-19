@@ -16,6 +16,7 @@
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
 <script src="shim.js"></script>
+<script src="relais.js"></script>
 <script src="sync.js"></script>
 </head>
 <body>
@@ -2347,7 +2348,7 @@ function openProfil() {
 let aiCtl = null;
 function aiError(e) {
   return ({ not_granted: window.jobelloStore ? "Ce bouton a besoin d'une clé Anthropic (payante), que tu n'as pas mise : demande-le plutôt à Claude dans ton projet Jobello." : "Tu n'as pas autorisé l'appli à utiliser Claude. Tu peux le réactiver dans le menu Autorisations de l'appli.", rate_limited: "Trop de demandes pour le moment. Réessaie un peu plus tard.",
-    session_expired: "Demande-le à Claude dans ton projet Jobello.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", refused: "Claude n'a pas pu traiter cette demande. Reformule-la." }[e?.code]) || "La rédaction a été interrompue. Réessaie.";
+    cancelled: "Demande annulée.", remplace: "Demande remplacée par la nouvelle.", session_expired: "Demande-le à Claude dans ton projet Jobello.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", refused: "Claude n'a pas pu traiter cette demande. Reformule-la." }[e?.code]) || "La rédaction a été interrompue. Réessaie.";
 }
 const dispo = () => state.profil?.disponibilite || "Disponible sous 1 mois (préavis)";
 function profileText() {
@@ -3872,10 +3873,11 @@ function renderAlerts() {
       <span>${esc(o.entreprise)} <span class="muted">· ${esc(o.ville)}</span> ${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? ` <span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score}% adapté</span>` : ""}</span>
       ${o.pourquoi ? `<span class="muted" style="font-size:.85rem">${esc(o.pourquoi)}</span>` : ""}
       <span class="muted" style="font-size:.78rem">${ageTag(o)}${o.source ? " · " + esc(o.source) : ""}</span><div class="row">${prepBtn(o)}<button type="button" class="small" data-alert-keep="${esc(o.url)}">Garder</button><button type="button" class="small ghost" data-alert-skip="${esc(o.url)}">Ignorer</button></div></div>`).join("")
-    : `<p class="muted" style="margin:0">${a.date === todayISO() ? "Aucune nouvelle offre pertinente aujourd'hui." : "Lance la recherche du jour : je cherche sur Indeed les postes de ton profil et je note chaque offre."}</p>`)
+    : `<p class="muted" style="margin:0">${a.date === todayISO() ? "Aucune nouvelle offre pertinente aujourd'hui." : window.jobelloParRelais && window.jobelloParRelais() ? "Tes offres arrivent ici chaque matin, d'après ta fiche." : "Lance la recherche du jour : je cherche sur Indeed les postes de ton profil et je note chaque offre."}</p>`)
     + `<div class="row"><button type="button" class="small" data-action="alerts-run" ${alertBusy ? "disabled" : ""}>${alertBusy ? "Recherche en cours…" : a.date === todayISO() ? "Relancer la recherche" : "Chercher les offres du jour"}</button><span class="muted" id="alerts-st" style="font-size:.8rem"></span></div>`;
 }
 async function runAlerts() {
+  if (window.jobelloParRelais && window.jobelloParRelais() && window.jobelloOffresAuto) return window.jobelloOffresAuto($("#alerts-st"));
   if (alertBusy) return; const mcp = await use("mcp"), st = () => $("#alerts-st");
   if (!mcp) { if (st()) st().textContent = "Indeed n'est pas disponible dans cette vue."; return; }
   alertBusy = true; renderAlerts();
@@ -3943,7 +3945,7 @@ function renderPicks() {
 let prepBusy = false;
 /* Sans clé Anthropic (cas de Tullio), « Préparer mon dossier » envoie la demande à Claude du projet :
    elle est rangée dans demandes/dossiers et la tâche planifiée prépare le dossier puis le range dans l'appli. */
-const sansCle = () => !!window.jobelloStore && !window.jobelloStore.get("aiKey", "");
+const sansCle = () => !!window.jobelloStore && !window.jobelloStore.get("aiKey", "") && !(window.jobelloParRelais && window.jobelloParRelais());
 const demandeOf = (o) => (state.demandes?.liste || []).find((d) => d.url === o.url || d.cle === offerKey(o));
 /* Passages de la tâche planifiée qui prépare les dossiers : toutes les heures à h47, de 8h47 à 20h47 (heure de Paris). */
 const PREP_SLOTS = Array.from({ length: 13 }, (_, i) => (8 + i) * 60 + 47), PREP_DUREE = 20;
@@ -4693,6 +4695,7 @@ render();
 <script src="plus.js"></script>
 <script src="ciblage.js"></script>
 <script src="accueil.js"></script>
+<script src="offres-auto.js"></script>
 <script src="postuler.js"></script>
 <script src="langue.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
