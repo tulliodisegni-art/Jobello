@@ -3122,14 +3122,14 @@ function replyBoxHTML(c) {
   const R = c.reponseMail; if (!R || R.envoye) return "";
   const ent = R.type === "entretien" && R.dateProp, alts = R.alts && R.alts.length ? R.alts : [{}, {}];
   const subj = /^re\s*:/i.test(R.objet) ? R.objet : "Re: " + (R.objet || `Candidature au poste ${dePoste(c.poste || "d'ingénieur")}`);
-  const txt = R.draft || replyText(c);
+  const txt = R.draft || replyText(c), dest = R.a && !isRelay(R.a) ? R.a : recruiterOf(c).email;
   return `<div class="relance-box reply-box"><span class="lbl" style="font-weight:600">Répondre au mail du ${esc(fmt(R.date))}</span>
     ${ent ? `<p class="muted" style="margin:0;font-size:.88rem">Ils proposent le ${esc(dayFr(R.dateProp))}${R.heureProp ? " à " + esc(hFr(R.heureProp)) : ""}. C'est déjà dans ton agenda.</p>
     <div class="seg" role="group" aria-label="Ta réponse"><button type="button" data-act="rp-mode" data-m="oui" aria-pressed="${R.mode !== "autre"}">J'accepte</button><button type="button" data-act="rp-mode" data-m="autre" aria-pressed="${R.mode === "autre"}">Autre jour ou horaire</button></div>
     ${R.mode === "autre" ? `<div class="rp-alts">${alts.map((x, i) => `<div class="row"><span class="muted" style="min-width:5.5em">Proposition ${i + 1}</span><input type="date" data-alt="${i}" data-f="d" value="${esc(x.d || "")}"><input type="time" data-alt="${i}" data-f="h" value="${esc(x.h || "")}" step="900"></div>`).join("")}</div>` : ""}` : ""}
     <textarea id="rp-msg" rows="9">${esc(txt)}</textarea>
-    <div class="row">${copyBtn("rp-msg")}${R.a ? `<a class="btn primary" id="rp-go" href="mailto:${esc(R.a)}?subject=${enc(subj)}&body=${enc(txt)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}<button type="button" data-act="rp-sent">C'est envoyé</button></div>
-    <p class="muted" style="margin:0;font-size:.8rem">${R.a ? `Le mail s'ouvre adressé à ${esc(R.a)}, avec l'objet et le texte. Tu relis puis tu appuies sur Envoyer.` : "Je n'ai pas trouvé l'adresse : copie le texte et réponds directement depuis le mail reçu."}</p></div>`;
+    <div class="row">${copyBtn("rp-msg")}${dest ? `<a class="btn primary" id="rp-go" href="mailto:${esc(dest)}?subject=${enc(subj)}&body=${enc(txt)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}<button type="button" data-act="rp-sent">C'est envoyé</button></div>
+    <p class="muted" style="margin:0;font-size:.8rem">${dest ? `Le mail s'ouvre adressé à ${esc(dest)}, avec l'objet et le texte. Tu relis puis tu appuies sur Envoyer.` : "Je n'ai pas l'adresse directe de la personne (le mail vient d'une plateforme) : copie le texte et réponds directement depuis le mail reçu."}</p></div>`;
 }
 function replyRefresh() {
   const c = editing, R = c?.reponseMail; if (!R) return;
@@ -3186,23 +3186,19 @@ function nextWorkDays(n) {
 }
 function rrDays(cur) { const L = nextWorkDays(15); return cur && !L.includes(cur) ? [cur, ...L] : L; }
 function rrPlages() { try { const p = JSON.parse(localStorage.getItem("jb-plages") || "null"); if (Array.isArray(p) && p.length === 3) return p; } catch {} return ["entre 12 h et 14 h", "", ""]; }
-function rrContact(c) {
-  const raw = String(c.contact || ""), mail = [c.email, raw, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
-  const nom = raw.replace(EMAIL_RE, "").split(/[·,(|]/)[0].trim() || [...(c.mails || [])].reverse().find((m) => m.de)?.de?.split(/[,(·]/)[0].trim() || "";
-  return { nom: /^[\p{L}' .-]{3,40}$/u.test(nom) ? nom : "", email: mail ? mail[0] : "" };
-}
+const rrContact = (c) => recruiterOf(c);
 function rrInit(c) {
   if (rr && rr.id === (c.id || "new")) return rr;
   const k = rrContact(c), pl = rrPlages(), defType = c.statut === "entretien" ? (c.dateEntretien && c.dateEntretien < todayISO() ? "merci" : "confirmer") : ACTIVE.includes(c.statut) ? "tel" : c.statut === "refus" ? "refus" : c.statut === "offre" ? "offre" : "tel";
   const mode = /t[ée]l[ée]phone/i.test(c.typeEntretien || "") ? "tel" : /visio/i.test(c.typeEntretien || "") || c.lienVisio ? "visio" : /place/i.test(c.typeEntretien || "") ? "physique" : "tel";
-  rr = { id: c.id || "new", type: defType, mail: "", nom: k.nom, email: k.email, slots: [{ d: nextWorkDays(1)[0], p: pl[0] || "entre 12 h et 14 h" }, { d: "", p: "" }, { d: "", p: "" }], civ: rrGuessCiv(k.nom), date: c.dateEntretien || "", heure: c.heureEntretien || "", mode, draft: "", open: false, info: "" };
+  rr = { id: c.id || "new", type: defType, mail: "", nom: k.nom, email: k.email, via: k.via, plat: k.plat, tel: k.tel, slots: [{ d: nextWorkDays(1)[0], p: pl[0] || "entre 12 h et 14 h" }, { d: "", p: "" }, { d: "", p: "" }], civ: c.recruteur?.civ || rrGuessCiv(k.nom), date: c.dateEntretien || "", heure: c.heureEntretien || "", mode, draft: "", open: false, info: "" };
   return rr;
 }
 // Lit le mail collé, sans IA : expéditeur, adresse, type de demande, date et heure proposées
 function rrParse(text) {
   const t = String(text || ""), n = normTxt(t), me = normTxt(state.profil?.nom || ""), myMail = String(state.profil?.email || "").toLowerCase();
   const out = {};
-  const mails = (t.match(new RegExp(EMAIL_RE.source, "g")) || []).filter((m) => m.toLowerCase() !== myMail && !/no-?reply|ne-pas-repondre|notification/i.test(m));
+  const mails = (t.match(new RegExp(EMAIL_RE.source, "g")) || []).filter((m) => m.toLowerCase() !== myMail && !/tulliodisegni/i.test(m) && !isRelay(m));
   if (mails[0]) out.email = mails[0];
   const head = t.match(/^\s*(?:De|From|Expéditeur)\s*:\s*"?([^<"\n]+?)"?\s*(?:<|$)/mi);
   const isName = (s) => s && /^[\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+){1,3}$/u.test(s.trim()) && normTxt(s) !== me && !/^(Bonjour|Madame|Monsieur|Cordialement|Bien|Bonne|Merci|Envoy)/.test(s.trim());
@@ -3237,7 +3233,7 @@ function rrParse(text) {
 function rrFromMail(c) {
   const p = rrParse(rr.mail), got = [];
   if (p.nom) { rr.nom = p.nom; rr.civ = p.civ || rrGuessCiv(p.nom); got.push(p.nom); }
-  if (p.email) { rr.email = p.email; got.push(p.email); }
+  if (p.email) { rr.email = p.email; rr.via = ""; got.push(p.email); }
   else if (p.nom) rr.email = rrContact(c).email;
   if (p.type) { rr.type = p.type; got.push(RR_LABEL[p.type].toLowerCase()); }
   if (p.mode) rr.mode = p.mode;
@@ -3299,7 +3295,7 @@ function rrHTML(c) {
       <p class="muted" style="margin:0;font-size:.8rem">Choisis le jour puis l'horaire : le mail s'adapte tout seul. Les créneaux 2 et 3 sont facultatifs.</p></div>` : ""}
     <textarea id="rr-msg" rows="12">${esc(txt)}</textarea>
     <div class="row">${copyBtn("rr-msg", "Copier la réponse")}${href ? `<a class="btn primary" id="rr-go" href="${esc(href)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}<button type="button" data-act="rr-sent">C'est envoyé</button></div>
-    <p class="muted" style="margin:0;font-size:.8rem">${rr.email ? `Le mail s'ouvre adressé à ${esc(rr.email)}, avec l'objet et le texte. Tu peux retoucher le texte avant.` : "Ajoute son adresse pour ouvrir le mail tout prêt, ou copie la réponse et colle-la en répondant au mail reçu."}</p>
+    <p class="muted" style="margin:0;font-size:.8rem">${rr.email ? `Le mail s'ouvre adressé à ${esc(rr.email)}, avec l'objet et le texte. Tu peux retoucher le texte avant.` : (rr.via ? (rr.nom ? `⚠️ Je n'ai pas l'adresse directe de ${esc(rr.nom)} : son mail est passé par ${esc(rr.plat)} (${esc(rr.via)}), une adresse de plateforme, pas la sienne. Copie la réponse et réponds directement depuis ce mail reçu, elle lui arrivera. Si tu as son adresse, ajoute-la ci-dessus.` : `⚠️ Personne de la société ne t'a encore écrit avec une vraie adresse : les mails reçus viennent de ${esc(rr.plat)} (${esc(rr.via)}), une adresse automatique, pas celle du recruteur. Dès qu'un recruteur t'écrit, son adresse s'affichera ici.`) : "Je n'ai pas encore l'adresse de la personne : ajoute-la ci-dessus pour ouvrir le mail tout prêt, ou copie la réponse et colle-la en répondant au mail reçu.") + (rr.tel ? ` Son téléphone : ${esc(rr.tel)}.` : "")}</p>
   </div></details>`;
 }
 function rrRefresh(keepDraft) {
@@ -3327,7 +3323,7 @@ async function rrSent(btn) {
   if (t === "refus" && c.statut !== "refus") c.statut = "refus";
   if (["tel", "visio", "physique", "decaler"].includes(t) && !c.prochaineRelance) c.prochaineRelance = addDays(today, 4);
   if (!c.contact && rr.nom) c.contact = rr.nom + (rr.email ? " · " + rr.email : "");
-  if (!c.email && rr.email) c.email = rr.email;
+  if (rr.email && !isRelay(rr.email)) { if (!c.email || isRelay(c.email)) c.email = rr.email; c.recruteur = { ...(c.recruteur || {}), nom: rr.nom || c.recruteur?.nom || "", civ: rr.civ || "", email: rr.email }; }
   c.historique.push({ date: today, texte: `Réponse envoyée : ${RR_LABEL[t].replace(/ \(.*\)$/, "").toLowerCase()}${(RR_SLOTS.includes(t) && slots.length) ? " (" + slots.map((x) => fmt(x.d) + (x.p ? " " + x.p : "")).join(", ") + ")" : t === "confirmer" && rr.date ? " (" + fmt(rr.date) + (rr.heure ? " " + rr.heure : "") + ")" : ""}` });
   if (rr.mail.trim()) {
     const h = hashTxt(rr.mail);
@@ -3338,6 +3334,26 @@ async function rrSent(btn) {
 
 /* ---------- Résumé de fiche + Relancer ---------- */
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
+// Adresses de plateformes (Indeed, logiciels de recrutement, no-reply…) : jamais le bon destinataire d'une réponse
+const RELAY_PLATS = [["indeed", "Indeed"], ["myworkday", "Workday"], ["workday", "Workday"], ["beetween", "Beetween"], ["teamtailor", "Teamtailor"], ["welcomekit", "Welcome to the Jungle"], ["welcometothejungle", "Welcome to the Jungle"], ["taleez", "Taleez"], ["recruitee", "Recruitee"], ["icims", "iCIMS"], ["gestmax", "Gestmax"], ["profils.org", "Profils"], ["smartrecruiters", "SmartRecruiters"], ["successfactors", "SuccessFactors"], ["lever.co", "Lever"], ["greenhouse", "Greenhouse"], ["jobvite", "Jobvite"], ["talentsoft", "Talentsoft"], ["taleo", "Taleo"], ["cornerstone", "Cornerstone"], ["flatchr", "Flatchr"], ["digitalrecruiters", "Digital Recruiters"], ["werecruit", "Werecruit"], ["softy", "Softy"], ["apec", "l'Apec"], ["hellowork", "HelloWork"], ["linkedin", "LinkedIn"], ["jobteaser", "JobTeaser"], ["monster", "Monster"], ["cadremploi", "Cadremploi"], ["meteojob", "Meteojob"]];
+const RELAY_RE = /(^|[._+-])(no-?reply|noreply|ne-?pas-?repondre|donotreply|do-not-reply|notifications?|mailer-daemon|auto-?reply|bounce)([._+-]|@)|^(myhr|reply-[\w]+|message|applications?|candidates?|jobs?-?alert)@/i;
+const relayPlat = (e) => { const d = String(e || "").toLowerCase().split("@")[1] || ""; return (RELAY_PLATS.find(([k]) => d.includes(k)) || [])[1] || ""; };
+const isRelay = (e) => !!e && (RELAY_RE.test(String(e)) || !!relayPlat(e));
+// La vraie personne qui a écrit : fiche (c.recruteur) puis dernier mail reçu d'une adresse directe, jamais une adresse relais
+const NOT_PERSON = /\b(equipe|équipe|service|recrutement|recruitment|talent|team|rh|hr|indeed|apply|candidature|ressources humaines|no-?reply)\b/i;
+function recruiterOf(c) {
+  const me = String(state.profil?.email || "").toLowerCase(), ok = (e) => e && !isRelay(e) && e.toLowerCase() !== me && !/tulliodisegni/i.test(e);
+  const cut = (s) => String(s || "").replace(EMAIL_RE, "").split(/[,(·|]/)[0].replace(/[<>"]/g, "").trim();
+  const person = (s) => { const n = cut(s); return /^[\p{L}' .-]{3,40}$/u.test(n) && !NOT_PERSON.test(n) && /\s/.test(n) ? n : ""; };
+  const r = c.recruteur || {}, mails = [...(c.mails || [])].reverse();
+  let email = ok(r.email) ? r.email : "", nom = person(r.nom), tel = r.tel || "";
+  if (!email) { const m = mails.find((x) => ok(x.email)); if (m) { email = m.email; nom = nom || person(m.de); } }
+  if (!email) { const m = [c.email, c.contact].join(" ").match(new RegExp(EMAIL_RE.source, "g")) || []; email = m.find(ok) || ""; }
+  nom = nom || person(c.contact);
+  const viaM = mails.find((x) => x.email && isRelay(x.email) && (!nom || normTxt(x.de || "").includes(normTxt(nom.split(" ").pop())))) || mails.find((x) => x.email && isRelay(x.email));
+  const via = !email && viaM ? viaM.email : "";
+  return { nom, email, tel, via, plat: via ? relayPlat(via) || via.split("@")[1] : "" };
+}
 const platOf = (c) => PLATS.find((p) => norm(c.source).includes(p.nom.toLowerCase()) || norm(c.source).includes(p.id));
 function candInvite(c) {
   const pr = state.profil || {}, quand = c.dateEnvoi ? ` le ${fmt(c.dateEnvoi, { day: "numeric", month: "long" })}` : "";
@@ -3348,7 +3364,7 @@ function relanceRoutes(c) {
   const msg = c.messageRelance || relanceText(c), r = [];
   const p = viaContact(c);
   if (p) r.push({ k: "contact", p, label: `Relancer via ${firstName(p.nom) || p.nom} (LinkedIn)`, hint: `${p.nom} est ton contact pour cette candidature : j'ouvre sa fiche avec le message prêt.` });
-  const mail = [c.email, c.contact, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
+  const mail = recruiterOf(c).email ? [recruiterOf(c).email] : null;
   const subj = `Ma candidature au poste ${dePoste(c.poste || "d'ingénieur")}${c.refOffre ? " (réf. " + c.refOffre + ")" : ""}`;
   if (mail) r.push({ k: "mail", href: `mailto:${mail[0]}?subject=${enc(subj)}&body=${enc(msg)}`, label: "Relancer par e-mail", msg, hint: `Le mail à ${mail[0]} s'ouvre déjà rempli : tu n'as plus qu'à appuyer sur Envoyer.` });
   const q = `"${c.groupe || c.entreprise}" talent acquisition OR RH OR recrutement OR "bureau d'études"`;
@@ -3785,7 +3801,7 @@ function thanksText(c) {
 }
 function suiviHTML(c) {
   if (!afterInterview(c)) return "";
-  const mail = [c.email, c.contact, ...(c.mails || []).map((m) => m.email || "")].join(" ").match(EMAIL_RE);
+  const mail = recruiterOf(c).email ? [recruiterOf(c).email] : null;
   const msg = c.messageMerci || thanksText(c);
   return `<div class="relance-box" id="apres-entretien"><span class="lbl" style="font-weight:600">✅ Entretien fait : et ensuite ?</span>
     ${suiteHTML(c, true)}
