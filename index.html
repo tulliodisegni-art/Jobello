@@ -1191,6 +1191,19 @@ const canalLabel = (c) => c.canal === "plateforme" ? "Plateforme · " + (c.sourc
 const answered = (c) => ["entretien", "offre", "refus"].includes(c.statut);
 const prenom = () => (state.profil?.nom || "").split(" ")[0] || "";
 
+/* Entretien déjà passé : jour passé, ou aujourd'hui mais remerciement / « et ensuite ? » déjà faits, ou l'heure est passée de 2 h */
+function entretienFait(c) {
+  const d = c && c.dateEntretien, today = todayISO();
+  if (!d) return false;
+  if (d < today) return true;
+  if (d > today) return false;
+  if ((c.attente && c.attente >= d) || (c.remerciement && c.remerciement >= d)) return true;
+  const m = /^(\d{1,2}):(\d{2})/.exec(c.heureEntretien || "");
+  if (!m) return false;
+  const n = new Date(); return n.getHours() * 60 + n.getMinutes() >= +m[1] * 60 + +m[2] + 120;
+}
+const entretienAVenir = (c) => !!(c && c.dateEntretien && c.dateEntretien >= todayISO() && !entretienFait(c));
+
 /* ---------- Rendu : accueil ---------- */
 /* Accueil : une seule liste de choses à faire, la plus urgente mise en avant. Le reste vit dans les onglets. */
 const TASK_BTN = { rep: "Voir ma réponse", offre: "Voir l'offre", ent: "Préparer l'entretien", merci: "Écrire le remerciement", rel: "Relancer", send: "Postuler", li: "Trouver la personne", net: "Ouvrir mon réseau", suite: "Voir la suite" };
@@ -1201,7 +1214,7 @@ function homeTasks() {
     const pc = viaContact(c);
     if (c.reponseMail && !c.reponseMail.envoye) return T.push({ ...base, p: 0, k: "rep", t: `Répondre à ${ent}`, s: c.reponseMail.type === "entretien" && c.reponseMail.dateProp ? `Entretien proposé le ${dayFr(c.reponseMail.dateProp)}${c.reponseMail.heureProp ? " à " + hFr(c.reponseMail.heureProp) : ""}` : (MAILTYPES[c.reponseMail.type] || "Mail reçu"), w: "réponse prête", hot: true });
     if (c.statut === "offre") return T.push({ ...base, p: 0, k: "offre", t: `Répondre à l'offre de ${ent}` });
-    if (c.dateEntretien && c.dateEntretien >= today && c.dateEntretien <= addDays(today, 14)) {
+    if (entretienAVenir(c) && c.dateEntretien <= addDays(today, 14)) {
       const d = c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric" });
       return T.push({ ...base, p: 0, k: "ent", t: `Entretien chez ${ent}`, s: [c.typeEntretien, c.poste].filter(Boolean).join(" · "), w: d + (c.heureEntretien ? " · " + c.heureEntretien.replace(":", " h ") : ""), hot: c.dateEntretien <= addDays(today, 1) });
     }
@@ -1244,7 +1257,7 @@ function renderHome() {
   $("#hero-summary").textContent = !state.loaded ? "Chargement de ton carnet…" : !all.length ? "Ton carnet est prêt. Ajoute une candidature ou trouve une offre dans l'onglet Offres."
     : !T.length ? "Tout est à jour. Rien à faire aujourd'hui." : urgent ? `${urgent} chose${urgent > 1 ? "s" : ""} urgente${urgent > 1 ? "s" : ""} aujourd'hui.` : "Rien d'urgent. Tu peux avancer tes candidatures.";
 
-  const joinable = all.filter((c) => c.lienVisio && c.dateEntretien && c.dateEntretien >= today && c.dateEntretien <= addDays(today, 1)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
+  const joinable = all.filter((c) => c.lienVisio && entretienAVenir(c) && c.dateEntretien <= addDays(today, 1)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
   $("#hero-join").hidden = !joinable.length;
   $("#hero-join").innerHTML = joinable.map((c) => joinHTML(c, `Rejoindre ${c.entreprise} · ${c.dateEntretien === today ? "aujourd'hui" : "demain"}${c.heureEntretien ? " " + c.heureEntretien : ""}`)).join("");
 
@@ -1335,7 +1348,7 @@ const STEP_L = ["Prête", "Envoyée", "Relancée", "Entretien", "Offre"];
 function nextOf(c) {
   const today = todayISO();
   if (c.reponseMail && !c.reponseMail.envoye) return ["Réponse à envoyer", "hot"];
-  if (c.statut === "entretien" && c.dateEntretien >= today) return [`Entretien ${c.dateEntretien === today ? "aujourd'hui" : "le " + fmt(c.dateEntretien)}${c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : ""}`, "ent"];
+  if (c.statut === "entretien" && entretienAVenir(c)) return [`Entretien ${c.dateEntretien === today ? "aujourd'hui" : "le " + fmt(c.dateEntretien)}${c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : ""}`, "ent"];
   if (c.statut === "entretien" && !c.dateEntretien) return ["Date d'entretien à fixer", ""];
   if (afterInterview(c) && !c.prochaineRelance) return c.notesEntretien ? ["Et ensuite ? Dis-moi la suite", "hot"] : ["Dire comment ça s'est passé", "hot"];
   if (c.statut === "a_envoyer") return ["À envoyer", ""];
@@ -3723,7 +3736,7 @@ function prepaHTML(c) {
   if (!hasInterview(c)) return "";
   const p = c.prepa, qa = (a) => (a || []).map((x) => `<details class="qa"><summary>${esc(x.q)}</summary><p>${esc(x.r)}</p></details>`).join("");
   const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "";
-  return `<details class="sec prepa-sec" id="sec-prepa" ${c.dateEntretien >= todayISO() && c.dateEntretien <= addDays(todayISO(), 7) ? "open" : ""}><summary>Préparer l'entretien <small>${esc(when)}</small></summary><div class="body">
+  return `<details class="sec prepa-sec" id="sec-prepa" ${entretienAVenir(c) && c.dateEntretien <= addDays(todayISO(), 7) ? "open" : ""}><summary>Préparer l'entretien <small>${esc(when)}</small></summary><div class="body">
     ${p ? `${p.pitch ? `<span class="lbl">Ta présentation (1 minute)</span><p class="pitch">${esc(p.pitch)}</p>` : ""}
       ${p.techniques?.length ? `<span class="lbl">Questions techniques probables</span>${qa(p.techniques)}` : ""}
       ${p.rh?.length ? `<span class="lbl">Questions RH et motivation</span>${qa(p.rh)}` : ""}

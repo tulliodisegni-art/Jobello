@@ -78,7 +78,7 @@
   }
 
   /* ========== 4. Antisèche d'entretien ========== */
-  const prochainEntretien = (c) => c && c.dateEntretien && c.dateEntretien >= todayISO();
+  const prochainEntretien = (c) => typeof entretienAVenir === "function" ? entretienAVenir(c) : !!(c && c.dateEntretien && c.dateEntretien >= todayISO());
   function antisecheHTML(c) {
     const s = societeOf(c), p = c.prepa || {}, Q = c.questionsEntretien || [];
     const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "Date à fixer";
