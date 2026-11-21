@@ -3,14 +3,14 @@
 (function () {
   const ls = window.jobelloStore, C = window.JOBELLO_CONFIG || {};
   const css = `
-  .jb-ov{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0B2E6B,#11557A 55%,#0E7A5A);display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#0e1f2b}
-  .jb-card{background:#fff;border-radius:24px;padding:26px 22px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(60,10,40,.35);display:flex;flex-direction:column;gap:12px}
-  .jb-card img{width:72px;height:72px;border-radius:18px;align-self:center}
-  .jb-card h1{margin:0;text-align:center;font-size:1.6rem}
+  .jb-ov{position:fixed;inset:0;z-index:9999;background:#0d3a63;display:flex;align-items:center;justify-content:center;padding:24px;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#0e1f2b}
+  .jb-card{background:#fff;border-radius:20px;padding:24px 20px;width:100%;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:12px}
+  .jb-card img{width:72px;height:72px;border-radius:16px;align-self:center}
+  .jb-card h1{margin:0;text-align:center;font-size:1.5rem;font-weight:600}
   .jb-card p{margin:0;color:#56697a;font-size:.92rem;text-align:center}
   .jb-card label{font-size:.82rem;font-weight:600;color:#56697a}
   .jb-card input{font:inherit;padding:12px 14px;border-radius:12px;border:1px solid #d5e5df;background:#f7fbfa;color:#0e1f2b;width:100%;box-sizing:border-box}
-  .jb-card button{font:inherit;font-weight:700;padding:13px;border-radius:999px;border:0;background:#0E7A5A;color:#fff;cursor:pointer}
+  .jb-card button{font:inherit;font-weight:600;min-height:48px;padding:12px 20px;border-radius:12px;border:0;background:#0E7A5A;color:#fff;cursor:pointer}
   .jb-card button.ghost{background:transparent;color:#0E7A5A;border:1px solid #bfe3d4}
   .jb-card .err{color:#c0392b;font-size:.86rem;text-align:center;min-height:1.2em}
   .jb-card .row{display:flex;gap:8px}.jb-card .row>*{flex:1}
