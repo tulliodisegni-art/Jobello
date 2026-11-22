@@ -183,7 +183,8 @@
         <b>${deck.oui ? `${deck.oui} candidature${deck.oui > 1 ? "s" : ""} confiée${deck.oui > 1 ? "s" : ""} aux agents` : "Plus d'offre à trier pour l'instant"}</b>
         <span class="muted">${deck.oui ? `Claude prépare CV et lettre pendant que les agents postulent en même temps sur ton ordinateur (Chrome ouvert). ${depart} Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>
         ${lanc ? `<a class="btn primary" href="${tacheURL()}" target="_blank" rel="noopener" data-lancer><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Lancer mes agents maintenant</a>` : ""}
-        <button type="button" class="${lanc ? "ghost" : "primary"}" data-sw="close">${deck.oui ? "Voir mes agents" : "Fermer"}</button></div>`;
+        ${deck.oui && !parRelais() ? `<button type="button" class="${lanc ? "" : "primary"}" data-sw="direct"><span class="dv-live${lien && lien.enCours ? "" : " off"}"><i></i>${lien && lien.enCours ? "EN DIRECT" : "VOIR"}</span> Regarder mes agents travailler</button>` : ""}
+        <button type="button" class="${deck.oui ? "ghost" : "primary"}" data-sw="close">${deck.oui ? "Voir mes agents" : "Fermer"}</button></div>`;
       return;
     }
     ov.innerHTML = head + `<div class="sw-stack">${nx ? cardHTML(nx, true) : ""}${cardHTML(o)}</div>
@@ -270,6 +271,7 @@
     return `<button type="button" class="ag-link on${ko ? " ko" : ""}" data-sw="lier"><span class="ic"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span><span class="tx"><b>Téléphone et ordi reliés</b><small>${esc(sub)}</small></span><span class="ch">›</span></button>`;
   }
   const tacheURL = () => lien && /^trig_[A-Za-z0-9]+$/.test(lien.tache || "") ? "https://claude.ai/code/routines/" + lien.tache : "https://claude.ai/code/routines";
+  window.jobelloAgents = { tacheURL: () => tacheURL(), lancerMode: () => lancerMode(), occupe: () => occupe() };
   /* Lancer les agents tout de suite : le bouton ⚡ ouvre la tâche Claude « Agents Jobello », où on touche « Exécuter maintenant » */
   const aEnvoyer = () => ready() && ((state.demandes?.liste || []).some((d) => d.auto && d.statut === "en_attente") || state.cands.some((c) => c.statut === "a_envoyer" && c.envoi && c.envoi.statut === "valide"));
   const lanceLe = () => +localStorage.getItem("jb-lance") || 0;
@@ -426,6 +428,7 @@
     if (a === "lier") return openLien();
     if (a === "lien-ok" || a === "lien-off") return lienAction(a);
     if (a === "open") return openDeck();
+    if (a === "direct") { closeDeck(); if (window.jobelloDirect) window.jobelloDirect(); return; }
     if (a === "close") { const vers = deck && deck.oui; closeDeck(); if (vers) document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (a === "preparer") return preparerGardees();
     if (a === "yes") return decide(true);
