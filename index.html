@@ -1193,7 +1193,7 @@ const modeTag = (m) => `<span class="mode-tag m-${m === "prestataire" ? "presta"
 const prestaLast = (x, y) => (modeOf(x) === "prestataire") - (modeOf(y) === "prestataire");
 const CANAUX = [["site", "Site carrière de l'entreprise"], ["plateforme", "Plateforme d'emploi"], ["recruteur", "Via un recruteur (LinkedIn)"], ["spontanee", "Candidature spontanée"]];
 const canalLabel = (c) => c.canal === "plateforme" ? "Plateforme · " + (c.source || "non précisée") : (CANAUX.find(([k]) => k === c.canal)?.[1] || "Canal non précisé");
-const answered = (c) => ["entretien", "offre", "refus"].includes(c.statut);
+const answered = (c) => ["entretien", "offre"].includes(c.statut) || (c.statut === "refus" && !c.refusAuto);
 const prenom = () => (state.profil?.nom || "").split(" ")[0] || "";
 
 /* Entretien déjà passé : jour passé, ou aujourd'hui mais remerciement / « et ensuite ? » déjà faits, ou l'heure est passée de 2 h */
@@ -1367,7 +1367,7 @@ function nextOf(c) {
 }
 const isNew = (c) => (c.createdAt || "").slice(0, 10) >= addDays(todayISO(), -3);
 function itemHTML(c) {
-  const st = STEP[c.statut], closed = st == null, [nx, nk] = archivedCand(c) ? [c.statut === "refus" ? "Refus" : "Arrêtée", ""] : nextOf(c);
+  const st = STEP[c.statut], closed = st == null, [nx, nk] = archivedCand(c) ? [c.statut === "refus" ? (c.refusAuto ? "Refus auto (sans nouvelles)" : "Refus") : "Arrêtée", ""] : nextOf(c);
   const since = c.dateEnvoi ? (() => { const n = daysBetween(c.dateEnvoi, todayISO()); return n <= 0 ? "Envoyée aujourd'hui" : `Envoyée il y a ${n} j`; })() : c.statut === "a_envoyer" ? (c.analyse ? `${c.analyse.score} % adapté` : "") : "";
   const sub = [since, c.ville].filter(Boolean).join(" · ");
   return `<button type="button" class="cc st-${esc(c.statut)}${closed ? " closed" : ""}" data-open="${esc(c.id)}">
@@ -1518,6 +1518,34 @@ const norm = (x) => String(x || "").trim().toLowerCase();
 const contactsOf = (ent) => ent ? state.contacts.filter((p) => norm(p.entreprise) === norm(ent)) : [];
 const archivedC = (p) => p.etape === "sans_suite";
 const archivedCand = (c) => c.decision === "stop" || ["refus", "abandon"].includes(c.statut);
+/* Refus automatique : envoyée ou relancée, et rien de la société depuis 30 jours (envoi, relance, mail, réponse, entretien) */
+const REFUS_AUTO_J = 30;
+const ISO_D = (x) => (typeof x === "string" && /^\d{4}-\d{2}-\d{2}/.test(x) ? x.slice(0, 10) : "");
+function derniereNouvelle(c) {
+  const d = [c.dateEnvoi, c.dateReponse, c.dateEntretien, c.refusAutoRepris, ...(c.mails || []).map((m) => m.date), ...(c.entretiens || []).map((e) => e.date),
+    ...(c.historique || []).filter((h) => /relanc|appel|réponse|mail|entretien|statut : (envoy|relanc)/i.test(h.texte || "")).map((h) => h.date)].map(ISO_D).filter(Boolean).sort();
+  return d.pop() || "";
+}
+function refusAutoDu(c) {
+  if (!ACTIVE.includes(c.statut) || c.decision === "stop" || c.offre || c.dateEntretien > todayISO()) return false;
+  const d = derniereNouvelle(c); return !!d && daysBetween(d, todayISO()) >= REFUS_AUTO_J;
+}
+let refusAutoFait = false;
+async function refusAutoPasse() {
+  if (refusAutoFait || !state.db || !state.loaded) return; refusAutoFait = true;
+  await new Promise((ok) => setTimeout(ok, 8000)); // laisse arriver les dernières mises à jour (mails, agents) avant de classer
+  const today = todayISO();
+  for (const c of state.cands.filter(refusAutoDu)) {
+    const d = derniereNouvelle(c), n = daysBetween(d, today);
+    await saveCand({ ...c, statut: "refus", prochaineRelance: "", refusAuto: { le: today, depuis: d, avant: c.statut }, refusAutoRepris: "",
+      historique: [...(c.historique || []), { date: today, texte: `Refus auto : sans nouvelles depuis ${n} jours` }] });
+  }
+}
+function refusAutoSortir(c, statut, texte) {
+  c.historique = [...(c.historique || []), { date: todayISO(), texte }];
+  c.statut = statut || c.refusAuto?.avant || "relancee"; c.refusAuto = null; c.refusAutoRepris = todayISO();
+  if (ACTIVE.includes(c.statut)) c.prochaineRelance = addDays(todayISO(), 7);
+}
 let candView = "actifs", netView = "actifs";
 const switchHTML = (attr, cur, nA, nH) => [["actifs", "En cours", nA], ["historique", "Historique", nH]].map(([k, l, n]) => `<button type="button" data-${attr}="${k}" aria-pressed="${cur === k}">${l}<span class="mono">${n}</span></button>`).join("");
 // Un contact ne sert plus quand sa candidature est déjà en entretien, en offre ou close
@@ -2205,6 +2233,10 @@ function visioBox(c) {
       <div class="row"><button type="button" class="small" data-act="paste-visio">Coller depuis le presse-papiers</button><button type="button" class="small primary" data-act="save-visio">Enregistrer le lien</button></div>` : ""}
     ${c.statut === "entretien" && c.dateEntretien > todayISO() ? `<div class="row"><button type="button" class="small" data-act="nr-done">Je l'ai déjà passé</button></div>` : ""}</div>`;
 }
+function refusAutoBox(c) {
+  if (!c.refusAuto || c.statut !== "refus") return "";
+  return `<div class="tip"><b>Refus automatique</b> : pas de nouvelles de la société depuis le ${fmt(c.refusAuto.depuis, { day: "numeric", month: "long" })}, alors je l'ai classée le ${fmt(c.refusAuto.le, { day: "numeric", month: "long" })}. Si un mail montre le contraire, je la remets toute seule.<div class="row" style="margin-top:6px"><button type="button" class="small" data-act="refus-auto-non">Ce n'est pas un refus, la remettre en cours</button></div></div>`;
+}
 function briefHTML(c) {
   if (!c.resume && !(c.motsCles || []).length && !c.canal) return "";
   const p = viaContact(c);
@@ -2225,7 +2257,7 @@ function drawDossier(isNew) {
   const ofr = [c.groupe && c.groupe !== c.entreprise ? "Groupe " + c.groupe : "", c.domaine, c.ville].filter(Boolean).join(" · ");
   openSheet(`
     <div class="sheet-head"><div style="min-width:0"><span class="label">${isNew ? "Nouvelle candidature" : "Dossier"}</span><h2>${esc(c.poste || "Poste")}${c.entreprise ? " · " + esc(c.entreprise) : ""}</h2></div><button type="button" class="ghost" data-act="close" aria-label="Fermer">Fermer</button></div>
-    ${visioBox(c)}
+    ${refusAutoBox(c)}${visioBox(c)}
     ${briefHTML(c)}
     <div class="status-chips" role="group" aria-label="Statut">${STATUTS.map(([k, l]) => `<button type="button" class="st-${k}" data-statut="${k}" aria-pressed="${c.statut === k}">${l}</button>`).join("")}</div>
     <details class="sec" ${isNew || !c.entreprise ? "open" : ""}><summary>L'offre <small>${esc(ofr || c.source || "")}</small></summary><div class="body">
@@ -2332,6 +2364,7 @@ function readDossier() {
 }
 function setStatut(s) {
   if (s === editing.statut) return;
+  if (editing.refusAuto && s !== "refus") { editing.refusAuto = null; editing.refusAutoRepris = todayISO(); }
   editing.historique.push({ date: todayISO(), texte: "Statut : " + LABEL[s] });
   if (s === "envoyee" && !editing.dateEnvoi) editing.dateEnvoi = todayISO();
   if (ACTIVE.includes(s) && !editing.prochaineRelance) editing.prochaineRelance = addDays(editing.dateEnvoi || todayISO(), 7);
@@ -3045,6 +3078,11 @@ ${text.slice(0, 12000) || "(voir les captures)"}`, { signal: aiCtl.signal, cache
 }
 function mailChanges(c, r) {
   const ch = [], set = (k, v, label) => { if (v && c[k] !== v) ch.push([k, v, label]); };
+  if (c.refusAuto && c.statut === "refus") {
+    if (r.type === "refus") ch.push(["refusAuto", null, "Refus confirmé par la société"]);
+    else if (!["entretien", "offre"].includes(r.type)) { ch.push(["statut", c.refusAuto.avant || "relancee", "Sort du refus auto : la société a donné des nouvelles"], ["refusAuto", null, ""], ["refusAutoRepris", r.dateMail || todayISO(), ""]); }
+    else ch.push(["refusAuto", null, "Sort du refus auto : la société a répondu"], ["refusAutoRepris", r.dateMail || todayISO(), ""]);
+  }
   if (r.type === "refus") set("statut", "refus", "Statut : Refus");
   if (r.type === "offre") set("statut", "offre", "Statut : Offre reçue");
   if (r.type === "entretien") {
@@ -3061,7 +3099,7 @@ function mailChanges(c, r) {
   if (!c.refOffre) set("refOffre", r.refOffre, "Référence " + r.refOffre);
   if (!c.ville) set("ville", r.ville, "Ville : " + r.ville);
   if (!c.contact && r.expediteur) set("contact", r.expediteur + (r.emailExpediteur ? " · " + r.emailExpediteur : ""), "Contact : " + r.expediteur);
-  return ch.filter((x) => x[2]);
+  return ch;
 }
 function drawMailResult() {
   const r = mailRes, tgt = r.match || "";
@@ -3077,7 +3115,7 @@ function drawMailResult() {
     ${r.lienVisio ? `<div class="row">${joinHTML({ ...(c || {}), lienVisio: r.lienVisio }, "Rejoindre la réunion", true)}</div>` : ""}
     <div class="field"><label for="m-target">Ranger dans</label><select id="m-target">${opts}</select></div>
     ${c ? (r.memeSociete > 1 && !r.match ? `<p class="muted" style="margin:0;font-size:.85rem">Tu as plusieurs fiches chez ${esc(r.entreprise)} : vérifie que c'est la bonne.</p>` : "")
-      + (dup ? `<p class="muted" style="margin:0">Ce mail est déjà rangé dans cette fiche.</p>` : `<span class="lbl">Ce que je vais changer</span><ul class="changes">${changes.map((x) => `<li>${esc(x[2])}</li>`).join("")}<li>Le mail est ajouté à l'historique de la fiche</li>${r.reponse ? "<li>Ta réponse est prête : tu la relis, tu choisis d'accepter ou de proposer un autre moment, puis tu l'envoies</li>" : ""}</ul>`)
+      + (dup ? `<p class="muted" style="margin:0">Ce mail est déjà rangé dans cette fiche.</p>` : `<span class="lbl">Ce que je vais changer</span><ul class="changes">${changes.filter((x) => x[2]).map((x) => `<li>${esc(x[2])}</li>`).join("")}<li>Le mail est ajouté à l'historique de la fiche</li>${r.reponse ? "<li>Ta réponse est prête : tu la relis, tu choisis d'accepter ou de proposer un autre moment, puis tu l'envoies</li>" : ""}</ul>`)
       : `<p class="muted" style="margin:0;font-size:.85rem">${r.entreprise ? `Aucune fiche ${esc(r.entreprise)} dans ton carnet : je vais en créer une.` : "Choisis la fiche où ranger ce mail."}</p>`}
     ${r.lienOffre ? `<p style="margin:0;font-size:.9rem">Le mail contient un lien vers l'offre. Ouvre-la, copie son texte et colle-le dans la fiche (« Texte de l'offre ») pour que je l'analyse. <a href="${esc(safeUrl(r.lienOffre))}" target="_blank" rel="noopener">Ouvrir l'offre</a></p>` : ""}
     <div class="row"><button type="button" class="primary" data-act="m-apply" ${dup ? "disabled" : ""}>${c ? "Mettre à jour la fiche" : "Créer la fiche"}</button></div>
@@ -3421,7 +3459,7 @@ function drawCandSum() {
     </div>` : "";
   openSheet(`
     <div class="sheet-head"><div style="min-width:0"><span class="label">${esc(LABEL[c.statut] || "Candidature")}${c.analyse ? " · " + c.analyse.score + "% adapté" : ""}</span><h2>${esc(c.poste || "Poste")}${c.entreprise ? " · " + esc(c.entreprise) : ""}</h2></div><button type="button" class="ghost" data-act="close">Fermer</button></div>
-    <div class="brief"><div class="meta">${chips.map((x, i) => `<span${i ? "" : ' class="canal"'}>${esc(x)}</span>`).join("")}</div>
+    ${refusAutoBox(c)}<div class="brief"><div class="meta">${chips.map((x, i) => `<span${i ? "" : ' class="canal"'}>${esc(x)}</span>`).join("")}</div>
       ${next ? `<p style="margin:0"><b>${esc(next)}</b>${pc ? ` <button type="button" class="small" data-contact="${esc(pc.id)}">Ouvrir ${esc(firstName(pc.nom))}</button>` : ""}</p>` : ""}
       ${c.contact ? `<p class="muted" style="margin:0;font-size:.88rem">Contact : ${esc(c.contact)}</p>` : ""}
       ${afterInterview(c) ? `<div class="row"><button type="button" class="primary" data-act="go-suite"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Entretien fait, et ensuite ?</button></div>` : hadCallHTML(c)}
@@ -4439,6 +4477,10 @@ $("#overlay").addEventListener("click", async (e) => {
   const act = t.dataset.act;
   if (act === "close") return closeSheet();
   if (act === "ai-stop") return aiCtl?.abort();
+  if (act === "refus-auto-non" && editing?.refusAuto) {
+    refusAutoSortir(editing, "", "Remise en cours (pas un refus)"); t.disabled = true;
+    if (await saveCand(editing)) { toast("Candidature remise en cours. Je compte de nouveau un mois à partir d'aujourd'hui."); closeSheet(); } return;
+  }
   if (sheetKind === "dossier") {
     if (t.dataset.statut) { readDossier(); setStatut(t.dataset.statut); return drawDossier(!editing.id); }
     if (t.dataset.dec) { readDossier(); editing.decision = t.dataset.dec; if (t.dataset.dec === "stop") editing.historique.push({ date: todayISO(), texte: "Décision : j'arrête" }); return drawDossier(!editing.id); }
@@ -4769,7 +4811,7 @@ render();
   use("assets").then((a) => { state.assets = a; });
   use("sample").then((s) => { state.sample = s; });
   use("downloads").then((d) => { state.downloads = d; if (!window.JOBELLO_CONFIG && $("#jb-export")) $("#jb-export").hidden = false; });
-  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; render(); iaRafraichir(); }, () => banner("Tes candidatures ne se chargent plus. Recharge la page."));
+  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; render(); iaRafraichir(); refusAutoPasse(); }, () => banner("Tes candidatures ne se chargent plus. Recharge la page."));
   db.collection("documents").onSnapshot((snap) => { state.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("cibles").onSnapshot((snap) => { state.cibles = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
