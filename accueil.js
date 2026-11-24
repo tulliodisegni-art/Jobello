@@ -7,6 +7,9 @@
      (secteurs, logiciels, contrats, type d'entreprise, télétravail, à éviter…), prêt pour une recherche d'offres automatique.
    - Le CV ajouté devient « Mon CV actuel » dans Mes CV ; « Refaire mon CV » en tire un CV propre, à relire avant d'enregistrer.
    - Un profil déjà rempli (celui de Tullio) n'ouvre jamais la fiche tout seul ; « Ma fiche » la rouvre, pré-remplie, et n'efface rien.
+   - Depuis la v2 (sw v70) : photo et adresse postale, comptes déjà créés sur les sites d'emploi et sites carrière (jamais de mot de passe),
+     « Ton Claude » (payant + Chrome / gratuit / pas encore), puis une visite guidée « Comment marche Jobello » adaptée à son Claude.
+     Sans Claude, Jobello ne serait qu'un carnet : CLAUDE_OBLIGATOIRE fait créer un compte Claude (gratuit) avant de finir la fiche.
    Ce fichier se charge après ciblage.js et utilise les outils de l'appli (state, esc, toast, lib, PDFJS, normTxt, editDoc…). */
 (function () {
   const css = `
@@ -29,7 +32,21 @@
   .fi-search .fi-q{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-top:8px;border-top:1px solid var(--line)}
   .fi-search .fi-q:first-child{border-top:0;padding-top:0}
   .fi-search .fi-q b{flex:1 1 100%;font-size:.9rem}
-  .fi-search a{font-size:.8rem}`;
+  .fi-search a{font-size:.8rem}
+  .fi .fi-photo{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
+  .fi .fi-photo img,.fi .fi-photo .fi-ph0{width:54px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none}
+  .fi .fi-photo .fi-ph0{display:grid;place-items:center;font-size:1.4rem;color:var(--muted);background:var(--surface-2)}
+  .fi .fi-photo div{flex:1;min-width:0}.fi .fi-photo p{margin:2px 0 0;font-size:.84rem;color:var(--muted)}
+  .fi .fi-cl{display:grid;gap:8px}
+  .fi .fi-cl button{display:block;width:100%;text-align:left;padding:12px 14px;border-radius:14px;font-weight:400;line-height:1.35}
+  .fi .fi-cl button b{display:block;font-size:.98rem;margin-bottom:2px}.fi .fi-cl button span{font-size:.85rem;color:var(--muted)}
+  .fi .fi-cl button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .fi .fi-cl .fi-tag{display:inline-block;font-size:.72rem;font-weight:700;color:var(--accent);margin-left:6px}
+  .fi .fi-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .vi .vi-ic{font-size:2.4rem;line-height:1;margin:4px 0 6px}
+  .vi .vi-t{margin:0;font-size:1rem;line-height:1.5}
+  .vi ol{margin:6px 0 0;padding-left:20px;line-height:1.5}.vi li{margin:4px 0}
+  .vi .vi-dots{display:flex;gap:6px;justify-content:center;margin:12px 0 0}.vi .vi-dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}.vi .vi-dots i.on{background:var(--accent)}`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
   /* ---------- Listes proposées ---------- */
@@ -43,6 +60,12 @@
   const DEPL = ["", "Jamais", "Occasionnels", "Fréquents"];
   const TRAJET = ["", "30 min", "45 min", "40 min à 1 h", "1 h", "1 h 15", "1 h 30"];
   const DISPO = ["", "Tout de suite", "Sous 1 mois", "Sous 2 mois", "Sous 3 mois (préavis)"];
+  const CLAUDE_OBLIGATOIRE = true; // sans Claude, Jobello n'est qu'un carnet de suivi : la fiche fait créer un compte Claude gratuit
+  const URL_CLAUDE = "https://claude.ai/", URL_CHROME = "https://claude.com/claude-in-chrome";
+  const CLAUDES = [["chrome", "J'ai Claude payant (Pro ou plus) et un ordinateur avec Chrome", "Le plus complet. Claude écrit ta lettre, adapte ton CV, puis remplit la candidature à ta place dans Chrome. Tu t'occupes seulement des codes reçus par e-mail.", "Recommandé"],
+    ["gratuit", "J'ai un compte Claude gratuit", "Claude écrit tes lettres, adapte ton CV à chaque offre et prépare tes entretiens. Tu envoies toi-même, avec le favori « Remplir avec Jobello » qui remplit les formulaires.", ""],
+    ["non", "Je n'ai pas encore Claude", "Crée ton compte gratuit en 2 minutes, une adresse e-mail suffit. Ensuite, choisis « J'ai un compte Claude gratuit ».", ""]];
+  const plats = () => (typeof PLATS !== "undefined" ? PLATS : []).filter((x) => !x.nocompte);
   const LANGUES = ["Anglais", "Allemand", "Espagnol", "Italien", "Portugais", "Néerlandais", "Arabe", "Chinois", "Japonais", "Russe", "Polonais", "Turc", "Roumain", "Coréen", "Hindi"];
   // Logiciels et compétences reconnus dans un CV (nom affiché, motif cherché dans le texte normalisé)
   const LOGICIELS = [["SolidWorks", "solidworks|solid works"], ["CATIA", "catia"], ["Creo", "creo|pro engineer|pro e"], ["Siemens NX", "siemens nx|unigraphics|\\bnx\\b"], ["Inventor", "inventor"], ["AutoCAD", "autocad"], ["Fusion 360", "fusion 360"], ["SolidEdge", "solid edge|solidedge"], ["TopSolid", "topsolid"], ["Revit", "revit"], ["SketchUp", "sketchup"], ["ArchiCAD", "archicad"], ["ANSYS", "ansys"], ["Abaqus", "abaqus"], ["COMSOL", "comsol"], ["Nastran", "nastran|patran"], ["HyperMesh", "hypermesh|hyperworks"], ["MATLAB", "matlab"], ["Simulink", "simulink"], ["LabVIEW", "labview"], ["Python", "python"], ["C++", "c\\+\\+|\\bcpp\\b"], ["C#", "c#|c sharp"], ["Java", "\\bjava\\b"], ["JavaScript", "javascript|\\bjs\\b|typescript"], ["SQL", "\\bsql\\b|mysql|postgresql"], ["R", "\\blangage r\\b|\\brstudio\\b"], ["VBA", "\\bvba\\b"], ["Excel", "excel"], ["Word", "\\bword\\b"], ["PowerPoint", "powerpoint"], ["Pack Office", "pack office|microsoft office|suite office|ms office"], ["Power BI", "power bi|powerbi"], ["Tableau", "\\btableau software\\b|\\btableau desktop\\b"], ["SAP", "\\bsap\\b"], ["Salesforce", "salesforce"], ["HubSpot", "hubspot"], ["Jira", "\\bjira\\b"], ["Confluence", "confluence"], ["Git", "\\bgit\\b|github|gitlab"], ["Docker", "docker"], ["AWS", "\\baws\\b|amazon web services"], ["Azure", "azure"], ["Photoshop", "photoshop"], ["Illustrator", "illustrator"], ["InDesign", "indesign"], ["Figma", "figma"], ["Canva", "canva"], ["WordPress", "wordpress"], ["Sage", "\\bsage\\b"], ["Cegid", "cegid"], ["MS Project", "ms project|microsoft project"], ["Primavera", "primavera"], ["Minitab", "minitab"], ["Windchill", "windchill"], ["Teamcenter", "teamcenter"], ["Enovia", "enovia|3dexperience"], ["Altium", "altium"], ["KiCad", "kicad"], ["Arduino", "arduino"], ["TIA Portal", "tia portal|step 7|step7"], ["Odoo", "odoo"]];
@@ -70,10 +93,11 @@
       competences: f.competences ? [...f.competences] : comp.filter((x) => !/logiciel|cao|outil|langue/i.test(x.categorie || "")).map((x) => x.nom).slice(0, 40),
       logiciels: f.logiciels ? [...f.logiciels] : comp.filter((x) => /logiciel|cao|outil/i.test(x.categorie || "")).map((x) => x.nom).slice(0, 30),
       langues: [...(f.langues || [])], contrats: [...(f.contrats || ["CDI"])], typeEntreprise: f.typeEntreprise || "direct", teletravail: f.teletravail || "",
+      adresse: p.adresse || "", codePostal: p.codePostal || "", comptes: Object.keys(p.comptes || {}), sites: [...(f.sitesCarriere || [])], claude: f.claude || "",
       trajetMax: c.trajetMax || "", deplacements: c.deplacements || "", salaire: p.salaire || "", disponibilite: f.disponibilite || "", eviter: f.eviter || "",
     };
     // un brouillon en cours (fiche fermée avant la fin) l'emporte, sauf si la fiche a été enregistrée depuis
-    return brouillon && !f.faite ? { ...base, ...brouillon } : base;
+    return brouillon && !(f.faite && (f.version || 1) >= 2) ? { ...base, ...brouillon } : base;
   }
   const garder = () => { try { ls.set("fiche.brouillon", F); } catch {} };
 
@@ -134,6 +158,9 @@
     const lieu = text.match(/(?:lieu|adresse|ville|domicile)\s*:?\s*([^\n·|]{3,50})/i);
     if (lieu) r.ville = lieu[1].split(/\s+(?:nationalit|t[ée]l[ ée.:]|e-?mail|linkedin|permis|n[ée]e? le|[âa]ge)/i)[0].replace(/[\s,]+(\d{2})$/, " ($1)").replace(/[\s,·]+$/, "").trim();
     else if (cp) r.ville = `${cp[2].trim()} (${cp[1].slice(0, 2)})`;
+    if (cp) r.codePostal = cp[1];
+    const rue = text.match(/\b(\d{1,4}\s?(?:bis|ter)?,?\s+(?:rue|avenue|av\.|boulevard|bd|all[ée]e|place|chemin|impasse|route|quai|cours|square|villa|r[ée]sidence)\s[^\n,·|]{2,45})/i);
+    if (rue) r.adresse = rue[1].replace(/\s+\d{5}.*$/, "").trim();
     r.logiciels = LOGICIELS.filter(([, m]) => new RegExp(m).test(n)).map(([x]) => x);
     if (r.logiciels.includes("Pack Office")) r.logiciels = r.logiciels.filter((x) => !["Word", "PowerPoint"].includes(x));
     r.competences = SAVOIRS.filter(([, m]) => new RegExp(m).test(n)).map(([x]) => x);
@@ -152,15 +179,15 @@
   }
   async function lireIA(text) {
     const r = await state.sample.json(`Voici le texte d'un CV. Remplis la fiche du candidat. Réponds uniquement en JSON :
-{"nom":"","email":"","telephone":"","ville":"","linkedin":"","titre":"son métier en quelques mots","postes":["3 à 6 intitulés de poste qu'il peut viser, d'après son parcours"],"experience":"${EXP.slice(1).join("|")}","etudes":"${ETUDES.slice(1).join("|")}","secteurs":["parmi : ${SECTEURS.join(", ")}"],"competences":["savoir-faire métier, 4 mots max chacun"],"logiciels":["logiciels et outils"],"langues":["Anglais (courant)"]}
-N'invente rien : laisse vide ce qui n'est pas dans le CV.
+{"nom":"","email":"","telephone":"","ville":"","adresse":"","codePostal":"","linkedin":"","titre":"son métier en quelques mots","postes":["3 à 6 intitulés de poste qu'il peut viser, d'après son parcours"],"experience":"${EXP.slice(1).join("|")}","etudes":"${ETUDES.slice(1).join("|")}","secteurs":["parmi : ${SECTEURS.join(", ")}"],"competences":["savoir-faire métier, 4 mots max chacun"],"logiciels":["logiciels et outils"],"langues":["Anglais (courant)"]}
+Adresse = numéro et rue seulement. N'invente rien : laisse vide ce qui n'est pas dans le CV.
 
 ${text.slice(0, 12000)}`, { cache: false });
     return r && typeof r === "object" ? r : {};
   }
   function fusion(r, remplacer) {
     let n = 0;
-    ["nom", "email", "telephone", "linkedin", "ville", "titre", "experience", "etudes"].forEach((k) => { const v = String(r[k] || "").trim(); if (v && (remplacer || !F[k])) { if (F[k] !== v) n++; F[k] = v; } });
+    ["nom", "email", "telephone", "linkedin", "ville", "adresse", "codePostal", "titre", "experience", "etudes"].forEach((k) => { const v = String(r[k] || "").trim(); if (v && (remplacer || !F[k])) { if (F[k] !== v) n++; F[k] = v; } });
     if (F.experience && !EXP.includes(F.experience)) F.experience = "";
     if (F.etudes && !ETUDES.includes(F.etudes)) F.etudes = "";
     ["postes", "secteurs", "competences", "logiciels", "langues"].forEach((k) => { const a = F[k].length; F[k] = uniq([...F[k], ...(Array.isArray(r[k]) ? r[k] : [])]); n += F[k].length - a; });
@@ -191,7 +218,9 @@ ${text.slice(0, 12000)}`, { cache: false });
   }
 
   /* ---------- La fiche ---------- */
-  const ETAPES = ["Bienvenue", "Toi", "Ton métier", "Tes compétences", "Ce que tu cherches", "C'est prêt"];
+  const ETAPES = ["Bienvenue", "Toi", "Ton métier", "Tes compétences", "Ce que tu cherches", "Tes comptes", "Ton Claude", "C'est prêt"];
+  const I_COMPTES = 5, I_CLAUDE = 6;
+  const claudeOk = () => !CLAUDE_OBLIGATOIRE || owner() || F.claude === "chrome" || F.claude === "gratuit";
   let ovEl = null;
   function chips(key, sug, placeholder) {
     const on = F[key] || [], reste = (sug || []).filter((s) => !on.some((x) => normTxt(x) === normTxt(s)));
@@ -203,13 +232,19 @@ ${text.slice(0, 12000)}`, { cache: false });
   const champ = (k, label, ph, type) => `<div class="field"><label for="fi-${k}">${label}</label><input id="fi-${k}" data-fi="${k}" value="${esc(F[k])}"${ph ? ` placeholder="${esc(ph)}"` : ""}${type ? ` type="${type}"` : ""}></div>`;
   const choix = (k, label, list) => `<div class="field"><label for="fi-${k}">${label}</label><select id="fi-${k}" data-fi="${k}">${opts(list, F[k])}</select></div>`;
   function corps() {
-    if (step === 0) return `<p class="fi-lead">Quelques questions pour que Jobello te propose les bons postes et t'aide à refaire ton CV. Ça prend 3 minutes, et tout reste modifiable.</p>
+    if (step === 0) return `<p class="fi-lead">Quelques questions pour que Jobello te propose les bons postes, prépare tes candidatures avec Claude et les envoie pour toi. Ça prend 5 minutes, et tout reste modifiable.</p>
       <div class="fi-cv"><b>Ajouter mon CV actuel</b><p>Je le lis et je remplis la fiche pour toi : tu n'as plus qu'à vérifier. Ton CV est aussi rangé dans « Mes CV ».</p>
         <div class="row"><label class="btn primary" for="fi-file">${busy ? "Lecture…" : "Choisir mon CV (PDF)"}</label><input type="file" id="fi-file" accept="application/pdf,.pdf" hidden></div></div>
       ${found ? `<p class="fi-found" role="status">${esc(found)}</p>` : ""}
       <details><summary class="fi-note" style="cursor:pointer">Mon CV n'est pas en PDF : coller son texte</summary><textarea id="fi-paste" rows="6" placeholder="Colle ici tout le texte de ton CV"></textarea><div class="row" style="margin-top:6px"><button type="button" class="small" data-fi-paste>Lire ce texte</button></div></details>
       <p class="fi-note">Pas de CV sous la main ? Appuie sur « Remplir à la main ».</p>`;
-    if (step === 1) return `${found ? `<p class="fi-found">${esc(found)}</p>` : ""}<div class="grid2">${champ("nom", "Prénom et nom", "ex. Camille Martin")}${champ("ville", "Où tu habites", "ex. Vincennes (94)")}${champ("email", "E-mail", "", "email")}${champ("telephone", "Téléphone", "", "tel")}</div>${champ("linkedin", "Ton profil LinkedIn (si tu en as un)", "linkedin.com/in/…")}`;
+    if (step === 1) { const ph = state.profil?.photoAssetId;
+      return `${found ? `<p class="fi-found">${esc(found)}</p>` : ""}
+      <div class="fi-photo">${ph ? `<img src="/_blob/${esc(ph)}" alt="Ta photo">` : `<span class="fi-ph0" aria-hidden="true">+</span>`}<div><b>Ta photo pour les CV</b><p>${ph ? "Elle sera sur tous les CV que Jobello prépare." : "Facultative, mais appréciée. Une photo nette, de face, sur fond clair."}</p></div>
+        <label class="btn small${ph ? "" : " primary"}" for="fi-photo-in">${busy === "photo" ? "Envoi…" : ph ? "Changer" : "Ajouter"}</label><input type="file" id="fi-photo-in" accept="image/png,image/jpeg" hidden></div>
+      <div class="grid2">${champ("nom", "Prénom et nom", "ex. Camille Martin")}${champ("ville", "Ta ville", "ex. Vincennes (94)")}${champ("email", "E-mail", "", "email")}${champ("telephone", "Téléphone", "", "tel")}${champ("adresse", "Adresse postale (n° et rue)", "ex. 12 rue de Fontenay")}${champ("codePostal", "Code postal", "ex. 94300")}</div>
+      ${champ("linkedin", "Ton profil LinkedIn (si tu en as un)", "linkedin.com/in/…")}
+      <p class="fi-note">Les formulaires de candidature demandent souvent l'adresse : Claude la recopie pour toi. Elle n'est jamais montrée ailleurs.</p>`; }
     if (step === 2) return `<div class="grid2">${champ("titre", "Ton métier", "ex. Ingénieur mécanique, comptable, aide-soignante…")}${choix("experience", "Ton expérience", EXP)}${choix("etudes", "Ton niveau d'études", ETUDES)}</div>
       <div class="field"><span class="lbl">Les postes que tu vises</span><p class="fi-note">Écris les intitulés tels qu'ils apparaissent dans les annonces : c'est avec eux que l'appli cherche les offres.</p>${chips("postes", F.titre && !F.postes.length ? [F.titre] : [], "ex. Ingénieur bureau d'études")}</div>
       <div class="field"><span class="lbl">Les secteurs qui t'intéressent</span>${chips("secteurs", SECTEURS, "Autre secteur")}</div>`;
@@ -221,9 +256,19 @@ ${text.slice(0, 12000)}`, { cache: false });
       <div class="field"><label for="fi-typeEntreprise">Type d'employeur</label><select id="fi-typeEntreprise" data-fi="typeEntreprise">${TYPES.map(([v, l]) => `<option value="${v}"${F.typeEntreprise === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
       <div class="grid2">${choix("trajetMax", "Trajet maximum depuis chez toi", TRAJET)}${choix("deplacements", "Déplacements", DEPL)}${choix("teletravail", "Télétravail", TELE)}${choix("disponibilite", "Disponible", DISPO)}${champ("salaire", "Salaire visé", "ex. 42 000 € brut / an")}</div>
       ${champ("eviter", "Ce que tu ne veux pas (métiers, secteurs, mots dans les annonces)", "ex. électronique, travail de nuit")}`;
+    if (step === I_COMPTES) return `<p class="fi-lead">Coche les sites où tu as déjà un compte. Jobello ne te demande jamais tes mots de passe : quand Claude postule, il passe par les connexions déjà ouvertes dans ton navigateur.</p>
+      <div class="field"><span class="lbl">Sites d'emploi</span><div class="fi-chips" role="group">${plats().map((x) => `<button type="button" data-fi-cpt="${esc(x.id)}" aria-pressed="${F.comptes.includes(x.id)}">${esc(x.nom)}</button>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Sites carrière d'entreprises</span><p class="fi-note">Les grandes entreprises ont leur propre espace candidat (Safran, Thales, L'Oréal…). Note celles où tu as un compte : Claude s'y connectera avant de postuler.</p>${chips("sites", [], "ex. Safran, Airbus")}</div>
+      <p class="fi-found">Le bon réflexe : sur ton ordinateur, connecte-toi une fois à chacun de ces sites dans Chrome en cochant « Rester connecté ». C'est ce qui permet à Claude d'aller jusqu'au bout sans t'attendre.</p>`;
+    if (step === I_CLAUDE) return `<p class="fi-lead">Jobello travaille avec Claude, l'assistant d'Anthropic, et avec ton propre compte : rien à payer à Jobello. C'est Claude qui écrit tes lettres, adapte ton CV à chaque offre et prépare tes entretiens.</p>
+      <div class="fi-cl" role="group" aria-label="Ton Claude">${CLAUDES.map(([v, t, d, tag]) => `<button type="button" data-fi-claude="${v}" aria-pressed="${F.claude === v}"><b>${esc(t)}${tag ? `<span class="fi-tag">${esc(tag)}</span>` : ""}</b><span>${esc(d)}</span></button>`).join("")}</div>
+      ${F.claude === "chrome" ? `<div class="fi-act"><a class="btn small primary" href="${URL_CHROME}" target="_blank" rel="noopener">Installer Claude dans Chrome</a></div><p class="fi-note">Sur ordinateur seulement. Ouvre Chrome, ajoute l'extension, épingle-la et connecte-toi avec ton compte Claude.</p>` : ""}
+      ${F.claude === "non" ? `<div class="fi-act"><a class="btn small primary" href="${URL_CLAUDE}" target="_blank" rel="noopener">Créer mon compte Claude gratuit</a></div>${CLAUDE_OBLIGATOIRE ? `<p class="fi-found">Sans Claude, Jobello ne serait qu'un carnet de suivi. Crée ton compte (c'est gratuit), puis reviens ici et choisis « J'ai un compte Claude gratuit ».</p>` : ""}` : ""}
+      ${F.claude === "gratuit" ? `<p class="fi-note">Plus tard, avec un abonnement Claude payant et Chrome sur ordinateur, Claude pourra aussi remplir et envoyer tes candidatures à ta place.</p>` : ""}`;
     const L = (l, v) => v ? `<div><b>${l}</b><span>${esc(v)}</span></div>` : "";
     return `<p class="fi-lead">Voici ta fiche. Enregistre-la : l'appli s'en sert pour te proposer les offres qui te correspondent et pour refaire ton CV.</p>
-      <div class="fi-recap">${L("Toi", [F.nom, F.ville].filter(Boolean).join(" · "))}${L("Métier", [F.titre, F.experience, F.etudes].filter(Boolean).join(" · "))}${L("Postes visés", F.postes.join(", "))}${L("Secteurs", F.secteurs.join(", "))}${L("Compétences", F.competences.join(", "))}${L("Logiciels", F.logiciels.join(", "))}${L("Langues", F.langues.join(", "))}${L("Contrat", F.contrats.join(", "))}${L("Employeur", (TYPES.find(([v]) => v === F.typeEntreprise) || [])[1])}${L("Trajet max", F.trajetMax)}${L("Salaire", F.salaire)}${L("À éviter", F.eviter)}</div>
+      <div class="fi-recap">${L("Toi", [F.nom, F.ville].filter(Boolean).join(" · "))}${L("Adresse", [F.adresse, F.codePostal].filter(Boolean).join(", "))}${L("Photo", state.profil?.photoAssetId ? "Ajoutée" : "")}${L("Métier", [F.titre, F.experience, F.etudes].filter(Boolean).join(" · "))}${L("Postes visés", F.postes.join(", "))}${L("Secteurs", F.secteurs.join(", "))}${L("Compétences", F.competences.join(", "))}${L("Logiciels", F.logiciels.join(", "))}${L("Langues", F.langues.join(", "))}${L("Contrat", F.contrats.join(", "))}${L("Employeur", (TYPES.find(([v]) => v === F.typeEntreprise) || [])[1])}${L("Trajet max", F.trajetMax)}${L("Salaire", F.salaire)}${L("À éviter", F.eviter)}${L("Mes comptes", [...plats().filter((x) => F.comptes.includes(x.id)).map((x) => x.nom), ...F.sites].join(", "))}${L("Mon Claude", (CLAUDES.find(([v]) => v === F.claude) || [])[1])}</div>
+      ${!claudeOk() ? `<p class="fi-found">Il te manque Claude (étape « Ton Claude ») : c'est lui qui prépare et envoie tes candidatures.</p>` : ""}
       ${!F.postes.length ? `<p class="fi-found">Ajoute au moins un poste visé (étape « Ton métier ») : c'est ce qui sert à chercher les offres.</p>` : ""}
       ${cvFile || cvText ? `<p class="fi-note">Ton CV sera rangé dans « Mes CV » sous le nom « Mon CV actuel ».</p>` : ""}`;
   }
@@ -234,7 +279,7 @@ ${text.slice(0, 12000)}`, { cache: false });
       <div class="sheet-head"><div style="min-width:0;flex:1"><span class="label">Ma fiche · ${step + 1} / ${ETAPES.length}</span><h2>${ETAPES[step]}</h2><div class="fi-steps" aria-hidden="true">${ETAPES.map((_, i) => `<i class="${i <= step ? "on" : ""}"></i>`).join("")}</div></div><button type="button" class="ghost" data-fi-go="fermer">Plus tard</button></div>
       ${corps()}
       <div class="sheet-foot"><div class="row">${step === 0 ? `<button type="button" class="ghost" data-fi-go="+1"${busy ? " disabled" : ""}>${F.nom || F.postes.length ? "Continuer sans CV" : "Remplir à la main"}</button>` : `<button type="button" class="ghost" data-fi-go="-1">Retour</button>`}
-        ${step > 0 && step < ETAPES.length - 1 ? `<button type="button" class="primary" data-fi-go="+1">Continuer</button>` : ""}${step === ETAPES.length - 1 ? `<button type="button" class="primary" data-fi-go="enregistrer">Enregistrer ma fiche</button>` : ""}</div></div></div>`;
+        ${step > 0 && step < ETAPES.length - 1 ? `<button type="button" class="primary" data-fi-go="+1"${step === I_CLAUDE && !claudeOk() ? " disabled" : ""}>Continuer</button>` : ""}${step === ETAPES.length - 1 ? `<button type="button" class="primary" data-fi-go="enregistrer"${claudeOk() ? "" : " disabled"}>Enregistrer ma fiche</button>` : ""}</div></div></div>`;
     const ns = ovEl.querySelector(".sheet"); if (ns && y) ns.scrollTop = y;
   }
   function ouvrir(etape) {
@@ -249,7 +294,16 @@ ${text.slice(0, 12000)}`, { cache: false });
   function saisie(e) {
     const t = e.target;
     if (t.id === "fi-file" && e.type === "change") return ajouterCV(t.files[0]);
+    if (t.id === "fi-photo-in" && e.type === "change") return photo(t.files[0]);
     if (t.dataset?.fi) { F[t.dataset.fi] = t.value; if (e.type === "change") garder(); }
+  }
+  async function photo(file) {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g)$/i.test(file.type)) return toast("Choisis une photo en JPG ou PNG");
+    if (!state.assets || !state.db) return toast("Connecte-toi à Jobello pour ajouter ta photo");
+    busy = "photo"; draw();
+    try { const up = await state.assets.upload(file); await saveProfil({ photoAssetId: up.id }, "Photo enregistrée : elle sera sur tes CV"); } catch { toast("La photo n'a pas pu être envoyée, réessaie."); }
+    busy = false; draw();
   }
   function ajout(key) {
     const i = ovEl.querySelector(`[data-fi-new="${key}"]`); if (!i) return;
@@ -267,6 +321,8 @@ ${text.slice(0, 12000)}`, { cache: false });
     }
     if (d.fiDel) { const [k, i] = d.fiDel.split(":"); F[k].splice(+i, 1); garder(); return draw(); }
     if (d.fiSug) { F[d.fiSug] = uniq([...F[d.fiSug], d.v]); garder(); return draw(); }
+    if (d.fiCpt) { F.comptes = F.comptes.includes(d.fiCpt) ? F.comptes.filter((x) => x !== d.fiCpt) : [...F.comptes, d.fiCpt]; garder(); return draw(); }
+    if (d.fiClaude) { F.claude = d.fiClaude; garder(); return draw(); }
     if (d.fiTog) { const k = d.fiTog; F[k] = F[k].includes(d.v) ? F[k].filter((x) => x !== d.v) : [...F[k], d.v]; garder(); return draw(); }
     if (d.fiAdd) return ajout(d.fiAdd);
     if ("fiPaste" in d) return collerTexte(ovEl.querySelector("#fi-paste")?.value);
@@ -289,16 +345,23 @@ ${text.slice(0, 12000)}`, { cache: false });
       const src = cvFile || cvText ? "d'après ton CV" : "ta fiche";
       const add = (nom, categorie) => { if (deja.has(normTxt(nom))) return; deja.add(normTxt(nom)); comp.push({ nom, categorie, niveau: null, source: src, aConfirmer: false }); };
       F.logiciels.forEach((x) => add(x, "Logiciels et outils")); F.competences.forEach((x) => add(x, "Savoir-faire")); F.langues.forEach((x) => add(x, "Langues"));
-      const fiche = { version: 1, faite: f0.faite || now, maj: now, source: cvFile ? "cv" : cvText ? "texte" : "main", cvDocId,
+      const fiche = { version: 2, faite: f0.faite || now, maj: now, source: cvFile ? "cv" : cvText ? "texte" : "main", cvDocId,
         ville: F.ville, experience: F.experience, etudes: F.etudes, secteurs: F.secteurs, competences: F.competences, logiciels: F.logiciels, langues: F.langues,
-        contrats: F.contrats, typeEntreprise: F.typeEntreprise, teletravail: F.teletravail, disponibilite: F.disponibilite, eviter: F.eviter };
-      const patch = { fiche, competencesDetail: comp, postes: F.postes, conditions: { ...(p.conditions || {}), trajetMax: F.trajetMax, deplacements: F.deplacements } };
-      [["nom", "nom"], ["email", "email"], ["telephone", "telephone"], ["linkedin", "linkedin"], ["titre", "titre"], ["salaire", "salaire"]].forEach(([k, pk]) => { if (String(F[k] || "").trim() || !p[pk]) patch[pk] = String(F[k] || "").trim(); });
+        contrats: F.contrats, typeEntreprise: F.typeEntreprise, teletravail: F.teletravail, disponibilite: F.disponibilite, eviter: F.eviter,
+        sitesCarriere: F.sites, claude: F.claude };
+      // comptes cochés : même format que « Plateformes » (id → date de création notée)
+      const comptes = { ...(p.comptes || {}) };
+      plats().forEach((x) => { if (F.comptes.includes(x.id)) comptes[x.id] = comptes[x.id] || todayISO(); else delete comptes[x.id]; });
+      const patch = { fiche, comptes, competencesDetail: comp, postes: F.postes, conditions: { ...(p.conditions || {}), trajetMax: F.trajetMax, deplacements: F.deplacements } };
+      [["nom", "nom"], ["email", "email"], ["telephone", "telephone"], ["linkedin", "linkedin"], ["titre", "titre"], ["salaire", "salaire"], ["adresse", "adresse"], ["codePostal", "codePostal"]].forEach(([k, pk]) => { if (String(F[k] || "").trim() || !p[pk]) patch[pk] = String(F[k] || "").trim(); });
       if (F.ville && !p.mobilite) patch.mobilite = F.ville;
+      if (F.ville && !p.ville) patch.ville = F.ville.replace(/\s*\(.*\)\s*/g, "").trim();
       if (F.disponibilite && !p.disponibilite) patch.disponibilite = F.disponibilite === "Tout de suite" ? "Disponible immédiatement" : "Disponible " + F.disponibilite.toLowerCase();
       if (!(await saveProfil(patch, "Ta fiche est enregistrée"))) { btn.disabled = false; btn.textContent = "Enregistrer ma fiche"; return; }
       cvFile = null; cvText = "";
-      fermer(); ls.set("fiche.brouillon", null); location.hash = "#documents"; setTimeout(() => document.getElementById("fi-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+      const premiere = !f0.version || f0.version < 2, cl = F.claude;
+      fermer(); ls.set("fiche.brouillon", null);
+      if (premiere) visite(cl); else { location.hash = "#documents"; setTimeout(() => document.getElementById("fi-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400); }
     } catch { toast("Enregistrement refusé, réessaie."); btn.disabled = false; btn.textContent = "Enregistrer ma fiche"; }
   }
 
@@ -358,7 +421,7 @@ ${base.contenu.slice(0, 12000)}`, { cache: false });
     const p = state.profil || {}, f = p.fiche;
     const nb = f ? [f.competences?.length && `${f.competences.length} compétences`, f.logiciels?.length && `${f.logiciels.length} logiciels`, (p.postes || []).length && `${p.postes.length} poste${p.postes.length > 1 ? "s" : ""} visé${p.postes.length > 1 ? "s" : ""}`].filter(Boolean).join(" · ") : "";
     el.innerHTML = `<h2 style="margin:0">Ma fiche</h2><p class="muted" style="margin:2px 0 0;font-size:.86rem">${f ? `Remplie le ${esc(fmt(String(f.maj || f.faite).slice(0, 10)) || "")}${nb ? " · " + esc(nb) : ""}. Elle sert à trouver tes offres et à refaire ton CV.` : "Ton métier, les postes que tu vises, tes compétences, ton trajet maximum… Avec ton CV, elle se remplit presque toute seule."}</p>
-      <div class="row" style="gap:6px;margin-top:10px"><button type="button" class="small${f ? "" : " primary"}" data-fi-open>${f ? "Modifier ma fiche" : "Remplir ma fiche"}</button>${f ? `<button type="button" class="small" data-fi-cv>Refaire mon CV</button>` : ""}</div>`;
+      <div class="row" style="gap:6px;margin-top:10px">${f && (f.version || 1) < 2 && !owner() ? `<button type="button" class="small primary" data-fi-open="1">Compléter ma fiche (photo, comptes, Claude)</button>` : `<button type="button" class="small${f ? "" : " primary"}" data-fi-open>${f ? "Modifier ma fiche" : "Remplir ma fiche"}</button>`}${f ? `<button type="button" class="small" data-fi-cv>Refaire mon CV</button>` : ""}<button type="button" class="small ghost" data-vi-open>Comment marche Jobello ?</button></div>`;
     const off = document.getElementById("v-plateformes"); if (!off) return;
     let s = document.getElementById("fi-offres");
     if (!s) { off.insertAdjacentHTML("afterbegin", `<details class="fold" id="fi-offres"><summary><span class="fold-t">Chercher avec ma fiche</span><span class="fold-s" id="fi-offres-s"></span></summary><div class="fold-b" id="fi-offres-b"></div></details>`); s = document.getElementById("fi-offres"); }
@@ -369,8 +432,51 @@ ${base.contenu.slice(0, 12000)}`, { cache: false });
   }
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-fi-open]")) return ouvrir(fiche() ? 1 : 0);
+    if (e.target.closest("[data-vi-open]")) return visite(fiche()?.claude || (owner() ? "chrome" : ""));
     const r = e.target.closest("[data-fi-cv]"); if (r) return refaireCV(r);
   });
+
+  /* ---------- Visite guidée : comment marche Jobello (après la fiche, ou « Comment marche Jobello ? ») ---------- */
+  let viEl = null, viStep = 0, viSlides = [], autoOk = null;
+  async function lireAuto() {
+    if (autoOk !== null || owner()) return;
+    try { const s = window.jobelloSupa && window.jobelloSupa(); const { data } = s ? await s.sb.rpc("offres_etat") : {}; autoOk = !!(data && data.cle); } catch { autoOk = false; }
+  }
+  function slides(cl) {
+    const chrome = cl === "chrome", auto = owner() || autoOk;
+    return [
+      ["👋", "Ta fiche est prête", `<p class="vi-t">Voici comment Jobello va travailler pour toi, en 5 étapes. Tu peux revoir cette visite quand tu veux depuis « CV & lettres », bouton « Comment marche Jobello ? ».</p>`],
+      ["🔎", "1. Les offres viennent à toi", `<p class="vi-t">${auto ? "Chaque matin, Jobello cherche les offres publiées ces derniers jours pour tes postes visés, autour de chez toi, et les range dans « Offres pour toi » sur l'accueil." : "Dans « Offres », Jobello te prépare les recherches de la semaine pour chacun de tes postes visés (Indeed, LinkedIn, France Travail, Apec…). Une offre te plaît : ajoute-la, Jobello s'occupe du reste."} Chaque offre a sa note « Mes chances », honnête, pour savoir où mettre ton énergie.</p>`],
+      ["👉", "2. Tu swipes", `<p class="vi-t">À droite, je la garde. À gauche, je passe. C'est le seul choix que tu as vraiment à faire.</p>`],
+      ["✍️", "3. Claude prépare ton dossier", `<p class="vi-t">Pour chaque offre gardée, Claude écrit la lettre et adapte ton CV au poste, avec ton compte Claude. Jobello ouvre Claude, tu valides, et le dossier revient tout seul dans l'appli. Il n'invente jamais une compétence que tu n'as pas.</p>`],
+      chrome ? ["🚀", "4. Claude postule à ta place", `<p class="vi-t">Sur ton ordinateur, dans la fiche de l'offre : « Copier la consigne pour Chrome », puis colle-la dans Claude (l'icône en haut à droite de Chrome). Il ouvre l'offre, se connecte avec ta session, remplit tout et joint ton CV. Toi, tu tapes seulement les codes reçus par e-mail.</p>`]
+        : ["📨", "4. Tu envoies en 2 minutes", `<p class="vi-t">Dans la fiche de l'offre, tout est prêt : CV et lettre à télécharger, message à copier, et le favori « Remplir avec Jobello » qui remplit le formulaire du site d'un seul geste (Offres, « Kit d'inscription »). Avec Claude payant et Chrome, Claude pourra même postuler à ta place.</p>`],
+      ["📅", "5. Jobello suit tout", `<p class="vi-t">Relance proposée au bon moment, réponses des recruteurs, entretiens dans l'agenda, préparation d'entretien avec Claude, et « Qui contacter » pour écrire au bon recruteur sur LinkedIn. Tu vois où tu en es d'un coup d'œil.</p>`],
+      ["✅", "Pour bien démarrer", `<ol><li>Ouvre « Offres » et garde tes 5 premières offres.</li>${chrome ? `<li>Sur ton ordinateur, installe Claude dans Chrome et connecte-toi à tes sites d'emploi.</li>` : `<li>Sur ton ordinateur, installe le favori « Remplir avec Jobello » (Offres, « Kit d'inscription »).</li>`}<li>Ajoute les candidatures que tu as déjà envoyées : Jobello te dira quand relancer.</li></ol>`],
+    ];
+  }
+  function viDraw() {
+    if (!viEl) return;
+    const [ic, t, body] = viSlides[viStep], last = viStep === viSlides.length - 1;
+    viEl.innerHTML = `<div class="sheet fi vi" role="dialog" aria-modal="true" aria-label="Comment marche Jobello">
+      <div class="sheet-head"><div style="min-width:0;flex:1"><span class="label">Comment marche Jobello</span></div><button type="button" class="ghost" data-vi="fin">Fermer</button></div>
+      <div class="vi-ic" aria-hidden="true">${ic}</div><h2 style="margin:0 0 6px">${esc(t)}</h2>${body}
+      <div class="vi-dots" aria-hidden="true">${viSlides.map((_, i) => `<i class="${i === viStep ? "on" : ""}"></i>`).join("")}</div>
+      <div class="sheet-foot"><div class="row">${viStep ? `<button type="button" class="ghost" data-vi="-1">Retour</button>` : ""}<button type="button" class="primary" data-vi="${last ? "go" : "+1"}">${last ? "C'est parti" : "Suivant"}</button></div></div></div>`;
+  }
+  async function visite(cl) {
+    if (viEl) return;
+    await lireAuto();
+    viSlides = slides(cl); viStep = 0;
+    viEl = document.createElement("div"); viEl.className = "overlay fi-ov"; document.body.appendChild(viEl); lockScroll(); viDraw();
+    viEl.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-vi]"); if (!b) return;
+      const v = b.dataset.vi;
+      if (v === "fin" || v === "go") { viEl.remove(); viEl = null; unlockScroll(); ls.set("visite.vue", todayISO()); if (v === "go") location.hash = "#plateformes"; return; }
+      viStep = Math.max(0, Math.min(viSlides.length - 1, viStep + Number(v))); viDraw();
+    });
+  }
+  window.jobelloVisite = visite;
 
   /* ---------- Première ouverture : la fiche s'ouvre seule si le profil est vide ---------- */
   const _render = render;
