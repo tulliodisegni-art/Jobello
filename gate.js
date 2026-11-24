@@ -55,6 +55,7 @@
       <p>Cette appli est sur invitation. Entre le code que tu as reçu.</p>
       <input id="gt-code" placeholder="XXXX-XXXX" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12">
       <button class="gt-btn" id="gt-go">Entrer</button><div class="gt-err" id="gt-err" role="alert"></div>
+      ${C.about ? `<a class="gt-ghost" href="${esc(C.about)}" style="color:inherit">Découvrir ${esc(C.name || "l'appli")} et demander une invitation</a>` : ""}
       <button class="gt-ghost" id="gt-own">Je suis le propriétaire</button>`);
     const inp = q(lockEl, "#gt-code"), err = q(lockEl, "#gt-err"), go = q(lockEl, "#gt-go");
     const fromUrl = new URLSearchParams(location.search).get("invite"); if (fromUrl) inp.value = fromUrl.toUpperCase();
