@@ -1228,7 +1228,7 @@ function homeTasks() {
     if (c.statut === "entretien" && !c.dateEntretien && !isDue(c) && c.decision !== "pause") return T.push({ ...base, p: 2, k: "ent", t: `Entretien chez ${ent} : date à fixer`, s: "Note la date, ou dis-moi si tu l'as déjà passé", w: "à fixer" });
     if (isDue(c)) { const n = late(c.prochaineRelance); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n }); }
     if (pc && c.decision !== "pause" && (pc.prochaineAction || "9") <= today) { const n = late(pc.prochaineAction); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent} via ${firstName(pc.nom) || pc.nom}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n, contact: pc.id }); }
-    if (c.statut === "a_envoyer" && c.envoi && ["a_valider", "valide", "en_cours"].includes(c.envoi.statut)) return; // les agents s'en occupent (postuler.js)
+    if (c.statut === "a_envoyer" && c.envoi && c.envoi.auto !== false && ["a_valider", "valide", "en_cours", "bloquee"].includes(c.envoi.statut)) return; // les agents s'en occupent : suivie dans « Mes agents » (postuler.js)
     if (c.statut === "a_envoyer" && c.decision !== "stop" && c.claudeLe) return T.push({ ...base, p: 3, k: "send", t: `Candidature ${ent} : elle est partie ?`, s: `Lancée avec Claude ${lanceeFr(c)}. Confirme l'envoi sur la fiche`, w: "à confirmer", score: 101 });
     if (c.statut === "a_envoyer" && c.decision !== "stop") return T.push({ ...base, p: 3, k: "send", t: `Postuler chez ${ent}`, w: c.analyse ? `${c.analyse.score} %` : "", score: c.analyse?.score ?? 50, presta: modeOf(c) === "prestataire" });
     if (needsRecruiter(c)) return T.push({ ...base, p: 5, k: "li", t: `Trouver un contact chez ${ent}`, s: "Un message à la bonne personne double tes chances", task: "li" });
@@ -4055,11 +4055,41 @@ const tooOld = (o) => { const a = offerAge(o); return a !== null && a > MAX_AGE;
 const ageTag = (o) => { const a = offerAge(o); return a === null ? `<span class="age unk">date non précisée</span>` : `<span class="age${a > MAX_AGE ? " old" : a <= 3 ? " new" : ""}">${a === 0 ? "aujourd'hui" : a === 1 ? "hier" : "il y a " + a + " j"}${a > MAX_AGE ? " · sûrement pourvue" : ""}</span>`; };
 function openOffers() {
   const vus = new Set(state.alertes?.vus || []), seen = new Set(), mine = new Set(state.cands.map(offerKey));
-  return [...(state.alertes?.offres || []), ...(state.sites?.offres || [])].filter((o) => {
+  const list = [...(state.alertes?.offres || []), ...(state.sites?.offres || [])].filter((o) => {
     if (!o.url || horsMetier(o) || tooOld(o)) return false; const k = offerKey(o);
     if (vus.has(o.url) || vus.has(k) || seen.has(k) || mine.has(k) || state.cands.some((c) => c.lien === o.url)) return false;
     seen.add(k); return true;
   });
+  return limiteGroupe(list);
+}
+/* Au plus 3 candidatures par groupe sur 30 jours (envoyées, en cours ou demandées comprises) : pour une société qui publie
+   beaucoup d'offres (Safran…), on ne propose que les meilleures places restantes (souhait de Tullio, 24/11/2026). */
+const MAX_PAR_GROUPE = 3;
+function groupeKey(nom) {
+  const w = String(nom || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\(.*?\)/g, " ").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((x) => x && !["groupe", "group", "sa", "sas", "the", "les", "la", "le"].includes(x));
+  return !w.length ? "" : w[0].length <= 3 && w[1] ? w[0] + " " + w[1] : w[0];
+}
+function candidaturesParGroupe() {
+  const lim = addDays(todayISO(), -30), n = {};
+  const add = (nom) => { const k = groupeKey(nom); if (k) n[k] = (n[k] || 0) + 1; };
+  state.cands.forEach((c) => {
+    const e = c.envoi || {};
+    const recente = (c.dateEnvoi && c.dateEnvoi >= lim) || (c.statut === "a_envoyer" && e.auto && ["valide", "a_valider", "en_cours", "bloquee"].includes(e.statut));
+    if (recente) add(c.groupe || c.entreprise);
+  });
+  (state.demandes?.liste || []).filter((d) => d.auto && ["en_attente", "en_preparation"].includes(d.statut) && !d.candidature).forEach((d) => add(d.offre?.entreprise));
+  return n;
+}
+let groupesMasques = {};
+function limiteGroupe(list) {
+  const n = candidaturesParGroupe(), pris = {}, out = []; groupesMasques = {};
+  list.slice().sort((a, b) => (b.score ?? 50) - (a.score ?? 50)).forEach((o) => {
+    const k = groupeKey(o.entreprise); if (!k) return out.push(o);
+    const deja = (n[k] || 0) + (pris[k] || 0);
+    if (deja >= MAX_PAR_GROUPE) { groupesMasques[k] = groupesMasques[k] || { nom: (o.entreprise || "").split(/\s+/)[0], n: 0, deja: n[k] || 0 }; groupesMasques[k].n++; return; }
+    pris[k] = (pris[k] || 0) + 1; out.push(o);
+  });
+  const keep = new Set(out); return list.filter((o) => keep.has(o));
 }
 const offerByUrl = (url) => [...(state.alertes?.offres || []), ...(state.sites?.offres || []), ...lastOffers].find((o) => o.url === url);
 function renderPicks() {
@@ -4112,6 +4142,7 @@ function prepItemHTML(d) {
 function demandesVisibles() {
   const lim = Date.now() - 3 * 864e5;
   return (state.demandes?.liste || []).filter((d) => {
+    if (d.auto) return false; // offre swipée : suivie dans « Mes agents » (un seul bloc, pas de doublon)
     if (d.statut !== "fait") return true;
     const c = state.cands.find((x) => x.id === d.candidature);
     return (!c || c.statut === "a_envoyer") && new Date(d.faitLe || d.demandeLe || 0).getTime() > lim;

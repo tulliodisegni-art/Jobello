@@ -159,6 +159,11 @@
       <a class="lnk" href="${esc(offerHref(o))}" target="_blank" rel="noopener">Voir l'annonce ›</a>
     </div>`;
   }
+  /* Offres masquées : au plus 3 candidatures par groupe sur 30 jours (index.html, limiteGroupe) */
+  function masquesHTML() {
+    const m = Object.values(typeof groupesMasques === "object" && groupesMasques || {}); if (!m.length) return "";
+    return `<span class="muted" style="font-size:.82rem">${m.map((g) => `${g.n} offre${g.n > 1 ? "s" : ""} ${esc(g.nom)} masquée${g.n > 1 ? "s" : ""}`).join(", ")} : 3 candidatures max par société sur 30 jours, on ne garde que les meilleures.</span>`;
+  }
   function langRow(o) {
     const v = (deck && deck.langue[o.url]) || "", an = langueAnnonce(o) === "en";
     return `<div class="sw-lang"><span>Postuler en :</span>${LANGS.map(([k, l]) => `<button type="button" class="${v === k ? "on" : ""}" data-sw="lang" data-lang="${k}">${l}</button>`).join("")}
@@ -179,10 +184,10 @@
     }
     if (!o) {
       const lc = !!(deck.oui && lien && lien.lancer), lanc = lc && !lien.enCours;
-      const depart = relie() ? "Ça part tout de suite." : lc && lien.enCours ? "Tes agents sont déjà au travail : ils prennent aussi ces offres." : lanc ? `Pour qu'ils partent tout de suite, touche ⚡ ci-dessous, puis « Exécuter maintenant » sur la page qui s'ouvre. Sinon, ils partent vers ${nextSlot()}.` : `Prochain passage vers ${nextSlot()}.`;
+      const depart = relie() ? "Ça part tout de suite." : lc && lien.enCours ? "Tes agents sont déjà au travail : ils prennent aussi ces offres." : lanc ? `Touche ⚡ ci-dessous puis « Exécuter maintenant » : c'est tout. Les agents écrivent CV et lettre, se connectent au site et postulent jusqu'au bout. Si un site te demande de te connecter, tu reçois une notification : tu te connectes sur ton ordi et l'agent continue tout seul. Sans ⚡, ils partent vers ${nextSlot()}.` : `Prochain passage vers ${nextSlot()}.`;
       ov.innerHTML = head + `<div class="sw-end"><span class="big">${deck.oui ? '<svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>' : '<svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'}</span>
         <b>${deck.oui ? `${deck.oui} candidature${deck.oui > 1 ? "s" : ""} confiée${deck.oui > 1 ? "s" : ""} aux agents` : "Plus d'offre à trier pour l'instant"}</b>
-        <span class="muted">${deck.oui ? `Claude prépare CV et lettre pendant que les agents postulent en même temps sur ton ordinateur (Chrome ouvert). ${depart} Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>
+        <span class="muted">${deck.oui ? `${depart} Tu suis tout sur l'accueil, dans « Mes agents ».` : "La veille en ajoute chaque matin. Reviens demain !"}</span>${masquesHTML()}
         ${lanc ? `<a class="btn primary" href="${tacheURL()}" target="_blank" rel="noopener" data-lancer><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Lancer mes agents maintenant</a>` : ""}
         ${deck.oui && !parRelais() ? `<button type="button" class="${lanc ? "" : "primary"}" data-sw="direct"><span class="dv-live${lien && lien.enCours ? "" : " off"}"><i></i>${lien && lien.enCours ? "EN DIRECT" : "VOIR"}</span> Regarder mes agents travailler</button>` : ""}
         <button type="button" class="${deck.oui ? "ghost" : "primary"}" data-sw="close">${deck.oui ? "Voir mes agents" : "Fermer"}</button></div>`;
@@ -242,6 +247,7 @@
       const recent = (iso) => iso && now - new Date(iso).getTime() < 3 * 864e5;
       if (e.statut === "envoyee" || c.statut !== "a_envoyer") { if (recent(e.fin || c.dateEnvoi)) L.push({ k: "ok", id: c.id, t: c.entreprise, s: c.poste, st: "Envoyée ✓", d: `Partie ${e.fin ? "le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) + " à " + new Date(e.fin).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}${e.via ? " via " + e.via : ""}`, at: e.fin }); return; }
       if (e.statut === "bloquee") return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: e.action === "main" ? "À finir toi-même" : "À toi de jouer", d: (e.raison || "L'agent n'a pas pu terminer").replace(/[.\s]+$/, "") + (e.page ? " · touche pour ouvrir la page à finir" : "") });
+      if (e.statut === "en_cours" && e.attente) return L.push({ k: "ko", id: c.id, t: c.entreprise, s: c.poste, st: e.attente.action === "compte" ? "Crée ton compte" : "Connecte-toi", d: `Sur ton ordi, l'onglet ${e.attente.site || "du site"} est ouvert : ${e.attente.action === "compte" ? "écris ton mot de passe et crée ton compte" : "connecte-toi"}, ton agent continue tout seul` });
       if (e.statut === "en_cours") return L.push({ k: "run", id: c.id, t: c.entreprise, s: c.poste, st: "Agent au travail", d: e.etape || "Remplit le formulaire sur le site", at: e.debut });
       if (e.statut === "a_valider") return L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "À valider", d: "Touche pour relire et lancer l'envoi" });
       L.push({ k: "wait", id: c.id, t: c.entreprise, s: c.poste, st: "Prête", d: `CV et lettre prêts${e.fichiers?.length ? "" : " (PDF en cours)"} · envoi ${quand()}` });
@@ -390,7 +396,7 @@
       }[e.action] || (lancerMode() ? `L'agent a besoin de toi : ${raison}. ${page ? "Sur ton ordi, touche « Ouvrir la page à finir »" : "Va sur ce site dans Chrome sur ton ordi"} : fais ce qui manque (créer ton compte ou te reconnecter), puis touche « Réessayer ».${apres}` : `L'agent n'a pas pu finir : ${raison}. ${page ? "Ouvre la page à finir" : "Va sur le site"}, fais ce qui manque, puis touche « Réessayer », ou termine-la toi-même avec « Postuler » plus bas.`);
       const t = { a_valider: "Les agents attendent ton OK pour envoyer cette candidature.",
         valide: (e.reprise ? "L'agent va reprendre sur la page où il s'était arrêté. " : "") + (relie() ? "Prête : un agent l'envoie tout de suite si ton ordinateur est allumé avec Chrome ouvert." : occupe() ? "Prête : tes agents sont au travail sur ton ordi et la prennent pendant ce passage." : go ? `Prête : touche « Lancer maintenant » pour que tes agents l'envoient tout de suite, sinon elle partira au prochain passage (vers ${nextSlot()}).` : `Prête : un agent l'enverra au prochain passage (vers ${nextSlot()}).`),
-        en_cours: e.reprise ? "Un agent reprend la candidature sur la page où il s'était arrêté." : "Un agent est en train de remplir le formulaire sur le site.",
+        en_cours: e.attente ? `Ton agent attend que tu ${e.attente.action === "compte" ? "crées ton compte" : "te connectes"} sur ${e.attente.site || site}. Sur ton ordi, l'onglet est ouvert dans Chrome${e.attente.action === "compte" ? " avec tout rempli sauf le mot de passe" : " (Chrome remplit tes codes, coche « Rester connecté »)"}. Dès que c'est fait, il continue tout seul jusqu'à l'envoi : rien d'autre à toucher.` : e.reprise ? "Un agent reprend la candidature sur la page où il s'était arrêté." : "Un agent est en train de remplir le formulaire sur le site.",
         envoyee: `Envoyée${e.via === "toi" ? " par toi" : " par un agent"}${e.fin ? " le " + fmt(e.fin.slice(0, 10), { day: "numeric", month: "long" }) : ""}${e.via && e.via !== "toi" ? " via " + e.via : ""}.`,
         bloquee: bloque }[e.statut] || "";
       const B = e.statut !== "bloquee" ? "" : e.action === "main"
@@ -415,7 +421,7 @@
     }
     if (a === "stop") c.envoi = { ...c.envoi, statut: "annulee", auto: false };
     if (await saveCand(c)) {
-      toast(a === "fait" ? "Bravo, elle est envoyée. Je te rappelle de relancer dans 7 jours." : a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : lance ? "C'est noté : sur la page Claude, touche « Exécuter maintenant »" : occupe() ? "C'est noté : tes agents la prennent pendant leur passage, sinon touche ⚡ quand ils ont fini" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`);
+      toast(a === "fait" ? "Bravo, elle est envoyée. Je te rappelle de relancer dans 7 jours." : a === "stop" ? "D'accord, les agents n'y touchent plus" : relie() ? "C'est parti : un agent l'envoie tout de suite" : lance ? "C'est noté : sur la page Claude, touche « Exécuter maintenant »" : occupe() ? "C'est noté : ton agent la reprend dans ce passage, rien d'autre à faire" : lancerMode() ? "C'est noté : touche ⚡ « Lancer mes agents maintenant »" : `Les agents l'enverront vers ${nextSlot()}`);
       closeSheet(); render(); preparer();
       if (lancerMode() && !lance && a !== "stop" && a !== "fait") setTimeout(() => { try { drawPanel(); document.getElementById("ag-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {} }, 300);
     }
