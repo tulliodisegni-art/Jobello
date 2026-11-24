@@ -153,6 +153,7 @@
       <span class="pst">${esc(o.titre || "")}</span>
       <span class="inf">${esc([o.ville, sal, o.type].filter(Boolean).join(" · "))}</span>
       ${o.pourquoi ? `<span class="why">${esc(o.pourquoi)}</span>` : ""}
+      ${back || !window.jobelloChancesLigne ? "" : window.jobelloChancesLigne(o)}
       <div class="desc">${esc(String(o.description || "").slice(0, 2500)) || "<i>Description complète sur l'annonce.</i>"}</div>
       ${back ? "" : langRow(o)}
       <a class="lnk" href="${esc(offerHref(o))}" target="_blank" rel="noopener">Voir l'annonce ›</a>
