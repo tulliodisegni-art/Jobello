@@ -4001,7 +4001,7 @@ function renderAlerts() {
   const a = state.alertes || {}, isP = (o) => (o.mode || guessMode(o.entreprise, o.titre)) === "prestataire", list = openOffers().sort((x, y) => isP(x) - isP(y) || (y.score ?? 0) - (x.score ?? 0));
   $("#alerts-meta").textContent = a.date ? `${list.length} nouvelle${list.length > 1 ? "s" : ""} · ${fmt(a.date).replace(/\.$/, "")}` : "À lancer";
   el.innerHTML = (list.length ? list.map((o) => `<div class="offer"><a class="title" href="${esc(offerHref(o))}" target="_blank" rel="noopener">${esc(o.titre)}</a>
-      <span>${esc(o.entreprise)} <span class="muted">· ${esc(o.ville)}</span> ${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? ` <span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score}% adapté</span>` : ""}</span>
+      <span>${esc(o.entreprise)} <span class="muted">· ${esc(o.ville)}</span> ${modeTag(o.mode || guessMode(o.entreprise, o.titre) || "direct")}${o.score != null ? ` <span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score}% adapté</span>` : ""} ${window.jobelloChancesPill ? window.jobelloChancesPill(o) : ""}</span>
       ${o.pourquoi ? `<span class="muted" style="font-size:.85rem">${esc(o.pourquoi)}</span>` : ""}
       <span class="muted" style="font-size:.78rem">${ageTag(o)}${o.source ? " · " + esc(o.source) : ""}</span><div class="row">${prepBtn(o)}<button type="button" class="small" data-alert-keep="${esc(o.url)}">Garder</button><button type="button" class="small ghost" data-alert-skip="${esc(o.url)}">Ignorer</button></div></div>`).join("")
     : `<p class="muted" style="margin:0">${a.date === todayISO() ? "Aucune nouvelle offre pertinente aujourd'hui." : window.jobelloParRelais && window.jobelloParRelais() ? "Tes offres arrivent ici chaque matin, d'après ta fiche." : "Lance la recherche du jour : je cherche sur Indeed les postes de ton profil et je note chaque offre."}</p>`)
@@ -4067,7 +4067,7 @@ function renderPicks() {
   const list = openOffers().filter((o) => o.score == null || o.score >= 55).sort((x, y) => isP(x) - isP(y) || (y.score ?? 50) - (x.score ?? 50));
   $("#picks-panel").hidden = !list.length;
   $("#picks-meta").textContent = list.length > 3 ? `Toutes (${list.length})` : "";
-  el.innerHTML = list.slice(0, 3).map((o) => `<div class="pick"><div class="cc-top"><b>${esc(o.entreprise || "Société ?")}</b><span class="cc-tags">${isP(o) ? modeTag("prestataire") : ""}${o.score != null ? `<span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score} %</span>` : ""}</span></div>
+  el.innerHTML = list.slice(0, 3).map((o) => `<div class="pick"><div class="cc-top"><b>${esc(o.entreprise || "Société ?")}</b><span class="cc-tags">${isP(o) ? modeTag("prestataire") : ""}${o.score != null ? `<span class="fit-pill v-${esc(o.verdict || "tente")}">${o.score} %</span>` : ""}${window.jobelloChancesPill ? window.jobelloChancesPill(o) : ""}</span></div>
       <a class="title" href="${esc(offerHref(o))}" target="_blank" rel="noopener">${esc(o.titre)}</a>
       <span class="muted" style="font-size:.82rem">${ageTag(o)} ${esc([o.ville, o.salaire && o.salaire !== "N/A" ? o.salaire : ""].filter(Boolean).join(" · "))}</span>
       ${o.pourquoi ? `<span style="font-size:.86rem">${esc(o.pourquoi)}</span>` : ""}
@@ -4835,6 +4835,7 @@ render();
 <script src="postuler.js"></script>
 <script src="direct.js"></script>
 <script src="langue.js"></script>
+<script src="atouts.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>
