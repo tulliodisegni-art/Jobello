@@ -2,6 +2,9 @@
    1. Mes chances, honnêtement : pour chaque offre, trois repères lisibles (le profil colle-t-il ? l'offre est-elle fraîche ?
       as-tu un accès direct à quelqu'un chez eux ?) plutôt qu'un simple « 80 % de match ». Calculé dans l'appli, sans IA,
       à partir de la note de l'offre, de sa date, de tes contacts et de tes propres résultats passés.
+      Aussi sur chaque candidature en cours (cartes du suivi, tâches de l'accueil, haut de la fiche) : une fois envoyée,
+      le repère « moment » devient le délai depuis l'envoi, comparé au délai habituel de tes réponses.
+      Un contact compte selon son étape : quelqu'un qui t'a répondu compte pleinement, une invitation pas encore acceptée pas encore.
    2. Qui contacter : pour chaque offre ou candidature, les trois personnes à trouver sur LinkedIn (recruteur, futur
       responsable, quelqu'un qui fait déjà ce métier chez eux) avec un message prêt à copier. Rien n'est envoyé tout seul.
    3. Mon bilan de la semaine : envois, réponses, entretiens et messages réseau, comparés à TON rythme habituel,
@@ -42,6 +45,14 @@
   .bil-hist .col{width:100%;max-width:34px;display:flex;flex-direction:column-reverse;border-radius:6px 6px 2px 2px;overflow:hidden;background:var(--surface-2);height:48px}
   .bil-hist .col i{display:block;background:var(--s-sent)} .bil-hist .col i.r{background:var(--accent)}
   .bil-hist div.cur{color:var(--fg);font-weight:600}
+  .cc-top .ch-pill{margin-left:auto;cursor:inherit;font-size:.68rem;padding:1px 7px}
+  .task-txt .ch-mini{display:inline-flex;align-items:center;gap:5px;font-size:.76rem;font-weight:600;color:var(--muted)}
+  .task-txt .ch-mini i{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+  .task-txt .ch-mini.n4{color:var(--accent)} .task-txt .ch-mini.n3{color:var(--s-sent)} .task-txt .ch-mini.n2{color:var(--s-follow)}
+  .ch-brief{display:flex;flex-direction:column;gap:4px;padding:9px 11px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+  .ch-brief .ch-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ch-brief p{margin:0;font-size:.86rem;color:var(--muted)}
+  .ch-brief .ch-why{all:unset;cursor:pointer;font-size:.8rem;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
   .bil-leg{display:flex;gap:12px;font-size:.75rem;color:var(--muted)} .bil-leg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;background:var(--s-sent)} .bil-leg i.r{background:var(--accent)}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
@@ -77,6 +88,19 @@
   }
   const pct = (x) => Math.round(x.r / x.n * 100);
 
+  // Délai habituel des réponses : 3 réponses sur 4 arrivent avant ce nombre de jours (tes chiffres dès 6 réponses datées, sinon 21 jours)
+  function delaiReponse() {
+    const d = state.cands.filter((c) => c.dateEnvoi && c.dateReponse && !c.refusAuto).map((c) => daysBetween(c.dateEnvoi, c.dateReponse)).filter((x) => x >= 0).sort((a, b) => a - b);
+    if (d.length < 6) return { j: 21, perso: false };
+    return { j: Math.min(30, Math.max(7, d[Math.ceil(d.length * 0.75) - 1])), perso: true };
+  }
+  // Date de publication d'une candidature à envoyer : celle de l'offre d'origine si on la retrouve dans les alertes
+  function dateAnnonce(c) {
+    if (!c || !c.statut) return "";
+    const L = [...(state.alertes?.offres || []), ...(state.sites?.offres || [])];
+    const o = L.find((x) => (c.lien && x.url === c.lien) || offerKey(x) === offerKey(c));
+    return o ? o.date || "" : "";
+  }
   function chances(o) {
     const ent = o.entreprise || o.groupe || "", isCand = !!o.statut;
     const score = o.score ?? o.analyse?.score ?? null, verdict = o.verdict || o.analyse?.verdict || "";
@@ -88,36 +112,67 @@
     else if (score >= 60) { A = 3; At = `Profil proche de l'annonce (${score} %), avec un ou deux points à rassurer dans ta lettre.`; }
     else if (score >= 45) { A = 2; At = `Correspondance partielle (${score} %) : plusieurs attentes de l'annonce ne sont pas dans ton parcours.`; }
     else { A = 1; At = `Écart important avec l'annonce (${score} %).`; }
-    // 2. Fraîcheur : plus on postule tôt, plus le dossier est lu avec attention
-    const age = offerAge({ date: o.date || o.datePublication });
-    let F, Ft;
-    if (age === null) { F = 2; Ft = "Date de publication inconnue : si l'annonce a plus de deux semaines, le tri a sans doute commencé."; }
+    // 2. Le moment. Avant l'envoi : fraîcheur de l'annonce (plus on postule tôt, plus le dossier est lu avec attention).
+    //    Après l'envoi : depuis combien de temps tu attends, comparé au délai habituel des réponses.
+    const sent = isCand && ["envoyee", "relancee"].includes(o.statut) && !!o.dateEnvoi;
+    const age = sent ? null : offerAge({ date: o.date || o.datePublication || dateAnnonce(o) });
+    let F, Ft, Fl = sent ? "Le délai de réponse" : "Le moment";
+    if (sent) {
+      const D = Math.max(0, daysBetween(o.dateEnvoi, today())), dl = delaiReponse();
+      const hab = dl.perso ? `chez toi, 3 réponses sur 4 arrivent en moins de ${dl.j} jours` : `la plupart des réponses arrivent en moins de ${dl.j} jours`;
+      const relance = o.statut === "relancee" ? " Tu as déjà relancé, c'est bien." : "";
+      if (D <= dl.j) { F = 3; Ft = `${D === 0 ? "Envoyée aujourd'hui" : D === 1 ? "Envoyée hier" : `Envoyée il y a ${D} jours`} : ${hab}.${relance}`; }
+      else if (D <= Math.min(2 * dl.j, 35)) { F = 2; Ft = `Pas de nouvelles depuis ${D} jours, plus que d'habitude (${hab}). Ce n'est pas un non, mais un signe de ta part aide.${relance}`; }
+      else { F = 0; Ft = `Sans nouvelles depuis ${D} jours, bien plus que d'habitude (${hab}) : une réponse reste possible, mais devient rare.`; }
+    }
+    else if (age === null) { F = 2; Ft = "Date de publication inconnue : si l'annonce a plus de deux semaines, le tri a sans doute commencé."; }
     else if (age <= 2) { F = 4; Ft = `Publiée ${age === 0 ? "aujourd'hui" : age === 1 ? "hier" : "il y a 2 jours"} : tu fais partie des premiers dossiers.`; }
     else if (age <= 6) { F = 3; Ft = `Publiée il y a ${age} jours : c'est encore le bon moment.`; }
     else if (age <= 10) { F = 2; Ft = `Publiée il y a ${age} jours : le recruteur a déjà des candidats, il faut sortir du lot.`; }
     else if (age <= 14) { F = 1; Ft = `Publiée il y a ${age} jours : les premiers entretiens ont peut-être commencé.`; }
     else { F = 0; Ft = `Publiée il y a ${age} jours : le poste est sûrement en voie d'être pourvu.`; }
-    // 3. Accès à quelqu'un chez eux
-    const contact = state.contacts.find((p) => !archivedC(p) && p.etape !== "sans_suite" && sameSoc(p.entreprise, ent));
+    // 3. Accès à quelqu'un chez eux. Une personne qui t'a répondu compte vraiment ; une invitation pas encore acceptée, pas encore.
+    const RANG = { repondu: 4, rdv: 4, connecte: 3, message: 3, relance: 3, invitation: 2, a_contacter: 1 };
+    const rang = (p) => RANG[p.etape || "a_contacter"] || 1;
+    const via = isCand && typeof viaContact === "function" ? viaContact(o) : null;
+    const contact = [via, ...state.contacts.filter((p) => !archivedC(p) && sameSoc(p.entreprise, ent))].filter(Boolean).sort((a, b) => rang(b) - rang(a))[0] || null;
+    const lien = contact ? rang(contact) : 0; // 4 t'a répondu, 3 en lien, 2 invitation envoyée, 1 à inviter, 0 personne
+    const nom = contact ? contact.nom || "ton contact" : "", pre = contact ? firstName(contact.nom) || "ton contact" : "";
     const refus = state.cands.filter((c) => c !== o && c.id !== o.id && c.statut === "refus" && !c.refusAuto && sameSoc(c.entreprise, ent) && (c.dateReponse || c.dateEnvoi || "") >= addDays(today(), -90));
     const enCours = state.cands.filter((c) => c.id !== o.id && !archivedCand(c) && c.statut !== "a_envoyer" && sameSoc(c.entreprise, ent));
     let R, Rt;
-    if (contact) { R = 4; Rt = `Tu connais ${contact.nom || "quelqu'un"} chez eux : un mot de sa part fait souvent passer ton dossier en haut de la pile.`; }
-    else if (mode === "prestataire") { R = 3; Rt = "Société de prestation : elles recrutent en continu et répondent plus souvent, mais c'est ton deuxième choix."; }
-    else { R = 2; Rt = "Pas encore de contact chez eux : une candidature en ligne seule se perd facilement dans la masse."; }
+    if (lien === 4) { R = 4; Rt = `${nom} t'a déjà répondu : un mot de sa part fait souvent passer ton dossier en haut de la pile.`; }
+    else if (lien === 3) { R = 3; Rt = `Tu es en lien avec ${nom} chez eux, sans réponse pour l'instant : dès qu'un échange démarre, un mot de sa part peut tout changer.`; }
+    else {
+      const attente = lien === 2 ? `Invitation envoyée à ${nom}, pas encore acceptée : elle comptera dès que vous serez en lien.` : lien === 1 ? `${nom} est dans ta liste à inviter : tant que l'invitation n'est pas partie, ça ne compte pas encore.` : "";
+      if (mode === "prestataire") { R = 3; Rt = "Société de prestation : elles recrutent en continu et répondent plus souvent, mais c'est ton deuxième choix." + (attente ? " " + attente : ""); }
+      else { R = 2; Rt = attente || "Pas encore de contact chez eux : une candidature en ligne seule se perd facilement dans la masse."; }
+    }
     if (refus.length) { R = Math.max(1, R - 1); Rt += ` Refus chez eux le ${fmt(refus[0].dateReponse || refus[0].dateEnvoi)} : vise un poste vraiment différent ou passe par une personne.`; }
     const total = Math.round((A * 0.5 + F * 0.3 + R * 0.2) * 25);
     let n = total >= 80 ? 4 : total >= 60 ? 3 : total >= 42 ? 2 : 1;
-    if (n === 4 && !contact) n = 3; // sans personne chez eux, on ne promet pas « très bonnes chances »
+    if (n === 4 && lien < 4) n = 3; // sans une personne qui t'a répondu chez eux, on ne promet pas « très bonnes chances »
+    if (sent && F === 0) n = Math.min(n, 2); // un long silence pèse plus lourd que la note de l'offre
     const label = ["", "Chances faibles", "Chances moyennes", "Bonnes chances", "Très bonnes chances"][n];
-    // Ce qui ferait monter tes chances, le levier le plus fort d'abord
+    // Ce qui ferait monter tes chances, le levier le plus fort d'abord (tournures sans il/elle : on ne devine pas le genre d'un contact)
     let conseil;
-    if (A <= 1) conseil = "Garde ton énergie pour les offres mieux notées, sauf si cette société t'attire vraiment.";
-    else if (!contact && mode !== "prestataire" && F >= 2) conseil = `Postule ${F >= 3 ? "dans les 48 heures" : "vite"} et envoie un message à une personne de chez ${ent || "eux"} : c'est ce qui fait le plus monter tes chances.`;
-    else if (!contact && mode !== "prestataire") conseil = `L'annonce n'est plus toute neuve : un message à une personne de chez ${ent || "eux"} est ta meilleure carte.`;
-    else if (contact) conseil = `Préviens ${firstName(contact.nom) || "ton contact"} quand tu postules et demande-lui s'il peut transmettre ton CV.`;
+    if (sent) {
+      if (typeof isDue === "function" && isDue(o)) conseil = lien >= 3 ? `C'est le moment de relancer : passe par ${pre}.` : "C'est le moment de relancer : touche « Relancer » plus bas sur cette fiche.";
+      else if (lien >= 3) conseil = `Demande à ${pre} de glisser un mot à l'équipe qui recrute.`;
+      else if (F === 0) conseil = o.statut === "relancee" ? "Tu as déjà relancé : garde-la en tête, mais mise surtout sur tes nouvelles candidatures." : "Relance une fois, puis mise surtout sur tes nouvelles candidatures.";
+      else if (lien === 2) conseil = `Dès que ${pre} accepte ton invitation, demande-lui de glisser un mot à l'équipe qui recrute.`;
+      else if (lien === 1) conseil = `Invite ${pre} sur LinkedIn : sur une candidature déjà envoyée, c'est ce qui fait le plus bouger les choses.`;
+      else if (mode !== "prestataire") conseil = `Écris à une personne de chez ${ent || "eux"} : sur une candidature déjà envoyée, c'est ce qui fait le plus bouger les choses.`;
+      else conseil = "Laisse-leur quelques jours, puis relance si tu n'as pas de nouvelles.";
+    }
+    else if (A <= 1) conseil = "Garde ton énergie pour les offres mieux notées, sauf si cette société t'attire vraiment.";
+    else if (lien >= 3) conseil = `Préviens ${pre} quand tu postules et demande-lui de transmettre ton CV.`;
+    else if (lien === 2) conseil = `Postule ${F >= 3 ? "dans les 48 heures" : "vite"}, et dès que ${pre} accepte ton invitation, demande-lui de transmettre ton CV.`;
+    else if (lien === 1 && mode !== "prestataire") conseil = `Postule ${F >= 3 ? "dans les 48 heures" : "vite"} et invite ${pre} sur LinkedIn : c'est ce qui fait le plus monter tes chances.`;
+    else if (mode !== "prestataire" && F >= 2) conseil = `Postule ${F >= 3 ? "dans les 48 heures" : "vite"} et envoie un message à une personne de chez ${ent || "eux"} : c'est ce qui fait le plus monter tes chances.`;
+    else if (mode !== "prestataire") conseil = `L'annonce n'est plus toute neuve : un message à une personne de chez ${ent || "eux"} est ta meilleure carte.`;
     else conseil = "Postule tant que l'annonce est fraîche, puis relance au bout d'une semaine.";
-    return { n, label, total, A, At, F, Ft, R, Rt, conseil, enCours, contact, ent, mode };
+    return { n, label, total, A, At, F, Ft, Fl, R, Rt, conseil, enCours, contact, lien, ent, mode, sent };
   }
   const dots = (k) => `<span class="ch-dots" aria-label="${k} sur 4">${[1, 2, 3, 4].map((i) => `<i class="${i <= k ? "on" : ""}"></i>`).join("")}</span>`;
   function chiffresHTML(c) {
@@ -133,10 +188,10 @@
   function chancesBody(x, ch) {
     return `<div class="ch-head"><span class="ch-big n${ch.n}">${ch.n}/4</span><div><b>${esc(ch.label)}</b><span>Une estimation honnête, pas une promesse</span></div></div>
       <div><div class="ch-f"><span class="ch-t">Ton profil et l'annonce</span>${dots(ch.A)}<p>${esc(ch.At)}</p></div>
-      <div class="ch-f"><span class="ch-t">Le moment</span>${dots(ch.F)}<p>${esc(ch.Ft)}</p></div>
+      <div class="ch-f"><span class="ch-t">${esc(ch.Fl)}</span>${dots(ch.F)}<p>${esc(ch.Ft)}</p></div>
       <div class="ch-f"><span class="ch-t">Ton accès à l'entreprise</span>${dots(ch.R)}<p>${esc(ch.Rt)}</p></div></div>
       <p class="ch-tip">${esc(ch.conseil)}</p>
-      ${ch.enCours.length ? `<p class="ch-note">Déjà en cours chez eux : ${ch.enCours.slice(0, 3).map((c) => esc(c.poste || "candidature")).join(", ")}. Cite-le dans ta lettre, ça montre ta motivation pour la société.</p>` : ""}
+      ${ch.enCours.length && !ch.sent ? `<p class="ch-note">Déjà en cours chez eux : ${ch.enCours.slice(0, 3).map((c) => esc(c.poste || "candidature")).join(", ")}. Cite-le dans ta lettre, ça montre ta motivation pour la société.</p>` : ""}
       ${chiffresHTML(x)}
       <p class="ch-note">Calculé dans Jobello à partir de la note de l'offre, de sa date de publication, de tes contacts et de tes résultats passés. Aucune donnée n'est envoyée ailleurs.</p>`;
   }
@@ -208,7 +263,7 @@
       <div class="sheet-foot"><div class="row">${typeof prepBtn === "function" ? prepBtn(o) : ""}<a class="btn" href="${esc(offerHref(o))}" target="_blank" rel="noopener">Voir l'annonce</a><button type="button" class="ghost" data-act="close">Fermer</button></div></div>`, "chances");
   }
 
-  /* Sur la fiche d'une candidature : mes chances (avant l'envoi) et qui contacter */
+  /* Sur la fiche d'une candidature en cours : mes chances (en haut, avec « Pourquoi ? ») et qui contacter */
   const _draw = drawCandSum;
   drawCandSum = function () {
     const r = _draw.apply(this, arguments), c = editing, sh = document.querySelector("#overlay .sheet");
@@ -216,7 +271,11 @@
     try {
       const brief = sh.querySelector(".brief"); if (!brief) return r;
       let html = "";
-      if (c.statut === "a_envoyer") { const ch = chances(c); html += `<details class="sec" id="sec-chances"><summary>Mes chances <small>${esc(ch.label)}</small></summary><div class="body">${chancesBody(c, ch)}</div></details>`; }
+      if (avecChances(c)) {
+        const ch = chances(c);
+        brief.insertAdjacentHTML("beforeend", `<div class="ch-brief"><div class="ch-row"><span class="ch-pill n${ch.n}" style="cursor:default"><i></i>${esc(ch.label)}</span><button type="button" class="ch-why" data-ch-why="1">Pourquoi ?</button></div><p>${esc(ch.conseil)}</p></div>`);
+        html += `<details class="sec" id="sec-chances"><summary>Mes chances <small>${esc(ch.label)}</small></summary><div class="body">${chancesBody(c, ch)}</div></details>`;
+      }
       if (!archivedCand(c) && !viaContact(c) && c.entreprise && !["offre"].includes(c.statut)) html += `<details class="sec" id="sec-reseau"><summary>Qui contacter chez ${esc(societe(c))} <small>messages prêts</small></summary><div class="body">${reseauHTML(c)}</div></details>`;
       if (html) brief.insertAdjacentHTML("afterend", html);
     } catch (e) {}
@@ -224,8 +283,9 @@
   };
 
   document.addEventListener("click", (e) => {
-    const b = e.target.closest && e.target.closest("[data-chances],[data-rs-found]"); if (!b) return;
+    const b = e.target.closest && e.target.closest("[data-chances],[data-rs-found],[data-ch-why]"); if (!b) return;
     e.preventDefault(); e.stopPropagation();
+    if (b.dataset.chWhy) { const f = document.getElementById("sec-chances"); if (f) { f.open = true; f.scrollIntoView({ behavior: "smooth", block: "start" }); } return; }
     if (b.dataset.chances != null) return ouvrirOffre(b.dataset.chances);
     if (b.dataset.rsFound) return trouve(b.dataset.rsFound);
   }, true);
@@ -234,6 +294,28 @@
     const c = t.nextElementSibling, max = +t.dataset.max || MAXI; if (!c) return;
     c.textContent = `${t.value.length} / ${max} caractères${t.value.length > max ? " : trop long pour une invitation" : ""}`; c.classList.toggle("over", t.value.length > max);
   });
+
+  /* ========== 1 bis. Mes chances là où tu passes : suivi, accueil ========== */
+  const avecChances = (c) => !!c && !archivedCand(c) && ["a_envoyer", "envoyee", "relancee"].includes(c.statut);
+  // Suivi : une pastille sur chaque carte de candidature en cours (la carte ouvre la fiche, où tout est expliqué)
+  const _item = itemHTML;
+  itemHTML = function (c) {
+    const h = _item.apply(this, arguments);
+    try {
+      if (!ready() || !avecChances(c)) return h;
+      const ch = chances(c);
+      return h.replace(/(<span class="cc-top">[\s\S]*?)(<\/span>\s*<span class="cc-po">)/, `$1<span class="ch-pill n${ch.n}" title="${esc(ch.conseil)}"><i></i>${esc(ch.label)}</span>$2`);
+    } catch (e) { return h; }
+  };
+  // Accueil : sous chaque tâche liée à une candidature en cours (« Postuler chez… », « Relancer… », « Trouver un contact… »)
+  function chancesAccueil() {
+    document.querySelectorAll("#todo .task[data-open]").forEach((row) => {
+      const c = state.cands.find((x) => x.id === row.dataset.open), tx = row.querySelector(".task-txt");
+      if (!tx || tx.querySelector(".ch-mini") || !avecChances(c)) return;
+      const ch = chances(c);
+      tx.insertAdjacentHTML("beforeend", `<span class="ch-mini n${ch.n}"><i></i>${esc(ch.label)}</span>`);
+    });
+  }
 
   /* ========== 3. Mon bilan de la semaine ========== */
   const OBJ_ENVOIS = 5, OBJ_RESEAU = 3;
@@ -288,12 +370,12 @@
     const grid = document.querySelector("#accueil .home-grid") || document.querySelector(".home-grid");
     if (!grid) return;
     if (!state.cands.length) { if (sec) sec.hidden = true; return; }
-    if (!sec) { sec = document.createElement("section"); sec.className = "home-block"; sec.id = "bilan-panel"; grid.after(sec); }
+    if (!sec) { sec = document.createElement("section"); sec.className = "home-block"; sec.id = "bilan-panel"; (document.getElementById("picks-panel") || grid).after(sec); }
     sec.hidden = false;
     sec.innerHTML = `<div class="row between"><h2 class="home-h">Mon bilan de la semaine</h2><span class="home-more">depuis lundi</span></div>${bilanHTML()}`;
   }
   window.jobelloBilan = bilan;
   const _rh = renderHome;
-  renderHome = function () { const r = _rh.apply(this, arguments); try { renderBilan(); } catch (e) {} return r; };
-  if (ready()) renderBilan();
+  renderHome = function () { const r = _rh.apply(this, arguments); try { chancesAccueil(); } catch (e) {} try { renderBilan(); } catch (e) {} return r; };
+  if (ready()) { try { chancesAccueil(); renderBilan(); if (typeof renderCands === "function") renderCands(); } catch (e) {} }
 })();
