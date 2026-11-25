@@ -13,7 +13,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 <script>/* Garde-fou du chargement (v72) : si le carnet n'est pas chargé au bout de 15 s, on montre où ça bloque et un bouton pour tout recharger. */
-(function(){var V="v75";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
+(function(){var V="v76";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
 addEventListener("error",function(e){window.__jbErr=String((e&&e.message)||e)+(e&&e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")});
 addEventListener("unhandledrejection",function(e){var r=e&&e.reason;window.__jbErr=String((r&&r.message)||r)});
 window.jbToutRecharger=function(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="jobello-meta"}).map(function(k){return caches.delete(k)}))}))}catch(e){}Promise.all(p).catch(function(){}).then(function(){location.replace(location.pathname+"?r="+Date.now())})};
@@ -2190,7 +2190,26 @@ function unlockScroll() {
   Object.assign(b, { position: "", top: "", left: "", right: "", width: "", overflow: "" });
   document.documentElement.style.scrollBehavior = "auto"; window.scrollTo(0, y); document.documentElement.style.scrollBehavior = "";
 }
-function openSheet(html, kind) { sheetKind = kind; $("#overlay").innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`; $("#overlay").hidden = false; lockScroll(); }
+/* Quand une fiche déjà ouverte est redessinée (un bouton, une option…), on garde la position et les volets ouverts au lieu de remonter en haut (souhait de Tullio, 25/11) */
+function openSheet(html, kind) {
+  const ov = $("#overlay"), old = !ov.hidden && ov.querySelector(".sheet"), meme = old && sheetKind === kind && ov.dataset.sheetId === String(editing?.id ?? "");
+  let garde = null;
+  if (meme) {
+    const sc = [old, ...old.querySelectorAll("*")].filter((el) => el.scrollTop > 0).map((el) => [el === old ? "" : cheminEl(el, old), el.scrollTop]);
+    const ouverts = [...old.querySelectorAll("details")].map((d) => [d.querySelector("summary")?.textContent.trim() || "", d.open]);
+    garde = { sc, ouverts };
+  }
+  sheetKind = kind; ov.dataset.sheetId = String(editing?.id ?? "");
+  ov.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`; ov.hidden = false; lockScroll();
+  if (garde) {
+    const sh = ov.querySelector(".sheet");
+    const ds = [...sh.querySelectorAll("details")];
+    garde.ouverts.forEach(([t, o]) => { const d = ds.find((x) => (x.querySelector("summary")?.textContent.trim() || "") === t); if (d && t) d.open = o; });
+    const remet = () => garde.sc.forEach(([p, y]) => { const el = p ? sh.querySelector(p) : sh; if (el) el.scrollTop = y; });
+    remet(); requestAnimationFrame(remet);
+  }
+}
+function cheminEl(el, racine) { const p = []; while (el && el !== racine) { const par = el.parentElement; if (!par) break; p.unshift(`:scope > :nth-child(${[...par.children].indexOf(el) + 1})`); el = par; } return p.join(" ").replace(/ :scope/g, ""); }
 let docBack = null;
 function closeSheet() { suiteMode = ""; hadCallOpen = false; docBack = null; aiCtl?.abort(); $("#overlay").hidden = true; $("#overlay").innerHTML = ""; unlockScroll(); editing = null; sheetKind = null; }
 const opts = (arr, v) => arr.map((x) => Array.isArray(x) ? x : [x, x]).map(([k, l]) => `<option value="${esc(k)}" ${k === v ? "selected" : ""}>${esc(l)}</option>`).join("");
