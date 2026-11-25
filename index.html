@@ -13,7 +13,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 <script>/* Garde-fou du chargement (v72) : si le carnet n'est pas chargé au bout de 15 s, on montre où ça bloque et un bouton pour tout recharger. */
-(function(){var V="v74";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
+(function(){var V="v75";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
 addEventListener("error",function(e){window.__jbErr=String((e&&e.message)||e)+(e&&e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")});
 addEventListener("unhandledrejection",function(e){var r=e&&e.reason;window.__jbErr=String((r&&r.message)||r)});
 window.jbToutRecharger=function(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="jobello-meta"}).map(function(k){return caches.delete(k)}))}))}catch(e){}Promise.all(p).catch(function(){}).then(function(){location.replace(location.pathname+"?r="+Date.now())})};
@@ -559,7 +559,7 @@ details.qa { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10
 .tasks > .news-row:last-child, .task-more > .news-row:last-child { border-bottom: 0; }
 .news-row .task { border-bottom: 0; grid-template-columns: 10px minmax(0, 1fr) auto; }
 .news-row.st-refus { background: color-mix(in srgb, var(--s-refused) 9%, transparent); }
-.news-row .task-txt span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.news-row .task-txt span { white-space: normal; display: block; overflow: visible; text-overflow: clip; -webkit-line-clamp: unset; } /* texte en entier (souhait de Tullio, 25/11) */
 .task-txt .news-k { font-size: .72rem; font-weight: 600; color: var(--st); }
 .news-vu { all: unset; cursor: pointer; margin-right: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: .82rem; font-weight: 600; color: var(--muted); background: var(--surface); }
 .news-vu:hover, .news-all:hover { color: var(--accent); border-color: var(--accent); }
