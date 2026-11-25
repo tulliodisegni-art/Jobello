@@ -12,6 +12,16 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
+<script>/* Garde-fou du chargement (v72) : si le carnet n'est pas chargé au bout de 15 s, on montre où ça bloque et un bouton pour tout recharger. */
+(function(){var V="v72";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
+addEventListener("error",function(e){window.__jbErr=String((e&&e.message)||e)+(e&&e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")});
+addEventListener("unhandledrejection",function(e){var r=e&&e.reason;window.__jbErr=String((r&&r.message)||r)});
+window.jbToutRecharger=function(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="jobello-meta"}).map(function(k){return caches.delete(k)}))}))}catch(e){}Promise.all(p).catch(function(){}).then(function(){location.replace(location.pathname+"?r="+Date.now())})};
+function montrer(){if(window.__jbOk||document.getElementById("jb-wd"))return;if(document.querySelector(".jb-ov")||document.querySelector(".gt-ov:not([hidden])"))return setTimeout(montrer,5000);
+var d=document.createElement("div");d.id="jb-wd";d.style.cssText="position:fixed;left:12px;right:12px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:9998;background:#fff;color:#0e1f2b;border-radius:16px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,.35);font:15px/1.4 -apple-system,system-ui,sans-serif";
+d.innerHTML='<b>Ton carnet ne se charge pas</b><div style="font-size:.85rem;color:#56697a;margin:4px 0 10px">Étape : '+window.__jbStep+(window.__jbErr?" · "+String(window.__jbErr).replace(/[<>&]/g,"").slice(0,140):"")+" · "+V+(navigator.onLine===false?" · hors ligne":"")+'</div><div style="display:flex;gap:8px"><button id="jb-wd-r" style="flex:1;font:inherit;font-weight:600;min-height:44px;border:0;border-radius:12px;background:#0E7A5A;color:#fff">Tout recharger</button><button id="jb-wd-x" style="font:inherit;min-height:44px;border:1px solid #bfe3d4;border-radius:12px;background:#fff;color:#0E7A5A;padding:0 14px">Fermer</button></div>';
+document.body.appendChild(d);document.getElementById("jb-wd-r").onclick=window.jbToutRecharger;document.getElementById("jb-wd-x").onclick=function(){d.remove()};}
+setTimeout(montrer,15000);})();</script>
 <script>window.GATE_CFG={app:"jobello",name:"Jobello",url:"https://vvxkkqcmjrwytagbxdfg.supabase.co",key:"sb_publishable_A-kJQIoJXxdXmjHF8iM40g_RP6myhMo",link:"https://tulliodisegni-art.github.io/Jobello/",about:"decouvrir.html",logo:"icons/icon-192.png",accent:"#E9B949",isOwner:function(){try{if(localStorage.getItem("jb_owner")==="1")return true;var a=JSON.parse(localStorage.getItem("jobello.auth")||"null");return !!(a&&a.user&&String(a.user.email).toLowerCase()==="tulliodisegni@icloud.com")}catch(e){return false}}};</script><script src="gate.js"></script>
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
@@ -4843,7 +4853,7 @@ render();
   use("assets").then((a) => { state.assets = a; });
   use("sample").then((s) => { state.sample = s; });
   use("downloads").then((d) => { state.downloads = d; if (!window.JOBELLO_CONFIG && $("#jb-export")) $("#jb-export").hidden = false; });
-  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; render(); iaRafraichir(); refusAutoPasse(); }, () => banner("Tes candidatures ne se chargent plus. Recharge la page."));
+  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; window.__jbOk = true; document.getElementById("jb-wd")?.remove(); render(); iaRafraichir(); refusAutoPasse(); }, (e) => { window.__jbStep = "lecture du carnet"; window.__jbErr = String(e?.message || e || ""); banner(/abort/i.test(String(e?.name) + e?.message) ? "Le réseau ne répond pas : tes candidatures ne se chargent pas. Vérifie ta connexion puis recharge." : "Tes candidatures ne se chargent pas (" + (e?.message || "erreur") + "). Recharge la page."); });
   db.collection("documents").onSnapshot((snap) => { state.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("cibles").onSnapshot((snap) => { state.cibles = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
