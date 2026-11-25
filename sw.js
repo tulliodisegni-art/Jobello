@@ -1,21 +1,13 @@
 // Garde Jobello disponible même avec un réseau faible : la page et ses scripts sont mis de côté.
 // Garde aussi la pastille de l'icône à jour. Reçoit aussi les notifications envoyées par le serveur (voir notifs.js et supabase/).
-const CACHE = "jobello-v72";
+const CACHE = "jobello-v73";
 const SHELL = ["./", "index.html", "config.js", "shim.js", "relais.js", "sync.js", "gate.js", "notifs.js", "plus.js", "ciblage.js", "accueil.js", "offres-auto.js", "postuler.js", "direct.js", "langue.js", "entrainement-data.js", "entrainement.js", "atouts.js", "vendor/supabase.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== "jobello-meta").map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
-  // Réseau d'abord ; si le réseau ne répond pas en 6 s (réseau faible), on sert la copie gardée au lieu de charger sans fin.
-  const net = fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }).then((res) => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); } return res; });
-  const garde = () => caches.match(e.request, { ignoreSearch: e.request.mode === "navigate" });
-  e.respondWith(new Promise((resolve) => {
-    let fini = false; const rend = (r) => { if (!fini && r) { fini = true; resolve(r); } };
-    const t = setTimeout(() => garde().then(rend), 6000);
-    net.then((r) => { clearTimeout(t); rend(r); }, () => { clearTimeout(t); garde().then((r) => (r ? rend(r) : rend(Response.error()))); });
-    net.then(() => {}, () => {});
-  }));
+  e.respondWith(fetch(e.request.url, { cache: "no-cache", credentials: "same-origin" }).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return res; }).catch(() => caches.match(e.request)));
 });
 
 /* ---------- Pastille sur l'icône : le nombre de choses urgentes, envoyé par l'appli ---------- */
