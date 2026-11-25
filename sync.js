@@ -19,7 +19,7 @@
   .jb-gear{position:absolute;right:12px;bottom:10px;z-index:2;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:transparent;color:rgba(255,255,255,.6);display:grid;place-items:center;cursor:pointer}.jb-gear:hover{color:#fff;background:rgba(255,255,255,.15)}
 `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
-  const ov = (html) => { const d = document.createElement("div"); d.className = "jb-ov"; d.innerHTML = `<div class="jb-card">${html}</div>`; document.body.appendChild(d); return d; };
+  const ov = (html) => { const d = document.createElement("div"); d.className = "jb-ov"; d.innerHTML = `<div class="jb-card">${html}</div>`; if (document.body) document.body.appendChild(d); else addEventListener("DOMContentLoaded", () => document.body.appendChild(d), { once: true }); return d; };
   const $ = (r, s) => r.querySelector(s);
 
   let sb = null, user = null;

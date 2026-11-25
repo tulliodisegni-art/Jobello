@@ -313,7 +313,9 @@
     const lancer = !enCours && L.some((i) => i.file || ["valide"].includes(i.e.statut)) && A.lancerMode && A.lancerMode() && !A.occupe() ? `<a class="btn primary" href="${E(A.tacheURL())}" target="_blank" rel="noopener" data-lancer>⚡ Lancer mes agents maintenant</a>` : "";
     const head = `<div class="dv-top"><h2><span class="dv-live${enCours ? "" : " off"}"><i></i>${enCours ? "EN DIRECT" : "PAUSE"}</span>Mes agents</h2><span class="dv-sub">${E(sub)}</span><button type="button" class="ghost" data-dv="close">Fermer</button></div>`;
     if (x && vue === "bureau") {
+      const yW = ov.querySelector(".bu-wall")?.scrollTop || 0, yO = ov.scrollTop; // garder la position quand l'écran se met à jour
       ov.innerHTML = head + bureauHTML(L) + `<div class="dv-foot">${lancer}</div>`;
+      const w = ov.querySelector(".bu-wall"); if (w) w.scrollTop = yW; ov.scrollTop = yO;
       ov.querySelectorAll(".dv-paper-mini[data-k]").forEach((el) => { const k = el.dataset.k, c = cible[k]; if (c) { const n = Math.min(shown[k] ?? 0, c.texte.length); el.innerHTML = paperHTML(c.texte, c.type, n, c.fini); el.dataset.done = n >= c.texte.length ? String(c.texte.length) + c.fini : ""; el.scrollTop = el.scrollHeight; } });
       placeCursors(); return;
     }
