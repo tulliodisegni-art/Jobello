@@ -35,7 +35,23 @@
   };
   function applyOwner() { const b = document.getElementById("jb-share-btn"); if (b) b.hidden = !window.jobelloIsOwner(); }
   { const q = new URLSearchParams(location.search).get("proprio"); if (q) window.jobelloOwnerCode(q).finally(() => { try { history.replaceState(null, "", location.pathname); } catch (e) {} }); }
-  if (C.url && C.key && window.supabase) sb = window.supabase.createClient(C.url, C.key, { auth: { persistSession: true, storageKey: "jobello.auth" } });
+  /* Verrou simple, dans la page : le verrou du navigateur (navigator.locks) peut rester bloqué sur iPhone quand l'appli
+     est mise en veille pendant un renouvellement de session ; la session ne se lisait alors jamais et l'appli chargeait sans fin. */
+  /* Chaque appel à la base abandonne au bout de 20 s (au lieu d'attendre sans fin quand le réseau du téléphone ne répond pas) */
+  const fetchDelai = (u, o) => { o = o || {}; const lecture = !o.method || /^(GET|HEAD)$/i.test(o.method) || /\/auth\/v1\//.test(String(u)); if (!lecture || o.signal || typeof AbortController === "undefined") return fetch(u, o); const ac = new AbortController(), t = setTimeout(() => ac.abort(), 20000); return fetch(u, { ...o, signal: ac.signal }).finally(() => clearTimeout(t)); };
+  const verrous = {};
+  const verrou = (nom, _t, fn) => { const p = (verrous[nom] || Promise.resolve()).catch(() => {}).then(() => fn()); verrous[nom] = p.catch(() => {}); return p; };
+  if (C.url && C.key && window.supabase) sb = window.supabase.createClient(C.url, C.key, { auth: { persistSession: true, storageKey: "jobello.auth", lock: verrou }, global: { fetch: fetchDelai } });
+  /* Si la connexion traîne plus de 12 s, on le dit et on propose de réessayer (plus de chargement sans fin) */
+  const delai = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("delai")), ms))]);
+  function lent(reessayer) {
+    if (document.querySelector(".jb-ov.jb-lent")) return;
+    const d = ov(`<img src="icons/icon-192.png" alt=""><h1>Connexion lente</h1><p>Jobello n'arrive pas à joindre ton carnet en ligne. Vérifie ta connexion (Wi-Fi ou 4G), puis réessaie.</p>
+      <button id="jb-re">Réessayer</button><button class="ghost" id="jb-relog">Me reconnecter</button>`);
+    d.classList.add("jb-lent");
+    $(d, "#jb-re").onclick = () => { d.remove(); reessayer(); };
+    $(d, "#jb-relog").onclick = () => { try { localStorage.removeItem("jobello.auth"); } catch (e) {} location.reload(); };
+  }
 
   /* ---------- Base en ligne ---------- */
   const remote = {
@@ -62,10 +78,13 @@
 
   async function start() {
     if (!sb) { ready(); return; } // pas de base en ligne configurée : tout reste sur ce téléphone
-    const { data } = await sb.auth.getSession();
+    let data; window.__jbStep = "session";
+    try { ({ data } = await delai(sb.auth.getSession(), 12000)); }
+    catch (e) { window.__jbStep = "session (délai dépassé)"; lent(start); return; }
+    if (data && data.error) window.__jbErr = data.error.message;
     user = data.session?.user || null;
-    if (!user) user = await login();
-    window.jobelloSetBackend(remote); applyOwner();
+    if (!user) { window.__jbStep = "connexion"; user = await login(); }
+    window.__jbStep = "lecture du carnet"; window.jobelloSetBackend(remote); applyOwner();
     sb.channel("docs").on("postgres_changes", { event: "*", schema: "public", table: "docs" }, () => { clearTimeout(start.t); start.t = setTimeout(window.jobelloRefresh, 300); }).subscribe();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) window.jobelloRefresh(); });
     ready();
