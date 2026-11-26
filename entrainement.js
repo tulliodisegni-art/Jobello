@@ -536,7 +536,7 @@
     const n = socQs(c).length, dem = (S0().ia?.liste || []).some((d) => d.cand === c.id && d.type === "prepa" && ["en_attente", "en_cours"].includes(d.statut));
     return `<div class="en-soc">${n ? `<span>🏢 <b>${n} question${n > 1 ? "s" : ""} propre${n > 1 ? "s" : ""} à ${h(c.entreprise || "cette société")}</b> ajoutée${n > 1 ? "s" : ""} à l'entretien blanc et dans « Questions par domaine ».</span>`
       : dem ? `<span>🏢 Claude prépare les questions propres à ${h(c.entreprise || "cette société")} ⏳ Elles arriveront ici toutes seules.</span>`
-      : `<span>🏢 Pour des questions propres à ${h(c.entreprise || "cette société")}, demande la préparation à Claude sur sa fiche.</span><button type="button" class="small" data-en-fiche="${h(c.id)}" style="align-self:flex-start">Ouvrir la fiche → Préparer avec Claude</button>`}</div>`;
+      : `<span>🏢 Pour des questions propres à ${h(c.entreprise || "cette société")}, Claude prépare tout seul les questions propres à la société sur sa fiche.</span><button type="button" class="small" data-en-fiche="${h(c.id)}" style="align-self:flex-start">Ouvrir la fiche</button>`}</div>`;
   }
   function renderHero() {
     const cs = candsEntretien();

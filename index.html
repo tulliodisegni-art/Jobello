@@ -13,7 +13,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 <script>/* Garde-fou du chargement (v72) : si le carnet n'est pas chargé au bout de 15 s, on montre où ça bloque et un bouton pour tout recharger. */
-(function(){var V="v76";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
+(function(){var V="v77";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
 addEventListener("error",function(e){window.__jbErr=String((e&&e.message)||e)+(e&&e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")});
 addEventListener("unhandledrejection",function(e){var r=e&&e.reason;window.__jbErr=String((r&&r.message)||r)});
 window.jbToutRecharger=function(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="jobello-meta"}).map(function(k){return caches.delete(k)}))}))}catch(e){}Promise.all(p).catch(function(){}).then(function(){location.replace(location.pathname+"?r="+Date.now())})};
@@ -3653,17 +3653,69 @@ function iaProchain() { const m = parisMin(), x = IA_SLOTS.find((v) => v > m); r
 function iaBoutonHTML(c, type, label, normal, primary) {
   if (!iaParClaude() || !c.id) return `<div class="row">${normal}</div>`;
   const d = iaDemande(c.id, type);
-  if (d) return `<div class="ia-wait"><p class="muted" style="margin:0;font-size:.86rem">⏳ ${d.statut === "en_cours" ? "Claude s'en occupe en ce moment : ça arrive ici dans une ou deux minutes." : `Demandé à Claude à ${hhmmIso(d.demandeLe)}. Ça arrive ici dès que sa tâche a tourné : tout de suite si tu as touché « Exécuter maintenant », sinon au prochain passage (${iaProchain()}).`}</p>${d.statut === "en_cours" ? "" : `<div class="row"><a class="btn small primary" href="${iaURL()}" target="_blank" rel="noopener" data-ia-go><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Lancer maintenant</a></div>`}</div>`;
+  if (d) return `<div class="ia-wait"><p class="muted" style="margin:0;font-size:.86rem">⏳ ${d.statut === "en_cours" ? "Claude s'en occupe en ce moment : ça arrive ici dans une ou deux minutes." : `Claude le prépare tout seul, tu n'as rien à faire : c'est ici au prochain passage (${iaProchain()}). Pressé ? Touche « Lancer maintenant » puis « Exécuter maintenant ».`}</p>${d.statut === "en_cours" ? "" : `<div class="row"><a class="btn small primary" href="${iaURL()}" target="_blank" rel="noopener" data-ia-go><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Lancer maintenant</a></div>`}</div>`;
   return `<div class="row"><a class="btn small${primary ? " primary" : ""}" href="${iaURL()}" target="_blank" rel="noopener" data-ia="${type}"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> ${esc(label)}</a></div><p class="muted" style="margin:0;font-size:.8rem">Sur la page Claude qui s'ouvre, touche « Exécuter maintenant » : c'est prêt ici en 2 à 3 minutes, sans clé payante.</p>`;
 }
-async function demanderIA(type, c) {
+async function demanderIA(type, c, auto) {
   if (!state.db || !c || !c.id) { toast("Enregistre d'abord la candidature"); return false; }
   let cur = state.ia || {};
   try { const sn = await state.db.doc("demandes/ia").get(); if (sn.exists) cur = sn.data(); } catch {}
-  const liste = (cur.liste || []).filter((d) => !(d.cand === c.id && d.type === type && d.statut !== "fait")).concat({ id: Math.random().toString(36).slice(2, 12), type, cand: c.id, entreprise: c.entreprise || "", poste: c.poste || "", ...(type === "societe" ? { groupe: c.groupe || "", ville: c.ville || "", societeId: (societeOf(c) || {}).id || socKey(c.groupe || c.entreprise).replace(/ /g, "-") || "societe" } : {}), statut: "en_attente", demandeLe: new Date().toISOString() }).slice(-40);
+  const liste = (cur.liste || []).filter((d) => !(d.cand === c.id && d.type === type && d.statut !== "fait")).concat({ id: Math.random().toString(36).slice(2, 12), type, cand: c.id, entreprise: c.entreprise || "", poste: c.poste || "", ...(type === "societe" ? { groupe: c.groupe || "", ville: c.ville || "", societeId: (societeOf(c) || {}).id || socKey(c.groupe || c.entreprise).replace(/ /g, "-") || "societe" } : {}), statut: "en_attente", ...(auto ? { auto: true } : {}), demandeLe: new Date().toISOString() }).slice(-60);
   const doc = { ...cur, liste };
   try { await state.db.doc("demandes/ia").set(doc); state.ia = doc; return true; } catch { toast("La demande n'a pas pu partir. Réessaie."); return false; }
 }
+/* Préparation automatique (26/11) : plus besoin de toucher « Préparer ».
+   Pour chaque candidature en cours, l'appli demande d'elle-même à Claude ce qui manque :
+   « Qui sont-ils ? » et les 5 questions dès que la candidature est prête ou envoyée, la préparation d'entretien dès qu'un entretien est prévu.
+   Quelques demandes à la fois (la tâche Claude les traite à chaque passage), sans jamais redemander ce qui a échoué ou vient d'être fait. */
+const IA_AUTO_MAX = 6;
+const iaAutoVivante = (c) => ["a_envoyer", "envoyee", "relancee", "entretien"].includes(c.statut) && !archivedCand(c) && (c.entreprise || c.poste);
+function iaManque(c) {
+  const t = [];
+  if (hasInterview(c) && !c.prepa) t.push("prepa");
+  if (c.entreprise && !societeOf(c)) t.push("societe");
+  if (!(c.questionsEntretien || []).length) t.push("questions");
+  return t;
+}
+function iaDejaTente(liste, cand, type) {
+  const lim = new Date(Date.now() - 3 * 864e5).toISOString();
+  return liste.some((d) => d.cand === cand && d.type === type && (d.statut === "en_attente" || d.statut === "en_cours" || ((d.statut === "erreur" || d.statut === "fait") && (d.faitLe || d.prisLe || d.demandeLe || "") > lim)));
+}
+let iaAutoBusy = false, iaAutoT = 0;
+function iaAuto() { clearTimeout(iaAutoT); iaAutoT = setTimeout(iaAutoRun, 1500); }
+async function iaAutoRun() {
+  if (iaAutoBusy || !state.db || !iaParClaude() || !state.loaded || state.ia === undefined || !state.societesVu) return;
+  iaAutoBusy = true;
+  try {
+    let cur = state.ia || {};
+    try { const sn = await state.db.doc("demandes/ia").get(); if (sn.exists) cur = sn.data(); } catch { return; }
+    const liste = cur.liste || [];
+    let place = IA_AUTO_MAX - liste.filter((d) => d.auto && (d.statut === "en_attente" || d.statut === "en_cours")).length;
+    if (place <= 0) return;
+    const rang = { prepa: 0, societe: 1, questions: 2 }, vus = new Set(), aFaire = [];
+    const cands = state.cands.filter(iaAutoVivante).sort((a, b) => (hasInterview(b) - hasInterview(a)) || String(b.updatedAt || b.dateEnvoi || "").localeCompare(String(a.updatedAt || a.dateEnvoi || "")));
+    cands.forEach((c) => iaManque(c).forEach((type) => {
+      if (iaDejaTente(liste, c.id, type)) return;
+      if (type === "societe") { const k = socKey(c.groupe || c.entreprise); if (vus.has(k) || liste.some((d) => d.type === "societe" && (d.statut === "en_attente" || d.statut === "en_cours") && socKey(d.groupe || d.entreprise) === k)) return; vus.add(k); }
+      aFaire.push({ c, type });
+    }));
+    aFaire.sort((a, b) => rang[a.type] - rang[b.type]);
+    const nouv = aFaire.slice(0, place).map(({ c, type }) => ({ id: Math.random().toString(36).slice(2, 12), type, cand: c.id, entreprise: c.entreprise || "", poste: c.poste || "", ...(type === "societe" ? { groupe: c.groupe || "", ville: c.ville || "", societeId: socKey(c.groupe || c.entreprise).replace(/ /g, "-") || "societe" } : {}), statut: "en_attente", auto: true, demandeLe: new Date().toISOString() }));
+    if (!nouv.length) return;
+    const garde = liste.filter((d) => d.statut === "en_attente" || d.statut === "en_cours");
+    const vieux = liste.filter((d) => !(d.statut === "en_attente" || d.statut === "en_cours"));
+    const doc = { ...cur, liste: vieux.slice(-Math.max(10, 60 - garde.length - nouv.length)).concat(garde, nouv) };
+    await state.db.doc("demandes/ia").set(doc); state.ia = doc; iaRafraichir();
+  } catch {} finally { iaAutoBusy = false; }
+}
+/* Ouvrir une partie vide de la fiche suffit : la demande part toute seule (ou, avec une clé, Claude prépare tout de suite). */
+document.addEventListener("toggle", (e) => {
+  const d = e.target; if (!d || !d.open || !d.id || sheetKind !== "candsum" || !editing || !editing.id) return;
+  const c = editing, type = d.id === "sec-prepa" ? (c.prepa ? "" : "prepa") : d.id === "sec-qposte" ? ((c.questionsEntretien || []).length ? "" : "questions") : d.id === "sec-societe" ? (societeOf(c) ? "" : "societe") : "";
+  if (!type) return;
+  if (iaParClaude()) { if (!iaDemande(c.id, type)) demanderIA(type, c, true).then((ok) => { if (ok) redessinerFiche([d.id]); }); return; }
+  if (state.sample?.json) { const b = d.querySelector(type === "prepa" ? "[data-act=prepa-ai]" : type === "questions" ? "[data-act=q-ai]" : "[data-act=soc-ai]"); if (b && !b.disabled) b.click(); }
+}, true);
 /* Redessine la fiche ouverte en gardant la position et les parties ouvertes */
 function redessinerFiche(ouvrir) {
   if (sheetKind !== "candsum" || !editing) return;
@@ -4872,14 +4924,14 @@ render();
   use("assets").then((a) => { state.assets = a; });
   use("sample").then((s) => { state.sample = s; });
   use("downloads").then((d) => { state.downloads = d; if (!window.JOBELLO_CONFIG && $("#jb-export")) $("#jb-export").hidden = false; });
-  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; window.__jbOk = true; document.getElementById("jb-wd")?.remove(); render(); iaRafraichir(); refusAutoPasse(); }, (e) => { window.__jbStep = "lecture du carnet"; window.__jbErr = String(e?.message || e || ""); banner(/abort/i.test(String(e?.name) + e?.message) ? "Le réseau ne répond pas : tes candidatures ne se chargent pas. Vérifie ta connexion puis recharge." : "Tes candidatures ne se chargent pas (" + (e?.message || "erreur") + "). Recharge la page."); });
+  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; window.__jbOk = true; document.getElementById("jb-wd")?.remove(); render(); iaRafraichir(); refusAutoPasse(); iaAuto(); }, (e) => { window.__jbStep = "lecture du carnet"; window.__jbErr = String(e?.message || e || ""); banner(/abort/i.test(String(e?.name) + e?.message) ? "Le réseau ne répond pas : tes candidatures ne se chargent pas. Vérifie ta connexion puis recharge." : "Tes candidatures ne se chargent pas (" + (e?.message || "erreur") + "). Recharge la page."); });
   db.collection("documents").onSnapshot((snap) => { state.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("cibles").onSnapshot((snap) => { state.cibles = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
-  db.collection("societes").onSnapshot((snap) => { const avant = editing ? JSON.stringify(societeOf(editing) || null) : ""; state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); if (editing && sheetKind === "candsum" && JSON.stringify(societeOf(editing) || null) !== avant) redessinerFiche(["sec-societe"]); }, () => {});
+  db.collection("societes").onSnapshot((snap) => { const avant = editing ? JSON.stringify(societeOf(editing) || null) : ""; state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); state.societesVu = true; iaAuto(); if (editing && sheetKind === "candsum" && JSON.stringify(societeOf(editing) || null) !== avant) redessinerFiche(["sec-societe"]); }, () => {});
   db.doc("alertes/jour").onSnapshot((snap) => { if (!alertBusy) { state.alertes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); } }, () => {});
   db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderPrep(); renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
-  db.doc("demandes/ia").onSnapshot((snap) => { state.ia = snap.exists ? snap.data() : null; iaRafraichir(); }, () => {});
+  db.doc("demandes/ia").onSnapshot((snap) => { state.ia = snap.exists ? snap.data() : null; iaRafraichir(); iaAuto(); }, () => {});
   db.doc("alertes/sites").onSnapshot((snap) => { state.sites = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); }, () => {});
   setTimeout(autoAlerts, 2500);
   db.doc("profil/main").onSnapshot((snap) => { state.profil = snap.exists ? snap.data() : null; state.profilVu = true; render(); }, () => {});

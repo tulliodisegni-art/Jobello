@@ -91,7 +91,7 @@
     return `<div class="sheet-head"><div style="min-width:0"><span class="label">Mon antisèche</span><h2>${esc(c.entreprise || "Entretien")}${c.poste ? " · " + esc(c.poste) : ""}</h2></div><button type="button" class="ghost" data-act="close">Fermer</button></div>
       <div class="brief anti"><p class="anti-when"><b>${esc(when)}</b>${c.typeEntretien ? " · " + esc(c.typeEntretien) : ""}</p>
         ${c.avecQui ? `<p>Avec ${esc(c.avecQui)}</p>` : ""}${lieu}${c.lienVisio ? joinHTML(c, "Rejoindre la visio") : ""}</div>
-      ${vide ? `<p class="muted" style="margin:0 0 10px;font-size:.9rem">Pas encore de préparation pour cet entretien : ouvre la candidature et touche « Préparer avec Claude ».</p>` : ""}
+      ${vide ? `<p class="muted" style="margin:0 0 10px;font-size:.9rem">Pas encore de préparation pour cet entretien : Claude la prépare tout seul, elle arrive dans la fiche au prochain passage.</p>` : ""}
       ${bloc("Ta présentation en 1 minute", p.pitch ? `<p class="pitch">${esc(p.pitch)}</p>` : "")}
       ${bloc("La société", s ? `${s.activite ? `<p>${esc(s.activite)}</p>` : ""}${(s.produits || []).length ? `<span class="lbl">Produits</span>${ul(s.produits.slice(0, 6))}` : ""}` : "")}
       ${bloc("Le poste", `${c.resume ? `<p>${esc(c.resume)}</p>` : ""}${(c.motsCles || []).length ? `<div class="kw">${c.motsCles.map((k) => `<i>${esc(k)}</i>`).join("")}</div>` : ""}`)}
