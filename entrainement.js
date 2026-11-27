@@ -571,7 +571,7 @@
   }
   function qCard(x, pos, nav) {
     const st = statQ(x.id);
-    return `<div class="en-card"><div class="en-meta">${x.n ? niv(x.n) : ""}<span>${h(x.dn || domNom(x.d))}</span>${pos ? `<span>· ${pos}</span>` : ""}${st ? `<span class="${st === "ok" ? "en-ok" : "en-ko"}">${st === "ok" ? "✓ sue" : "↻ à revoir"}</span>` : ""}</div>
+    return `<div class="en-card"><div class="en-meta">${x.n ? niv(x.n) : ""}<span>${h(x.dn || domNom(x.d))}</span>${pos ? `<span>· ${pos}</span>` : ""}${st ? `<span class="${st === "ok" ? "en-ok" : "en-ko"}">${st === "ok" ? "✓ sue" : "↻ à revoir"}</span>` : ""}<span class="sp" style="flex:1"></span>${window.jbCoursBtn ? jbCoursBtn(x.d === "soc" ? "plan" : x.d) : ""}</div>
       <p class="en-q">${h(x.q)}</p>
       ${ui.rev ? `${x.e ? `<p class="en-e">${h(x.e)}</p>` : ""}${x.k ? `<div class="en-k">${x.k.map((k) => `<span>${h(k)}</span>`).join("")}</div>` : ""}${x.p ? `<p class="en-c cy"><b>⚠</b>${h(x.p)}</p>` : ""}
         ${x.r && x.r !== x.e ? `<details class="en-more"${x.e ? "" : " open"}><summary>Détail</summary><p>${h(x.r)}</p></details>` : ""}
@@ -585,7 +585,7 @@
     const marks = p.err.map((er, i) => found.includes(i) ? `<circle cx="${er.x}" cy="${er.y}" r="20" fill="rgba(14,122,90,.12)" stroke="#0e7a5a" stroke-width="2.5"/><text x="${er.x + 18}" y="${er.y - 14}" font-size="14" font-weight="800" fill="#0e7a5a">${i + 1}</text>`
       : sol ? `<circle cx="${er.x}" cy="${er.y}" r="20" fill="rgba(217,67,58,.1)" stroke="#d9433a" stroke-width="2.5" stroke-dasharray="5 3"/><text x="${er.x + 18}" y="${er.y - 14}" font-size="14" font-weight="800" fill="#d9433a">${i + 1}</text>` : "").join("");
     const shown = p.err.map((er, i) => ({ ...er, i })).filter((er) => found.includes(er.i) || sol);
-    return `<div class="en-meta">${niv(p.n)}<span>${h(p.titre)}</span><span>· ${found.length} / ${p.err.length} erreurs trouvées</span>${ui.miss ? `<span>· ${ui.miss} touche${ui.miss > 1 ? "s" : ""} à côté</span>` : ""}</div>
+    return `<div class="en-meta">${niv(p.n)}<span>${h(p.titre)}</span><span>· ${found.length} / ${p.err.length} erreurs trouvées</span>${ui.miss ? `<span>· ${ui.miss} touche${ui.miss > 1 ? "s" : ""} à côté</span>` : ""}<span class="sp" style="flex:1"></span>${window.jbCoursBtn ? jbCoursBtn("plan") : ""}</div>
       <p class="en-tip">Touche les ${p.err.length} erreurs sur le plan, et dis à voix haute pourquoi c'est faux.<span class="en-glisse"> Fais glisser le plan sur le côté pour tout voir.</span></p>
       <div class="en-paper click pl">${svgWrap(p.w, p.hh, p.draw() + marks, `data-en-plan="${p.id}"`)}</div>
       ${shown.length ? `<div class="en-leg"><span><i style="background:#0e7a5a"></i>trouvée par toi</span>${sol ? `<span><i style="background:#d9433a"></i>ratée</span>` : ""}</div>
@@ -612,7 +612,7 @@
   /* 3. GD&T */
   function gdtCard(g, rev) {
     const r = g.r;
-    return `<div class="en-card"><div class="en-meta">${niv(g.n)}<span>${h(g.nom)}</span>${P.gdt[g.id] ? `<span class="${P.gdt[g.id] === "ok" ? "en-ok" : "en-ko"}">${P.gdt[g.id] === "ok" ? "✓ sue" : "↻ à revoir"}</span>` : ""}</div>
+    return `<div class="en-card"><div class="en-meta">${niv(g.n)}<span>${h(g.nom)}</span>${P.gdt[g.id] ? `<span class="${P.gdt[g.id] === "ok" ? "en-ok" : "en-ko"}">${P.gdt[g.id] === "ok" ? "✓ sue" : "↻ à revoir"}</span>` : ""}<span class="sp" style="flex:1"></span>${window.jbCoursBtn ? jbCoursBtn("gps") : ""}</div>
       <div class="en-paper gd">${gdtSVG(g, rev)}</div>
       ${rev ? `<p class="en-c cb"><b>Quoi ?</b>${h(r.dit)}</p><p class="en-c co"><b>Zone</b>${h(r.zone)}</p><p class="en-c cg"><b>Par rapport à</b>${h(r.ref)}</p><p class="en-c"><b>Contrôle</b>${h(r.ctrl)}</p><p class="en-c cy"><b>⚠</b>${h(r.piege)}</p>
         <div class="en-row"><button type="button" class="small primary" data-en-gs="ok" data-id="${g.id}">✓ Je savais</button><button type="button" class="small" data-en-gs="revoir" data-id="${g.id}">↻ À revoir</button></div>`
@@ -639,7 +639,7 @@
       ? `<label>Jeu mini (µm)<input inputmode="decimal" data-en-in="jmin"></label><label>Jeu maxi (µm)<input inputmode="decimal" data-en-in="jmax"></label><label>Type<select data-en-in="genre"><option value="">—</option><option value="jeu">Avec jeu</option><option value="incertain">Incertain</option><option value="serre">Serré</option></select></label>`
       : `<label>J mini (mm)<input inputmode="decimal" data-en-in="jmin"></label><label>J maxi (mm)<input inputmode="decimal" data-en-in="jmax"></label>${ex.type === "stat" ? `<label>IT statistique (mm)<input inputmode="decimal" data-en-in="itq"></label>` : ""}`;
     const can3D = ex.type === "empil" || ex.type === "stat";
-    return `<div class="en-meta">${niv(ct.n)}<span>${h(ct.nom)}</span></div>
+    return `<div class="en-meta">${niv(ct.n)}<span>${h(ct.nom)}</span><span class="sp" style="flex:1"></span>${window.jbCoursBtn ? jbCoursBtn(ex.type === "ajust" ? "ajust" : "chaines") : ""}</div>
       <p class="en-q">${h(ct.q)}</p>
       ${ex.type === "ajust" ? `<p class="en-r">Ø${ex.Dn} H7/${ex.arb}. Alésage H7 : ${sg(ex.EI)} / ${sg(ex.ES)} µm. Arbre ${ex.arb} : ${sg(ex.ei)} / ${sg(ex.es)} µm.</p>` : ""}
       ${ui.v3d && can3D && !inSimu ? `<div class="en-3d"><canvas id="en-cv"></canvas><span class="hint">Fais glisser pour tourner</span></div><div class="en-row"><button type="button" class="small" data-en-cam="face">Vue de face</button><button type="button" class="small" data-en-cam="iso">Vue 3D</button><label style="display:flex;gap:6px;align-items:center;font-size:.85rem"><input type="checkbox" data-en-chaine ${ui.chaine ? "checked" : ""} style="width:auto"> Montrer la chaîne</label></div>`
