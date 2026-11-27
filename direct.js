@@ -134,13 +134,15 @@
       const vivant = (e.auto !== false && ["en_cours", "valide", "a_valider"].includes(e.statut) && c.statut === "a_envoyer") || ago(e.fin) < 3 * 3600e3 || (d && ago(d.majLe || d.fin) < 3 * 3600e3);
       if (!d && !(e.auto && vivant)) return;
       if (!vivant) return;
+      // Annulée (offre expirée…) : on la montre 30 min avec sa raison, puis elle sort de l'écran
+      if ((e.statut === "annulee" || c.statut === "abandon") && ago(e.fin || (d && d.majLe)) > 30 * 60e3) return;
       L.push({ id: c.id, c, e, d: d || {} });
     });
     (state.demandes?.liste || []).filter((x) => x.auto && x.statut === "en_attente" && !x.candidature).forEach((x) => L.push({ id: "q:" + x.url, file: x, c: { entreprise: x.offre?.entreprise, poste: x.offre?.titre }, e: {}, d: {} }));
     const rang = (x) => (x.file ? 3 : x.e.statut === "en_cours" ? 0 : ["valide", "a_valider"].includes(x.e.statut) ? 1 : 2);
     return L.sort((a, b) => rang(a) - rang(b) || ago(a.d.majLe || a.e.debut || a.e.fin) - ago(b.d.majLe || b.e.debut || b.e.fin));
   }
-  const etatOf = (x) => x.file ? "wait" : x.e.statut === "envoyee" || x.c.statut === "envoyee" ? "ok" : x.e.statut === "bloquee" ? "ko" : x.e.statut === "en_cours" ? "run" : "wait";
+  const etatOf = (x) => x.file ? "wait" : x.e.statut === "annulee" || x.c.statut === "abandon" ? "stop" : x.e.statut === "envoyee" || x.c.statut === "envoyee" ? "ok" : x.e.statut === "bloquee" ? "ko" : x.e.statut === "en_cours" ? "run" : "wait";
   const docOf = (id) => id && state.docs.find((d) => d.id === id);
   const jr = (x, qui) => (x.d.journal || []).filter((j) => j.qui === qui);
 
@@ -183,9 +185,9 @@
   function laneDoc(x, kind) {
     const k = x.id + ":" + kind, t = laneTexte(x, kind), J = jr(x, kind), last = J[J.length - 1];
     const nom = kind === "lettre" ? "Agent Lettre" : "Agent CV", ic = kind === "lettre" ? "✍️" : "📄";
-    const etat = t.fini ? "ok" : t.texte || (last && x.e.statut === "en_cours") ? "run" : etatOf(x) === "ko" && !t.texte ? "ko" : "wait";
-    const sous = t.fini ? (kind === "lettre" ? "Lettre de motivation terminée" : "CV adapté à l'offre terminé") : last ? last.t : x.file ? "Attend le départ des agents" : x.e.statut === "en_cours" ? (kind === "lettre" ? "Lit l'annonce et relève les mots-clés" : "Choisit le CV de base") : "En attente";
-    const st = { ok: "Terminé ✓", run: "Rédige…", ko: "Arrêté", wait: "En attente" }[etat];
+    const etat = t.fini ? "ok" : t.texte || (last && x.e.statut === "en_cours") ? "run" : etatOf(x) === "ko" && !t.texte ? "ko" : etatOf(x) === "stop" ? "stop" : "wait";
+    const sous = etat === "stop" ? "Rien à écrire : candidature annulée" : t.fini ? (kind === "lettre" ? "Lettre de motivation terminée" : "CV adapté à l'offre terminé") : last ? last.t : x.file ? "Attend le départ des agents" : x.e.statut === "en_cours" ? (kind === "lettre" ? "Lit l'annonce et relève les mots-clés" : "Choisit le CV de base") : "En attente";
+    const st = { ok: "Terminé ✓", run: "Rédige…", ko: "Arrêté", wait: "En attente", stop: "Annulée" }[etat];
     if (t.texte) {
       const old = cible[k];
       // Ouvert après coup sur un document fini depuis longtemps : on l'affiche d'un coup
@@ -205,8 +207,8 @@
     if (!J.length && e.etape && etat === "run") lis.push(`<li class="run"><span class="m">…</span><span>${E(e.etape)}</span></li>`);
     if (etat === "run" || etat === "wait") ETAPES.forEach((t, i) => { if (i + 1 > maxN && (J.length || !e.etape || i > 0)) lis.push(`<li class="nx"><span class="m">${i + 1}</span><span>${E(t)}</span></li>`); });
     const last = J[J.length - 1];
-    const sous = etat === "ok" ? "Candidature envoyée" + (e.via ? " via " + e.via : "") : etat === "ko" ? "S'est arrêté : il a besoin de toi" : etat === "run" ? (last ? last.t : e.etape || "Ouvre l'offre dans Chrome") : x.file ? "Attend le départ des agents" : e.statut === "a_valider" ? "Attend ton OK" : "Prête, attend le prochain passage";
-    const st = { ok: "Envoyée ✓", run: "Postule…", ko: "À toi", wait: "En attente" }[etat];
+    const sous = etat === "stop" ? "Annulée : " + (e.raison || "les agents ne l'envoient pas").replace(/[.\s]+$/, "") : etat === "ok" ? "Candidature envoyée" + (e.via ? " via " + e.via : "") : etat === "ko" ? "S'est arrêté : il a besoin de toi" : etat === "run" ? (last ? last.t : e.etape || "Ouvre l'offre dans Chrome") : x.file ? "Attend le départ des agents" : e.statut === "a_valider" ? "Attend ton OK" : "Prête, attend le prochain passage";
+    const st = { ok: "Envoyée ✓", run: "Postule…", ko: "À toi", wait: "En attente", stop: "Annulée" }[etat];
     const fin = etat === "ok" ? `<div class="dv-end ok">🎉 Candidature envoyée${e.fin ? " à " + hm(e.fin) : ""}</div>` : etat === "ko" ? `<div class="dv-end ko">${E((e.raison || "L'agent n'a pas pu terminer").replace(/[.\s]+$/, ""))}. Ouvre la fiche pour finir.</div>` : "";
     return `<section class="dv-lane ${etat}"><div class="dv-lh"><span class="dv-av">🤖</span><span class="tx"><b>Agent Candidature</b><small>${E(sous)}</small></span><span class="dv-st">${st}</span></div><ul class="dv-steps">${lis.join("")}</ul>${fin}</section>`;
   }
@@ -255,6 +257,7 @@
     let body = "", cur = "";
     const a = ag[b.qui], lab = b.qui === "connexion" ? "Connexion" : "Remplissage";
     if (etat === "ok") body = `<div class="bu-f"><div class="ok">✓ Candidature envoyée</div></div>`;
+    else if (etat === "stop") body = `<div class="bu-f"><div class="lock">Candidature annulée<em style="animation:none;color:#5b6470">${E((x.e.raison || "").replace(/[.\s]+$/, ""))}</em></div></div>`;
     else if (etat === "ko") body = `<div class="bu-f"><div class="lock">L'agent s'est arrêté<em>Il a besoin de toi : ouvre la fiche</em></div></div>`;
     else if (b.attente) { body = `<div class="bu-f"><div class="t">${E(b.attente.site || b.site)}</div><label>E-mail<span class="in">tulliodisegni@…</span></label><label>Mot de passe<span class="in">••••••</span></label><span class="btn" data-tg>Se connecter</span><div class="lock"><em>À toi : connecte-toi sur ton ordi</em></div></div>`; cur = curHTML(a, lab, "wait"); }
     else if (etat !== "run") body = `<div class="vide">${x.file ? "En file : part au prochain « Exécuter »" : "En attente"}</div>`;
@@ -286,7 +289,7 @@
     const rows = L.map((x, i) => {
       const etat = etatOf(x), ag = agentsOf(x, i), t0 = x.e.debut, t1 = etat === "ok" || etat === "ko" ? x.e.fin : null;
       const tm = t0 ? `<span class="tm" data-t0="${E(t0)}" ${t1 ? `data-t1="${E(t1)}"` : ""}>${dureeTxt((t1 ? new Date(t1) : Date.now()) - new Date(t0))}</span>` : "";
-      const st = { ok: "Envoyée ✓", run: "En cours", ko: "À toi", wait: x.file ? "En file" : "En attente" }[etat];
+      const st = { ok: "Envoyée ✓", run: "En cours", ko: "À toi", wait: x.file ? "En file" : "En attente", stop: "Annulée" }[etat];
       const conf = etat === "ok" && ago(x.e.fin) < 10 * 60e3 && !fetes.has(x.id) ? (fetes.add(x.id), sessionStorage.setItem("bu-fetes", JSON.stringify([...fetes])), `<div class="bu-confetti">${Array.from({ length: 28 }, (_, k) => `<i style="left:${(k * 37) % 100}%;background:${COUL[k % COUL.length]};animation-delay:${(k % 7) * 0.08}s"></i>`).join("")}</div>`) : "";
       return `<div class="bu-row ${etat}" data-dv="sel" data-id="${E(x.id)}"><div class="bu-rh"><b>${E(x.c.entreprise || "Offre")}</b><small>${E(x.c.poste || "")} · ${st}</small>${tm}</div>
         <div class="bu-win">${miniPaper(x, "lettre", ag, etat)}${miniPaper(x, "cv", ag, etat)}${browserHTML(x, ag, etat)}</div>${conf}</div>`;
