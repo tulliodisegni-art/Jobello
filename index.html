@@ -138,6 +138,23 @@ html, body { overflow-x: clip; max-width: 100%; }
 .kw-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .kw-row i { font-style: normal; font-size: .7rem; padding: 1px 7px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
 .visio-box { border: 1px solid color-mix(in srgb, var(--s-interview) 50%, var(--line)); background: color-mix(in srgb, var(--s-interview) 8%, var(--surface)); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.pj-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pj-wrap .pj-l { width: 100%; font-size: .78rem; font-weight: 600; color: var(--muted); }
+.btn.pj { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; max-width: 100%; }
+.btn.pj span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-add { font-size: .85rem; cursor: pointer; }
+.pj-card { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--s-interview) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--s-interview) 40%, var(--line)); color: var(--fg); }
+.pj-card-t { font-weight: 600; text-align: left; }
+.ag2-pj { margin: -2px 0 8px 12px; }
+.pj-ov { position: fixed; inset: 0; z-index: 9998; background: rgba(8, 20, 28, .92); display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.pj-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; color: #fff; }
+.pj-bar b { font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-acts { display: flex; gap: 8px; flex-shrink: 0; }
+.pj-body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; background: #fff; }
+.pj-body img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+.pj-body img.big { width: 260%; max-width: none; cursor: zoom-out; }
+.pj-body iframe { width: 100%; height: 100%; border: 0; }
+.pj-tip { margin: 0; padding: 6px 14px; color: #cfe; font-size: .8rem; text-align: center; }
 .join-wrap { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .join-wrap .muted { font-size: .8rem; }
 .ghost-join { background: transparent; border: 1px dashed currentColor; }
@@ -1058,6 +1075,36 @@ const extractUrl = (t) => { const m = String(t || "").match(/https?:\/\/[^\s<>"'
 const teamsApp = (u) => /^https:\/\/teams\.microsoft\.com\//i.test(u) ? u.replace(/^https:\/\/teams\.microsoft\.com\//i, "msteams:/") : "";
 const joinHTML = (c, label, small) => { const u = safeUrl(c.lienVisio); if (!u) return ""; const app = teamsApp(u); const isT = /teams\./i.test(u);
   return `<span class="join-wrap"><a class="btn ${small ? "small " : ""}join" href="${esc(app || u)}" ${app ? "" : 'target="_blank" rel="noopener"'}>${ICON.video} ${esc(label || (isT ? "Ouvrir dans Teams" : "Rejoindre la visio"))}</a>${app ? `<a class="small muted" href="${esc(u)}" target="_blank" rel="noopener">ou dans le navigateur</a>` : ""}</span>`; };
+/* Pièces jointes des mails d'entretien (plans d'accès, convocations…) : rangées dans Jobello (fichiers/doc-pj-…), ouvertes d'un toucher, sans chercher dans les mails */
+const piecesOf = (c) => (c && Array.isArray(c.pieces) ? c.pieces.filter((p) => p && p.id) : []);
+const pjName = (p) => String(p.titre || p.nom || "Document").replace(/\.(pdf|png|jpe?g)$/i, "");
+const PJ_IC = '<svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
+const piecesHTML = (c, small, add) => { const ps = piecesOf(c); if (!ps.length && !add) return "";
+  return `<div class="pj-wrap">${ps.length ? `<span class="pj-l">${ps.length > 1 ? "Documents reçus" : "Document reçu"}</span>` : ""}${ps.map((p, i) => `<a class="btn ${small ? "small " : ""}pj" href="/_blob/${esc(p.id)}" data-pj="${esc(c.id)}:${i}">${PJ_IC}<span>${esc(pjName(p))}</span></a>`).join("")}${add && c.id ? `<label class="linkish pj-add">+ Joindre un document (plan, convocation)<input type="file" accept="application/pdf,image/*" data-pj-add="${esc(c.id)}" hidden></label>` : ""}</div>`; };
+function pjView(c, i) {
+  const p = piecesOf(c)[i]; if (!p) return;
+  document.querySelector(".pj-ov")?.remove();
+  const d = document.createElement("div"); d.className = "pj-ov";
+  d.innerHTML = `<div class="pj-bar"><b>${esc(pjName(p))}</b><span class="pj-acts"><a class="btn small" href="/_blob/${esc(p.id)}">Ouvrir le PDF</a><button type="button" class="btn small primary" data-pj-close>Fermer</button></span></div><div class="pj-body"><div class="empty">Chargement…</div></div>${p.apercu ? `<p class="pj-tip">Touche le plan pour zoomer.</p>` : ""}`;
+  document.body.appendChild(d);
+  d.addEventListener("click", (e) => { if (e.target.closest("[data-pj-close]") || e.target === d) d.remove(); else if (e.target.tagName === "IMG") e.target.classList.toggle("big"); });
+  (async () => { const body = d.querySelector(".pj-body");
+    const u = await window.jobelloBlob?.(p.apercu || p.id); if (!u) { body.innerHTML = `<div class="empty">Fichier introuvable. Il est aussi dans le mail reçu.</div>`; return; }
+    body.innerHTML = p.apercu || /^image\//.test(p.type || "") ? `<img src="${u}" alt="${esc(pjName(p))}">` : `<iframe src="${u}" title="${esc(pjName(p))}"></iframe>`; })();
+}
+addEventListener("click", (e) => { const a = e.target.closest && e.target.closest("a[data-pj]"); if (!a) return; e.preventDefault(); e.stopPropagation();
+  const [cid, i] = a.dataset.pj.split(":"); pjView(state.cands.find((x) => x.id === cid), +i); }, true);
+document.addEventListener("change", async (e) => {
+  const cid = e.target.dataset?.pjAdd, file = e.target.files?.[0]; if (!cid || !file) return;
+  const c = state.cands.find((x) => x.id === cid); if (!c) return;
+  if (!state.assets) return toast("Connecte-toi à Jobello pour joindre un document");
+  if (file.size > 8e6) return toast("Fichier trop gros (8 Mo maximum)");
+  try { const up = await state.assets.upload(file); const pj = { id: up.id, nom: file.name, type: file.type || "application/pdf", date: todayISO(), manuel: true };
+    const tgt = typeof editing !== "undefined" && editing && editing.id === cid ? editing : c;
+    tgt.pieces = [...piecesOf(tgt), pj]; if (tgt !== c) c.pieces = tgt.pieces;
+    if (await saveCand(tgt)) { toast("Document joint à la fiche"); if (typeof sheetKind !== "undefined" && sheetKind === "dossier") drawDossier(false); else drawCandSum(); }
+  } catch { toast("Le document n'a pas pu être envoyé, réessaie."); }
+});
 const safeUrl = (u) => { u = String(u || "").trim(); if (!u) return ""; if (!/^https?:\/\//i.test(u)) u = "https://" + u; return u; };
 const initials = (s) => String(s || "?").split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
 function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2400); }
@@ -1273,8 +1320,10 @@ function renderHome() {
     : !T.length ? "Tout est à jour. Rien à faire aujourd'hui." : urgent ? `${urgent} chose${urgent > 1 ? "s" : ""} urgente${urgent > 1 ? "s" : ""} aujourd'hui.` : "Rien d'urgent. Tu peux avancer tes candidatures.";
 
   const joinable = all.filter((c) => c.lienVisio && entretienAVenir(c) && c.dateEntretien <= addDays(today, 1)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
-  $("#hero-join").hidden = !joinable.length;
-  $("#hero-join").innerHTML = joinable.map((c) => joinHTML(c, `Rejoindre ${c.entreprise} · ${c.dateEntretien === today ? "aujourd'hui" : "demain"}${c.heureEntretien ? " " + c.heureEntretien : ""}`)).join("");
+  const withPj = all.filter((c) => piecesOf(c).length && entretienAVenir(c) && c.dateEntretien <= addDays(today, 7)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
+  $("#hero-join").hidden = !joinable.length && !withPj.length;
+  $("#hero-join").innerHTML = joinable.map((c) => joinHTML(c, `Rejoindre ${c.entreprise} · ${c.dateEntretien === today ? "aujourd'hui" : "demain"}${c.heureEntretien ? " " + c.heureEntretien : ""}`)).join("")
+    + withPj.map((c) => `<div class="pj-card"><button type="button" class="linkish pj-card-t" data-open="${esc(c.id)}">Entretien ${esc(c.entreprise || "")} · ${esc(c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }))}${c.heureEntretien ? " à " + esc(c.heureEntretien.replace(":", " h ")) : ""}</button>${piecesHTML(c, true)}</div>`).join("");
 
   const [first, ...rest] = [null, ...T], tag = (x) => x.w ? `<span class="task-w${x.hot ? " hot" : ""}">${esc(x.w)}</span>` : "";
   const row = (x) => `<${x.href ? "a" : "button type=\"button\""} class="task st-${TASK_ST[x.k]}" ${taskAttrs(x)}><span class="task-dot"></span><span class="task-txt"><b>${esc(x.t)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ""}</span>${tag(x)}${ICON.chev}</${x.href ? "a" : "button"}>`;
@@ -1451,7 +1500,7 @@ function renderAgenda() {
   const dayName = (d) => d === today ? "Aujourd'hui" : d === tomorrow ? "Demain" : cap(fmt(d, { weekday: "long", day: "numeric", month: "long" }));
   const ago = (d) => { const n = Math.round((new Date(today + "T12:00:00") - new Date(d + "T12:00:00")) / 864e5); return n <= 1 ? "depuis hier" : `depuis ${n} jours`; };
   const item = (e) => {
-    if (e.st === "entretien") { const c = e.c; return `<button type="button" class="ag2-it ent" id="ev-${evKey(e.key)}" data-open="${esc(c.id)}"><span class="ag2-ic">${esc(hm(c.heureEntretien) || "Entretien")}</span><span class="ag2-tx"><b>${esc(c.entreprise || "")}</b><span>${esc(["Entretien", c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span></span>${ICON.chev}</button>`; }
+    if (e.st === "entretien") { const c = e.c; return `<button type="button" class="ag2-it ent" id="ev-${evKey(e.key)}" data-open="${esc(c.id)}"><span class="ag2-ic">${esc(hm(c.heureEntretien) || "Entretien")}</span><span class="ag2-tx"><b>${esc(c.entreprise || "")}</b><span>${esc(["Entretien", c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span></span>${ICON.chev}</button>${piecesOf(c).length && e.date >= today ? `<div class="ag2-pj">${piecesHTML(c, true)}</div>` : ""}`; }
     if (e.p) return `<button type="button" class="ag2-it li" id="ev-${evKey(e.key)}" data-contact="${esc(e.p.id)}"><span class="ag2-ic">in</span><span class="ag2-tx"><b>${esc(e.p.nom || e.p.entreprise || "Contact")}</b><span>${esc(e.kind)}</span></span>${ICON.chev}</button>`;
     const lt = e.date < today;
     return `<button type="button" class="ag2-it rel${lt ? " late" : ""}" id="ev-${evKey(e.key)}" data-open="${esc(e.c.id)}"${e.task ? ` data-task="${e.task}"` : ""}><span class="ag2-ic">${lt ? "!" : "↻"}</span><span class="ag2-tx"><b>${esc(e.c.entreprise || "")}</b><span>${esc(e.kind === "Relance" ? "Relancer" : e.kind)}${lt ? ` <em>en retard ${ago(e.date)}</em>` : ""}</span></span>${ICON.chev}</button>`;
@@ -1466,7 +1515,7 @@ function renderAgenda() {
 
   /* 1. En haut, toujours : le prochain entretien et la carte du jour */
   const nextEnt = ev.find((e) => e.st === "entretien" && e.date >= today);
-  const hero = nextEnt ? (() => { const c = nextEnt.c; return `<button type="button" class="ag2-hero" id="ev-hero" data-open="${esc(c.id)}"><span class="ag2-hero-l">Prochain entretien</span><b class="ag2-hero-t">${esc(c.entreprise || "")}</b><span class="ag2-hero-w">${esc(dayName(nextEnt.date))}${c.heureEntretien ? " à " + esc(hm(c.heureEntretien)) : ""}</span><span class="ag2-hero-s">${esc([c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span><span class="ag2-hero-go">Ouvrir la fiche ${ICON.chev}</span></button>`; })() : "";
+  const hero = nextEnt ? (() => { const c = nextEnt.c; return `<button type="button" class="ag2-hero" id="ev-hero" data-open="${esc(c.id)}"><span class="ag2-hero-l">Prochain entretien</span><b class="ag2-hero-t">${esc(c.entreprise || "")}</b><span class="ag2-hero-w">${esc(dayName(nextEnt.date))}${c.heureEntretien ? " à " + esc(hm(c.heureEntretien)) : ""}</span><span class="ag2-hero-s">${esc([c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span><span class="ag2-hero-go">Ouvrir la fiche ${ICON.chev}</span></button>${piecesOf(c).length ? `<div class="ag2-pj">${piecesHTML(c, true)}</div>` : ""}`; })() : "";
   const tList = ev.filter((e) => e.date === today), tDone = doneOf(today, today);
   const tItems = sortDay(tList.filter((e) => e.st === "entretien")).map(item).join("") + late.filter((e) => !e.p).map(item).join("") + sortDay(tList.filter((e) => e.st !== "entretien")).map(item).join("") + liGroup([...late, ...tList].filter((e) => e.p));
   const nToday = tList.length + late.length;
@@ -2265,6 +2314,7 @@ function visioBox(c) {
   if (!c.dateEntretien) return "";
   const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "date à préciser";
   return `<div class="visio-box"><div><span class="label">Entretien${(c.entretiens || []).length ? " n° " + ((c.entretiens || []).length + 1) : ""}</span><strong style="display:block">${esc(when)}${c.typeEntretien ? " · " + esc(c.typeEntretien) : ""}</strong>${c.avecQui ? `<span class="muted" style="font-size:.85rem;display:block">Avec ${esc(c.avecQui)}</span>` : ""}${c.lieuEntretien ? `<a href="https://maps.apple.com/?q=${enc(c.lieuEntretien)}" target="_blank" rel="noopener" style="font-size:.88rem"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> ${esc(c.lieuEntretien)}</a>` : ""}</div>
+    ${piecesHTML(c, true, true)}
     ${c.lienVisio ? joinHTML(c) : isVisio ? `<div class="field"><label for="vx-link">Coller le lien Teams</label><input id="vx-link" placeholder="Colle ici le lien ou toute l'invitation reçue par e-mail"></div>
       <div class="row"><button type="button" class="small" data-act="paste-visio">Coller depuis le presse-papiers</button><button type="button" class="small primary" data-act="save-visio">Enregistrer le lien</button></div>` : ""}
     ${c.statut === "entretien" && c.dateEntretien > todayISO() ? `<div class="row"><button type="button" class="small" data-act="nr-done">Je l'ai déjà passé</button></div>` : ""}</div>`;
