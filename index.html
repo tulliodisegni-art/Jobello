@@ -13,7 +13,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 <script>/* Garde-fou du chargement (v72) : si le carnet n'est pas chargé au bout de 15 s, on montre où ça bloque et un bouton pour tout recharger. */
-(function(){var V="v77";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
+(function(){var V="v78";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
 addEventListener("error",function(e){window.__jbErr=String((e&&e.message)||e)+(e&&e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")});
 addEventListener("unhandledrejection",function(e){var r=e&&e.reason;window.__jbErr=String((r&&r.message)||r)});
 window.jbToutRecharger=function(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="jobello-meta"}).map(function(k){return caches.delete(k)}))}))}catch(e){}Promise.all(p).catch(function(){}).then(function(){location.replace(location.pathname+"?r="+Date.now())})};
@@ -1296,15 +1296,17 @@ function renderHome() {
   $("#home-week").innerHTML = Array.from({ length: 7 }, (_, i) => { const d = addDays(today, i), e = evs.filter((x) => x.date === d || (i === 0 && x.date < today)); const ent = e.some((x) => x.st === "entretien");
     return `<button type="button" class="wk-day${i === 0 ? " today" : ""}${d === homeDay ? " sel" : ""}" data-wk="${d}"><small>${fmt(d, { weekday: "short" }).replace(".", "")}</small><b>${new Date(d + "T12:00:00").getDate()}</b><span class="wk-dots">${e.length ? (ent ? `<i class="ent"></i>` : "") + `<em>${e.length}</em>` : ""}</span></button>`; }).join("");
   renderHomeDay(evs);
-  const sent = all.filter((c) => c.statut !== "a_envoyer"), F = [["Envoyées", sent.length, "envoyee"], ["Réponses", sent.filter(answered).length, "relancee"], ["Entretiens", all.filter((c) => (c.entretiens || []).length || ["entretien", "offre"].includes(c.statut)).length, "entretien"], ["Offres", all.filter((c) => c.statut === "offre" || c.offre).length, "offre"]];
+  const sent = all.filter((c) => c.statut !== "a_envoyer"), F = [["Envoyées", sent.length, "envoyee"], ["Réponses", sent.filter(answered).length, "relancee"], ["Entretiens", all.filter(eueEntretien).length, "entretien"], ["Offres", all.filter((c) => c.statut === "offre" || c.offre).length, "offre"]];
   const mx = Math.max(1, F[0][1]);
   $("#funnel").innerHTML = F.map(([l, n, st]) => `<div class="fn st-${st}"><span class="fn-l">${l}</span><span class="fn-bar"><i style="width:${Math.max(n ? 6 : 0, Math.round(n / mx * 100))}%"></i></span><b>${n}</b></div>`).join("");
   $("#home-foot").innerHTML = all.length ? `Toutes mes candidatures · ${live} en cours ${ICON.chev}` : "";
-  $("#stats").innerHTML = [[sentN, sentN > 1 ? "envoyées" : "envoyée"], [all.filter((c) => ACTIVE.includes(c.statut)).length, "en attente"], [all.filter(isDue).length, "à relancer"], [all.filter((c) => ["entretien", "offre"].includes(c.statut)).length, "entretiens"], [sentN ? Math.round(rep / sentN * 100) + " %" : "–", "de réponses"]]
+  $("#stats").innerHTML = [[sentN, sentN > 1 ? "envoyées" : "envoyée"], [all.filter((c) => ACTIVE.includes(c.statut)).length, "en attente"], [all.filter(isDue).length, "à relancer"], [all.filter(eueEntretien).length, all.filter(eueEntretien).length > 1 ? "entretiens ou appels" : "entretien ou appel"], [sentN ? Math.round(rep / sentN * 100) + " %" : "–", "de réponses"]]
     .map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
   const counts = STATUTS.map(([k, l]) => [k, l, all.filter((c) => c.statut === k).length]).filter((x) => x[2]);
   $("#pipe").innerHTML = counts.map(([k, l, n]) => `<span class="st-${k}" style="flex:${n}" title="${l} : ${n}"></span>`).join("");
   $("#legend").innerHTML = counts.map(([k, l, n]) => `<span class="st-${k}"><i></i>${l} ${n}</span>`).join("") || "<span>Pas encore de candidature</span>";
+  { const ee = all.filter(eueEntretien), fini = ee.filter((c) => c.statut === "refus").length, enCours = ee.filter((c) => !archivedCand(c)).length;
+    if (ee.length) $("#legend").innerHTML += `<span style="flex-basis:100%;margin-top:4px">🎤 <b>${ee.length}</b> candidature${ee.length > 1 ? "s" : ""} avec entretien ou appel : ${enCours} en cours${fini ? `, ${fini} terminée${fini > 1 ? "s" : ""} par un refus` : ""}. Les entretiens comptent même après un refus.</span>`; }
   renderNews();
   const n = all.filter(isDue).length + state.contacts.filter(contactDue).length; $("#due-dot").hidden = !n; $("#due-dot").textContent = n;
   $("#fs-stats").textContent = all.length ? `${all.length} candidatures · ${sentN ? Math.round(rep / sentN * 100) : 0} % de réponses` : "";
@@ -1528,6 +1530,9 @@ const norm = (x) => String(x || "").trim().toLowerCase();
 const contactsOf = (ent) => ent ? state.contacts.filter((p) => norm(p.entreprise) === norm(ent)) : [];
 const archivedC = (p) => p.etape === "sans_suite";
 const archivedCand = (c) => c.decision === "stop" || ["refus", "abandon"].includes(c.statut);
+/* A-t-il déjà eu un entretien ou un appel pour cette candidature, même si elle s'est finie par un refus ? (27/11) */
+const ENT_HIST = /entretien (n°|t[ée]l[ée]phonique|pass[ée]|fix[ée]|visio|technique|sur place)|refus apr[èe]s (l'|un )?entretien|[ée]change t[ée]l[ée]phonique|appel (le|t[ée]l[ée]phonique|du|avec)|j'ai eu un appel|remerciement envoy[ée] apr[èe]s/i;
+const eueEntretien = (c) => ["entretien", "offre"].includes(c.statut) || !!c.offre || (c.entretiens || []).length > 0 || !!c.dateEntretien || (c.mails || []).some((m) => m.type === "entretien") || (c.historique || []).some((h) => ENT_HIST.test(h.texte || ""));
 /* Refus automatique : envoyée ou relancée, et rien de la société depuis 30 jours (envoi, relance, mail, réponse, entretien) */
 const REFUS_AUTO_J = 30;
 const ISO_D = (x) => (typeof x === "string" && /^\d{4}-\d{2}-\d{2}/.test(x) ? x.slice(0, 10) : "");
@@ -1870,11 +1875,13 @@ document.addEventListener("click", (e) => {
 /* Questions probables propres à une candidature (champ questionsEntretien) */
 function qPosteHTML(c) {
   const Q = c.questionsEntretien || [], live = ["a_envoyer", "envoyee", "relancee", "entretien"].includes(c.statut) && !archivedCand(c);
-  if (!Q.length && !live) return "";
-  const body = Q.length ? `<div class="qa-list">${Q.map((x) => `<details class="qa"><summary><span>${esc(x.q)}</span></summary><div class="qa-b"><p class="qa-a">${esc(x.a)}</p></div></details>`).join("")}</div>
-      <p class="muted" style="margin:0;font-size:.8rem">Les questions générales (parcours, motivation, salaire…) sont dans l'onglet CV, « S'entraîner à l'entretien ».</p>`
-    : `<p class="muted" style="margin:0;font-size:.86rem">Claude prépare 5 questions probables pour ce poste, avec des réponses tirées de ton CV.</p>${iaBoutonHTML(c, "questions", "Préparer les 5 questions", `<button type="button" class="small primary" data-act="q-ai">Préparer les 5 questions</button>`, true)}`;
-  return `<details class="sec" id="sec-qposte"${c.statut === "entretien" ? " open" : ""}><summary>Questions probables pour ce poste <small>${Q.length || "à préparer"}</small></summary><div class="body">${body}</div></details>`;
+  const G = (state.entr && state.entr.questions) || [];
+  if (!Q.length && !live && !G.length) return "";
+  const qa = (x, a) => `<details class="qa"><summary><span>${esc(x.q)}</span></summary><div class="qa-b"><p class="qa-a">${esc(a)}</p>${x.tip ? `<p class="qa-tip"><b>Conseil :</b> ${esc(x.tip)}</p>` : ""}</div></details>`;
+  const propres = Q.length ? `<span class="lbl">Propres à ce poste</span><div class="qa-list">${Q.map((x) => qa(x, x.a)).join("")}</div>`
+    : live ? `<span class="lbl">Propres à ce poste</span>${iaBoutonHTML(c, "questions", "Préparer les 5 questions", `<button type="button" class="small primary" data-act="q-ai">Préparer les 5 questions</button>`, true)}` : "";
+  const types = G.length ? `<details class="soc-more"><summary>Questions types qu'on te pose partout (${G.length}) : parcours, motivation, salaire…</summary><div class="qa-list">${G.map((x) => qa(x, x.a)).join("")}</div></details>` : "";
+  return `<details class="sec" id="sec-qposte"${c.statut === "entretien" ? " open" : ""}><summary>Questions d'entretien <small>${Q.length ? Q.length + " pour ce poste" : ""}${Q.length && G.length ? " + " : ""}${G.length ? G.length + " types" : ""}</small></summary><div class="body">${propres}${types}</div></details>`;
 }
 async function qPosteAI(btn) {
   const c = editing; if (!state.sample?.json) return toast("Demande-le à Claude dans ton projet Jobello");
@@ -3600,6 +3607,12 @@ function salaryLine(c, s) {
   const warn = top && top < minN ? ` Le haut de la fourchette est sous ton minimum : vise ${minN} k€ et appuie-toi sur tes 5 ans d'expérience et ton diplôme d'ingénieur.` : "";
   return `<div class="tip"><b>Salaire.</b> ${esc(parts.join(" · "))}.${esc(warn)}</div>`;
 }
+/* Résumé de la société tiré de l'annonce, affiché tout de suite en attendant la fiche complète */
+function socAnnonce(c) {
+  if (c.annonce && c.annonce.entreprise) return [].concat(c.annonce.entreprise).join(" ");
+  try { const p = decouperAnnonce(c.description || ""); if (p && p.entreprise) return [].concat(p.entreprise).join(" ").slice(0, 600); } catch {}
+  return "";
+}
 function societeHTML(c) {
   const s = societeOf(c), ppl = contactsOf(c.entreprise).concat(c.groupe && c.groupe !== c.entreprise ? contactsOf(c.groupe) : []);
   const name = c.groupe || c.entreprise || "";
@@ -3619,7 +3632,7 @@ function societeHTML(c) {
       ${sources.length ? sub("Sources", `<ul>${sources.map((u) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a></li>`).join("")}</ul>`) : ""}
       <span class="muted" style="font-size:.78rem">${esc(s.origine || "Infos publiques")}${s.date ? " · " + fmt(s.date) : ""} · à vérifier</span>
       ${iaDemande(c.id, "societe") || !s.date || s.date < addDays(todayISO(), -30) || !s.aRetenir ? majBtn("Mettre à jour avec Claude", false) : ""}`
-      : `<p class="muted" style="margin:0">Claude cherche pour toi qui ils sont : activité, produits, taille, clients, actualité, ambiance et ce qu'il est bon de dire en entretien.</p>${majBtn("Demander à Claude qui ils sont", true)}`}
+      : `${socAnnonce(c) ? `<span class="lbl">D'après l'annonce</span><p style="margin:0">${esc(socAnnonce(c))}</p>` : ""}${majBtn("Demander à Claude qui ils sont", true)}`}
     ${ppl.length ? `<span class="lbl">Tes contacts</span><div class="row">${ppl.map((p) => `<button type="button" class="small" data-contact="${esc(p.id)}">${esc(p.nom)}${p.role ? " · " + esc(p.role.split(",")[0]) : ""}</button>`).join("")}</div>` : ""}
     ${links}</div></details>`;
 }
@@ -3652,9 +3665,10 @@ const hhmmIso = (iso) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-di
 function iaProchain() { const m = parisMin(), x = IA_SLOTS.find((v) => v > m); return x != null ? `vers ${hhmm(x + 5)}` : `demain vers ${hhmm(IA_SLOTS[0] + 5)}`; }
 function iaBoutonHTML(c, type, label, normal, primary) {
   if (!iaParClaude() || !c.id) return `<div class="row">${normal}</div>`;
+  // 27/11 : Tullio ne veut rien à toucher ni à exécuter. Ce qui manque est demandé tout seul (iaAuto) et s'affiche ici dès que c'est prêt.
   const d = iaDemande(c.id, type);
-  if (d) return `<div class="ia-wait"><p class="muted" style="margin:0;font-size:.86rem">⏳ ${d.statut === "en_cours" ? "Claude s'en occupe en ce moment : ça arrive ici dans une ou deux minutes." : `Claude le prépare tout seul, tu n'as rien à faire : c'est ici au prochain passage (${iaProchain()}). Pressé ? Touche « Lancer maintenant » puis « Exécuter maintenant ».`}</p>${d.statut === "en_cours" ? "" : `<div class="row"><a class="btn small primary" href="${iaURL()}" target="_blank" rel="noopener" data-ia-go><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Lancer maintenant</a></div>`}</div>`;
-  return `<div class="row"><a class="btn small${primary ? " primary" : ""}" href="${iaURL()}" target="_blank" rel="noopener" data-ia="${type}"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> ${esc(label)}</a></div><p class="muted" style="margin:0;font-size:.8rem">Sur la page Claude qui s'ouvre, touche « Exécuter maintenant » : c'est prêt ici en 2 à 3 minutes, sans clé payante.</p>`;
+  if (d || primary) return `<p class="muted ia-wait" style="margin:0;font-size:.84rem">⏳ ${primary ? "En préparation : ça s'affiche ici tout seul, tu n'as rien à faire." : "Mise à jour en cours : la nouvelle version remplace celle-ci toute seule."}</p>`;
+  return `<div class="row"><button type="button" class="small ghost" data-ia-refaire="${type}">${esc(label)}</button></div>`;
 }
 async function demanderIA(type, c, auto) {
   if (!state.db || !c || !c.id) { toast("Enregistre d'abord la candidature"); return false; }
@@ -3735,9 +3749,9 @@ function iaRafraichir() {
   redessinerFiche(ks.includes("prepa") ? ["sec-prepa"] : ks.includes("questionsEntretien") ? ["sec-qposte"] : []);
 }
 document.addEventListener("click", (e) => {
-  const a = e.target.closest && e.target.closest("a[data-ia]"); if (!a) return; // le lien ouvre la tâche Claude (nouvel onglet)
-  const c = editing, type = a.dataset.ia; if (!c || !c.id) return;
-  demanderIA(type, c).then((ok) => { if (ok) { toast("C'est noté : sur la page Claude, touche « Exécuter maintenant »"); redessinerFiche([type === "prepa" ? "sec-prepa" : type === "societe" ? "sec-societe" : "sec-qposte"]); } });
+  const a = e.target.closest && e.target.closest("[data-ia-refaire]"); if (!a) return;
+  const c = editing, type = a.dataset.iaRefaire; if (!c || !c.id) return;
+  demanderIA(type, c).then((ok) => { if (ok) { toast("C'est noté : Claude refait ça tout seul"); redessinerFiche([type === "prepa" ? "sec-prepa" : type === "societe" ? "sec-societe" : "sec-qposte"]); } });
 });
 
 /* ---------- L'annonce complète, rangée : l'entreprise, le poste, les missions, le profil, les plus, salaire et conditions ----------
@@ -4064,7 +4078,7 @@ function renderDash() {
   const perW = weeks.map((w) => sent.filter((c) => monday(c.dateEnvoi) === w).length), maxW = Math.max(1, ...perW);
   const ch = ["site", "plateforme", "recruteur", "spontanee"].map((k) => {
     const cs = sent.filter((c) => (c.canal || "") === k), rep = cs.filter((c) => answered(c) || (c.mails || []).some((m) => m.type !== "accuse"));
-    return { k, n: cs.length, r: rep.length, ok: cs.filter((c) => ["entretien", "offre"].includes(c.statut)).length };
+    return { k, n: cs.length, r: rep.length, ok: cs.filter(eueEntretien).length };
   }).filter((x) => x.n);
   const delays = sent.filter((c) => c.dateReponse && c.dateReponse >= c.dateEnvoi).map((c) => daysBetween(c.dateEnvoi, c.dateReponse));
   const avg = delays.length ? Math.round(delays.reduce((a, b) => a + b, 0) / delays.length) : null;
