@@ -201,13 +201,16 @@
     { t: "Technique", min: "20 à 30 min", dire: "Lecture de plan, cotation ISO (GPS), chaînes de cotes. Là où les candidats échouent le plus." },
   ];
 
+  // fiche de cours de chaque exercice (cours.js) : celle de l'atelier, sauf exception
+  const COURS_EX = { p6: "ajust", c2: "ajust", p7: "procedes", p8: "procedes", p10: "conception" };
+  const coursDe = (x) => COURS_EX[x.id] || { plan: "plan", gps: "gps", ch: "chaines" }[x.a];
   /* ---------- Cartes ---------- */
   function exCard(x, inS) {
     const sol = inS ? ui.simu.rev : !!ui.sol[x.id], vals = ui.vals[x.id] || [], res = ui.res[x.id];
     const at = AT.find((a) => a.id === x.a) || {};
     const stat = P.ex[x.id];
     return `<div class="en-card" data-pc-ex="${x.id}">
-      <div class="en-meta"><span>${at.ic || ""} ${h(at.nom || "")}</span><span class="en-niv">${[1, 2, 3].map((k) => `<i class="${k <= x.n ? "on" : ""}"></i>`).join("")} niveau ${x.n}</span>${stat ? `<span class="${stat === "ok" ? "en-ok" : "en-ko"}">${stat === "ok" ? "✓ su" : "à revoir"}</span>` : ""}</div>
+      <div class="en-meta"><span>${at.ic || ""} ${h(at.nom || "")}</span><span class="en-niv">${[1, 2, 3].map((k) => `<i class="${k <= x.n ? "on" : ""}"></i>`).join("")} niveau ${x.n}</span>${stat ? `<span class="${stat === "ok" ? "en-ok" : "en-ko"}">${stat === "ok" ? "✓ su" : "à revoir"}</span>` : ""}<span class="sp" style="flex:1"></span>${window.jbCoursBtn ? jbCoursBtn(coursDe(x)) : ""}</div>
       <p class="en-q">${h(x.t)}</p><p class="en-r">${h(x.q)}</p>
       ${x.fig ? `<div class="en-paper" style="max-width:560px">${fig(x.fig, sol)}</div>` : ""}
       ${x.in ? `<div class="pc-in">${x.in.map((f, k) => `<label>${h(f.l)}<input inputmode="decimal" data-pc-val="${k}" value="${h(vals[k] ?? "")}" autocomplete="off">${res ? `<i class="${res[k] ? "en-ok" : "en-ko"}">${res[k] ? "✓ juste" : "✗ réponse : " + nfr(f.v)}</i>` : ""}</label>`).join("")}</div>
@@ -327,7 +330,7 @@
     ov.innerHTML = `<div class="in"><div class="top"><h2>Bilan de l'entretien blanc</h2><button type="button" class="small ghost" data-pc-quit>Fermer</button></div>
       <p class="en-score">${sc} %</p><p class="en-r">${sc >= 75 ? "Très bien : tu peux y aller confiant. Relis juste les points ci-dessous." : sc >= 50 ? "Correct. Reprends les points ci-dessous avant le jour J." : "Encore du travail : refais les exercices ci-dessous, puis un nouvel entretien blanc."} (${Math.round((Date.now() - S.t0) / 60000)} min)</p>
       <div class="en-card"><b>Par partie</b>${Object.entries(parts).map(([p, rs]) => `<div class="en-row"><span>${h(p)}</span><span class="sp"></span>${rs.map((r) => (r === "ok" ? "🟢" : r === "moyen" ? "🟡" : "🔴")).join(" ")}</div>`).join("")}</div>
-      ${rev.length ? `<div class="en-card"><b>À revoir</b><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">${rev.map((x) => `<li>${h(lbl(x))}</li>`).join("")}</ul></div>` : ""}
+      ${rev.length ? `<div class="en-card"><b>À revoir</b><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">${rev.map((x) => `<li>${h(lbl(x))}${x.k === "ex" && window.jbCoursBtn ? " " + jbCoursBtn(coursDe(EX.find((e) => e.id === x.id))) : ""}</li>`).join("")}</ul></div>` : ""}
       <div class="en-row"><button type="button" class="primary" data-pc-quit>Terminer</button><button type="button" class="small" data-pc-simu>Refaire un entretien blanc</button></div></div>`;
   }
   function quitSimu() { clearInterval(chrono); ui.simu = null; const ov = $("#pc-ov"); if (ov) ov.remove(); document.body.style.overflow = ""; render(); }
