@@ -4012,7 +4012,7 @@ function hadCallHTML(c) {
   return `<div class="relance-box" id="hc-box"><span class="lbl" style="font-weight:600"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> J'ai eu un appel / un entretien</span>
     <div class="grid2"><div class="field"><label for="hc-date">Quand</label><input id="hc-date" type="date" value="${todayISO()}" max="${todayISO()}"></div>
       <div class="field"><label for="hc-type">Comment</label><select id="hc-type">${opts(["Téléphone", "Visio", "Sur place"], "Téléphone")}</select></div></div>
-    <div class="field"><label for="hc-qui">Avec qui</label><textarea id="hc-qui" class="short" rows="2" placeholder="ex. Mme Martin, recrutement">${esc(c.contact || "")}</textarea></div>
+    <div class="field"><label for="hc-qui">Avec qui</label><textarea id="hc-qui" class="short" rows="2" placeholder="ex. Mme Martin, recrutement, 06 12 34 56 78 : elle sera ajoutée à ton réseau">${esc(c.contact || "")}</textarea></div>
     <div class="field"><label for="hc-notes">Ce qui s'est dit (facultatif)</label><textarea id="hc-notes" rows="3" placeholder="questions posées, prochaines étapes…"></textarea></div>
     <div class="row"><button type="button" class="primary" data-act="hc-save">Enregistrer et passer à la suite</button><button type="button" class="ghost" data-act="hc-cancel">Annuler</button></div></div>`;
 }
@@ -4989,10 +4989,10 @@ render();
   use("assets").then((a) => { state.assets = a; });
   use("sample").then((s) => { state.sample = s; });
   use("downloads").then((d) => { state.downloads = d; if (!window.JOBELLO_CONFIG && $("#jb-export")) $("#jb-export").hidden = false; });
-  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; window.__jbOk = true; document.getElementById("jb-wd")?.remove(); render(); iaRafraichir(); refusAutoPasse(); iaAuto(); }, (e) => { window.__jbStep = "lecture du carnet"; window.__jbErr = String(e?.message || e || ""); banner(/abort/i.test(String(e?.name) + e?.message) ? "Le réseau ne répond pas : tes candidatures ne se chargent pas. Vérifie ta connexion puis recharge." : "Tes candidatures ne se chargent pas (" + (e?.message || "erreur") + "). Recharge la page."); });
+  db.collection("candidatures").onSnapshot((snap) => { state.cands = snap.docs.map((d) => ({ id: d.id, historique: [], ...d.data() })); state.loaded = true; window.__jbOk = true; document.getElementById("jb-wd")?.remove(); render(); iaRafraichir(); refusAutoPasse(); iaAuto(); window.jbContactsAuto?.(); }, (e) => { window.__jbStep = "lecture du carnet"; window.__jbErr = String(e?.message || e || ""); banner(/abort/i.test(String(e?.name) + e?.message) ? "Le réseau ne répond pas : tes candidatures ne se chargent pas. Vérifie ta connexion puis recharge." : "Tes candidatures ne se chargent pas (" + (e?.message || "erreur") + "). Recharge la page."); });
   db.collection("documents").onSnapshot((snap) => { state.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
   db.collection("cibles").onSnapshot((snap) => { state.cibles = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
-  db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); }, () => {});
+  db.collection("contacts").onSnapshot((snap) => { state.contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() })); state.contactsVu = true; render(); window.jbContactsAuto?.(); }, () => {});
   db.collection("societes").onSnapshot((snap) => { const avant = editing ? JSON.stringify(societeOf(editing) || null) : ""; state.societes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); state.societesVu = true; iaAuto(); if (editing && sheetKind === "candsum" && JSON.stringify(societeOf(editing) || null) !== avant) redessinerFiche(["sec-societe"]); }, () => {});
   db.doc("alertes/jour").onSnapshot((snap) => { if (!alertBusy) { state.alertes = snap.exists ? snap.data() : null; renderAlerts(); renderPicks(); } }, () => {});
   db.doc("demandes/dossiers").onSnapshot((snap) => { state.demandes = snap.exists ? snap.data() : null; renderPrep(); renderAlerts(); renderPicks(); try { renderOffers(); } catch {} }, () => {});
@@ -5018,6 +5018,7 @@ render();
 <script src="prepa-combinee-data.js"></script>
 <script src="prepa-combinee.js"></script>
 <script src="atouts.js"></script>
+<script src="contacts-auto.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
 </html>
