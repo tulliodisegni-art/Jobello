@@ -82,6 +82,15 @@
   .bu-w .pg .nm{font-size:1.3em;font-weight:800}.bu-w .pg .ti{color:#1d4f91;font-weight:700}.bu-w .pg .h{color:#1d4f91;font-weight:800;border-bottom:1px solid #bed0e6;margin:4px 0 2px}.bu-w .pg .ro{font-weight:700}.bu-w .pg .or{font-style:italic;color:#5b6470}
   .bu-w .vide{position:absolute;inset:20px 0 0;display:grid;place-items:center;font:600 10px system-ui;color:#8a939d;text-align:center;padding:8px}
   .bu-f{font:9px system-ui;display:flex;flex-direction:column;gap:5px;padding:8px 10px}
+  .bu-gm .pg{padding:0;font:8px/1.4 system-ui,sans-serif}
+  .gm{position:absolute;inset:0;display:flex;flex-direction:column}
+  .gm-h{background:#404a57;color:#fff;font:700 9px system-ui;padding:4px 8px}
+  .gm-l{display:flex;gap:6px;padding:3px 8px;border-bottom:1px solid #e3e7ec;font-size:8.5px;white-space:nowrap;overflow:hidden}.gm-l span{color:#8a939d;flex:none;width:30px}.gm-l b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .gm-b{flex:1;overflow:hidden;padding:5px 8px;font:7.5px/1.4 system-ui,sans-serif}.gm-b p{margin:0 0 3px}
+  .gm-f{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 8px;border-top:1px solid #e3e7ec}
+  .gm-pj{font-size:7.5px;padding:1px 6px;border-radius:99px;background:#eef2f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
+  .gm-send{margin-left:auto;padding:3px 12px;border-radius:99px;background:#0b57d0;color:#fff;font-weight:700;font-size:8.5px}
+  .gm-ok{position:absolute;inset:auto 0 30px;text-align:center;color:#12a37a;font:800 13px system-ui;text-shadow:0 0 6px #fff}
   .bu-f .t{font-weight:800;font-size:10.5px;color:#1d4f91;margin-bottom:2px}
   .bu-f label{display:flex;flex-direction:column;gap:1px;color:#5b6470;font-size:8px}
   .bu-f .in{height:15px;border:1px solid #cfd6de;border-radius:4px;padding:0 5px;display:flex;align-items:center;color:#1b1f24;font-size:9px;white-space:nowrap;overflow:hidden;background:#fff}
@@ -225,8 +234,24 @@
     return { n, champs, site, qui, attente: e.attente, last };
   }
   const bro = {}; // id -> { i: champ en cours, c: caractères tapés }
+  /* Candidature par e-mail : l'agent écrit le mail dans Gmail (fenêtre « Gmail » au lieu du site carrière) */
+  const isMail = (x, b) => /mail\.google/.test(b.site || "") || x.c.canal === "email" || /^e-mail/i.test(x.e.via || "");
+  function gmailHTML(x, ag, etat, b) {
+    const a = ag.postuleur, J = (x.d.journal || []).filter((j) => j.qui === "postuleur"), m = [...J].reverse().find((j) => j.mail)?.mail || {};
+    const a_ = m.a || x.c.contact || "adresse de l'annonce", objet = m.objet || `Candidature au poste de ${x.c.poste || ""}`;
+    const k = x.id + ":mail", texte = String(x.c.messageCandidature || ""), ok = etat === "ok", ecrit = ok || b.n >= 3;
+    if (ecrit && texte) { cible[k] = { texte, type: "lettre", fini: ok || b.n >= 5 }; if (ok && !(k in shown) && ago(x.e.fin) > 10 * 60e3) shown[k] = texte.length; }
+    const pj = ok || b.n >= 4 ? (x.e.fichiers || []).map((f) => `<span class="gm-pj">📎 ${E(f.nom || f.type)}</span>`).join("") : "";
+    let body;
+    if (etat === "ko") body = `<div class="bu-f"><div class="lock">L'agent s'est arrêté<em>Il a besoin de toi : ouvre la fiche</em></div></div>`;
+    else if (!ecrit && etat !== "run") body = `<div class="vide">${x.file ? "En file : part au prochain « Exécuter »" : "Le mail s'écrira ici"}</div>`;
+    else body = `<div class="gm"><div class="gm-h">Nouveau message</div><div class="gm-l"><span>À</span><b ${!ecrit ? "data-tg" : ""}>${E(a_)}</b></div><div class="gm-l"><span>Objet</span><b>${E(objet)}</b></div>${ecrit && texte ? `<div class="gm-b dv-paper-mini" data-k="${E(k)}"></div>` : `<div class="gm-b"><span class="dv-dots">${E(b.last.t || "Ouvre Gmail")}</span></div>`}<div class="gm-f">${pj}<span class="gm-send"${b.n >= 6 && !ok ? " data-tg" : ""}>${ok ? "Envoyé ✓" : "Envoyer"}</span></div>${ok ? `<div class="gm-ok">✓ Mail envoyé</div>` : ""}</div>`;
+    const cur = etat === "run" ? curHTML(a, "E-mail") : "";
+    return `<div class="bu-w bu-br bu-gm" data-br="${E(x.id)}" data-mail="1"><div class="bar"><i></i><i></i><i></i><span>✉️ Gmail · ${E(a_)}</span></div><div class="pg">${body}</div>${cur}</div>`;
+  }
   function browserHTML(x, ag, etat) {
     const b = brState(x), anim = bro[x.id] || (bro[x.id] = { i: 0, c: 0 });
+    if (isMail(x, b)) return gmailHTML(x, ag, etat, b);
     let body = "", cur = "";
     const a = ag[b.qui], lab = b.qui === "connexion" ? "Connexion" : "Remplissage";
     if (etat === "ok") body = `<div class="bu-f"><div class="ok">✓ Candidature envoyée</div></div>`;
@@ -285,7 +310,7 @@
     if (++brT % 3) return;
     let redraw = false;
     items().forEach((x, idx) => {
-      if (etatOf(x) !== "run" || x.e.attente) return; const b = brState(x); if (b.n < 3 || !b.champs.length) return;
+      if (etatOf(x) !== "run" || x.e.attente) return; const b = brState(x); if (b.n < 3 || !b.champs.length || isMail(x, b)) return;
       const a = bro[x.id] || (bro[x.id] = { i: 0, c: 0 }), ch = b.champs.slice(0, 7), v = String((ch[a.i] || [])[1] || "");
       if (a.i >= ch.length - 1 && a.c >= v.length) return;
       if (a.c < v.length) a.c += Math.max(1, Math.ceil(v.length / 14)); else { a.i++; a.c = 0; }
