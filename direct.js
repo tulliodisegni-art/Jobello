@@ -131,7 +131,9 @@
     const L = [];
     state.cands.forEach((c) => {
       const e = c.envoi || {}, d = directs[c.id];
-      const vivant = (e.auto !== false && ["en_cours", "valide", "a_valider"].includes(e.statut) && c.statut === "a_envoyer") || ago(e.fin) < 3 * 3600e3 || (d && ago(d.majLe || d.fin) < 3 * 3600e3);
+      // En cours : seulement si les agents écrivent encore (ou attendent leur départ). Fini : visible 30 min, puis l'écran se vide.
+      const enAttente = e.auto !== false && ["en_cours", "valide", "a_valider"].includes(e.statut) && c.statut === "a_envoyer" && !fige({ c, e, d: d || {} });
+      const vivant = enAttente || ago(e.fin) < FINI_MS || (d && ago(d.majLe || d.fin) < FINI_MS && !finie(c, e));
       if (!d && !(e.auto && vivant)) return;
       if (!vivant) return;
       // Annulée (offre expirée…) : on la montre 30 min avec sa raison, puis elle sort de l'écran
@@ -142,7 +144,17 @@
     const rang = (x) => (x.file ? 3 : x.e.statut === "en_cours" ? 0 : ["valide", "a_valider"].includes(x.e.statut) ? 1 : 2);
     return L.sort((a, b) => rang(a) - rang(b) || ago(a.d.majLe || a.e.debut || a.e.fin) - ago(b.d.majLe || b.e.debut || b.e.fin));
   }
-  const etatOf = (x) => x.file ? "wait" : x.e.statut === "annulee" || x.c.statut === "abandon" ? "stop" : x.e.statut === "envoyee" || x.c.statut === "envoyee" ? "ok" : x.e.statut === "bloquee" ? "ko" : x.e.statut === "en_cours" ? "run" : "wait";
+  const FINI_MS = 30 * 60e3;
+  // candidature déjà au bout (envoyée, annulée, refusée…) : plus rien ne travaille dessus
+  const finie = (c, e) => e.statut === "envoyee" || e.statut === "annulee" || (c.statut && c.statut !== "a_envoyer");
+  // « en cours » resté coincé : le passage des agents est terminé depuis, ou plus rien n'a bougé depuis 45 min
+  const fige = (x) => {
+    if (x.e.statut !== "en_cours") return false;
+    const bouge = Math.min(ago(x.d.majLe), ago(x.e.debut));
+    if (passage && /termin/i.test(passage.texte || "") && passage.le && x.e.debut && new Date(passage.le) > new Date(x.d.majLe || x.e.debut)) return true;
+    return bouge > 45 * 60e3;
+  };
+  const etatOf = (x) => x.file ? "wait" : x.e.statut === "annulee" || x.c.statut === "abandon" ? "stop" : x.e.statut === "envoyee" || (x.c.statut && x.c.statut !== "a_envoyer") ? "ok" : x.e.statut === "bloquee" || fige(x) ? "ko" : x.e.statut === "en_cours" ? "run" : "wait";
   const docOf = (id) => id && state.docs.find((d) => d.id === id);
   const jr = (x, qui) => (x.d.journal || []).filter((j) => j.qui === qui);
 
@@ -272,7 +284,7 @@
   function miniPaper(x, kind, ag, etat) {
     const k = x.id + ":" + kind, t = laneTexte(x, kind), J = jr(x, kind), a = ag[kind];
     if (t.texte) cible[k] = { texte: t.texte, type: kind === "cv" ? "cv" : "lettre", fini: t.fini };
-    if (t.texte && !(k in shown) && t.fini && ago(t.le) > 15 * 60e3) shown[k] = t.texte.length;
+    if (t.texte && t.fini && (etat !== "run" || (!(k in shown) && ago(t.le) > 15 * 60e3))) shown[k] = t.texte.length; // fini : affiché d'un coup, sans « réécrire » sous tes yeux
     const writing = t.texte && !(t.fini && (shown[k] ?? 0) >= t.texte.length);
     const run = writing || (!t.texte && etat === "run" && !x.file);
     const titre = kind === "lettre" ? "Lettre de motivation" : "CV adapté";
@@ -336,10 +348,13 @@
     const L = items(), x = L.find((i) => i.id === sel) || L[0];
     if (x) sel = x.id;
     const enCours = L.some((i) => etatOf(i) === "run");
-    const sub = enCours ? `${L.filter((i) => etatOf(i) === "run").length} candidature(s) en cours sur ton ordinateur` : passage && ago(passage.le) < 2 * 3600e3 ? (passage.chrome === false ? "Ton ordinateur n'était pas joignable : allume-le et ouvre Chrome" : `Dernier passage à ${hm(passage.le)} · ${passage.texte || ""}`) : L.length ? "Les agents n'ont pas encore démarré" : "";
+    const toutFini = !enCours && L.length && L.every((i) => !i.file && ["ok", "stop", "ko"].includes(etatOf(i)));
+    const finA = toutFini ? L.map((i) => i.e.fin).filter(Boolean).sort().pop() : "";
+    const nOk = L.filter((i) => etatOf(i) === "ok").length;
+    const sub = enCours ? `${L.filter((i) => etatOf(i) === "run").length} candidature(s) en cours sur ton ordinateur` : toutFini ? `Terminé${finA ? " à " + hm(finA) : ""} : ${nOk} envoyée${nOk > 1 ? "s" : ""}, plus aucun agent au travail` : passage && ago(passage.le) < 2 * 3600e3 ? (passage.chrome === false ? "Ton ordinateur n'était pas joignable : allume-le et ouvre Chrome" : `Dernier passage à ${hm(passage.le)} · ${passage.texte || ""}`) : L.length ? "Les agents n'ont pas encore démarré" : "";
     const A = window.jobelloAgents || {};
     const lancer = !enCours && L.some((i) => i.file || ["valide"].includes(i.e.statut)) && A.lancerMode && A.lancerMode() && !A.occupe() ? `<a class="btn primary" href="${E(A.tacheURL())}" target="_blank" rel="noopener" data-lancer>⚡ Lancer mes agents maintenant</a>` : "";
-    const head = `<div class="dv-top"><h2><span class="dv-live${enCours ? "" : " off"}"><i></i>${enCours ? "EN DIRECT" : "PAUSE"}</span>Mes agents</h2><span class="dv-sub">${E(sub)}</span><button type="button" class="ghost" data-dv="close">Fermer</button></div>`;
+    const head = `<div class="dv-top"><h2><span class="dv-live${enCours ? "" : " off"}"><i></i>${enCours ? "EN DIRECT" : toutFini ? "TERMINÉ" : "PAUSE"}</span>Mes agents</h2><span class="dv-sub">${E(sub)}</span><button type="button" class="ghost" data-dv="close">Fermer</button></div>`;
     if (x && vue === "bureau") {
       const yW = ov.querySelector(".bu-wall")?.scrollTop || 0, yO = ov.scrollTop; // garder la position quand l'écran se met à jour
       ov.innerHTML = head + bureauHTML(L) + `<div class="dv-foot">${lancer}</div>`;
