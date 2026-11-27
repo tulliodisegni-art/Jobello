@@ -145,6 +145,14 @@ html, body { overflow-x: clip; max-width: 100%; }
 .pj-add { font-size: .85rem; cursor: pointer; }
 .pj-card { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--s-interview) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--s-interview) 40%, var(--line)); color: var(--fg); }
 .pj-card-t { font-weight: 600; text-align: left; }
+.adr-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.adr-box.small { padding: 8px 10px; }
+.adr-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adr-t b { font-size: .95rem; line-height: 1.3; user-select: text; -webkit-user-select: text; }
+.adr-t small { color: var(--muted); font-size: .82rem; line-height: 1.35; }
+.adr-k { font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.adr-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.adr-btns .btn, .adr-btns button { margin: 0; }
 .ag2-pj { margin: -2px 0 8px 12px; }
 .pj-ov { position: fixed; inset: 0; z-index: 9998; background: rgba(8, 20, 28, .92); display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .pj-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; color: #fff; }
@@ -1079,6 +1087,21 @@ const joinHTML = (c, label, small) => { const u = safeUrl(c.lienVisio); if (!u) 
 const piecesOf = (c) => (c && Array.isArray(c.pieces) ? c.pieces.filter((p) => p && p.id) : []);
 const pjName = (p) => String(p.titre || p.nom || "Document").replace(/\.(pdf|png|jpe?g)$/i, "");
 const PJ_IC = '<svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
+/* Adresse de l'entretien : adresse postale (ouvrable dans Plans / Google Maps, copiable) + consignes d'accès à part */
+const lieuOf = (c) => {
+  if (!c || c.lienVisio) return null;
+  const raw = String(c.lieuEntretien || "").trim(), m = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(raw);
+  const adr = String(m ? m[1] : raw).replace(/[\s,;]+$/, "").trim();
+  if (!adr || /^https?:/i.test(adr)) return null;
+  const note = String(m ? m[2] : "").trim();
+  return { adr, note };
+};
+const adresseHTML = (c, small) => {
+  const L = lieuOf(c); if (!L) return "";
+  const id = "adr-" + String(c.id || "x").replace(/[^\w-]/g, "") + (small ? "-s" : ""), q = enc(L.adr);
+  return `<div class="adr-box${small ? " small" : ""}"><div class="adr-t"><span class="adr-k">📍 Adresse</span><b id="${id}">${esc(L.adr)}</b>${L.note && !small ? `<small>${esc(L.note)}</small>` : ""}</div>
+    <div class="adr-btns"><a class="btn small primary" href="https://maps.apple.com/?q=${q}" target="_blank" rel="noopener">Ouvrir dans Plans</a><a class="btn small" href="https://www.google.com/maps/search/?api=1&amp;query=${q}" target="_blank" rel="noopener">Google Maps</a><button type="button" class="small" data-copy="${id}">Copier l'adresse</button></div></div>`;
+};
 const piecesHTML = (c, small, add) => { const ps = piecesOf(c); if (!ps.length && !add) return "";
   return `<div class="pj-wrap">${ps.length ? `<span class="pj-l">${ps.length > 1 ? "Documents reçus" : "Document reçu"}</span>` : ""}${ps.map((p, i) => `<a class="btn ${small ? "small " : ""}pj" href="/_blob/${esc(p.id)}" data-pj="${esc(c.id)}:${i}">${PJ_IC}<span>${esc(pjName(p))}</span></a>`).join("")}${add && c.id ? `<label class="linkish pj-add">+ Joindre un document (plan, convocation)<input type="file" accept="application/pdf,image/*" data-pj-add="${esc(c.id)}" hidden></label>` : ""}</div>`; };
 function pjView(c, i) {
@@ -1238,7 +1261,11 @@ $("#today").textContent = ((d) => d[0].toUpperCase() + d.slice(1))(new Date().to
 /* ---------- Logique ---------- */
 /* une candidature dont la relance passe par un contact du réseau ne crée pas de rappel en double */
 const viaContact = (c) => { const p = c.relancePar && state.contacts.find((x) => x.id === c.relancePar); return p && p.etape !== "sans_suite" ? p : null; };
-const ownRelance = (c) => (ACTIVE.includes(c.statut) || c.statut === "entretien") && c.decision !== "stop" && c.decision !== "pause" && c.prochaineRelance && !viaContact(c);
+/* Une relance prévue avant un nouvel entretien appartient au tour d'avant : elle ne compte plus (on demandera « et ensuite ? » après l'entretien) */
+const relanceAncienne = (c) => !!(c.dateEntretien && c.prochaineRelance && (!c.attente || c.attente < c.dateEntretien));
+/* Pas de relance quand un entretien est déjà fixé, ni quand une réponse à leur mail attend (c'est elle l'action à faire) */
+const ownRelance = (c) => (ACTIVE.includes(c.statut) || c.statut === "entretien") && c.decision !== "stop" && c.decision !== "pause" && c.prochaineRelance && !viaContact(c)
+  && !relanceAncienne(c) && !(c.reponseMail && !c.reponseMail.envoye) && !(c.dateEntretien && c.dateEntretien >= todayISO());
 const isDue = (c) => ownRelance(c) && c.prochaineRelance <= todayISO();
 const PRESTA_RE = /\b(alten|akkodis|akka|modis|expleo|segula|assystem|altran|capgemini engineering|ausy|scalian|astek|amaris|apside|extia|abylsen|ekium|bertrandt|aktiv|elsys design|silkan|sogeti|alteca|ingeliance|cimpa|aerocontact|sii|helis|alphatec|atexis|ametra|inetum)\b/i;
 const PRESTA_TXT = /(en mission chez|chez (l'un de )?nos clients|pour le compte de nos clients|assistance technique|en régie|ingénieur consultant|consultant(e)? ingénieur|société de conseil en ingénierie|\bESN\b)/i;
@@ -1281,7 +1308,7 @@ function homeTasks() {
       return T.push({ ...base, p: 0, k: "ent", t: `Entretien chez ${ent}`, s: [c.typeEntretien, c.poste].filter(Boolean).join(" · "), w: d + (c.heureEntretien ? " · " + c.heureEntretien.replace(":", " h ") : ""), hot: c.dateEntretien <= addDays(today, 1) });
     }
     if (needThanks(c)) return T.push({ ...base, p: 1, k: "merci", t: `Remercier ${ent} après l'entretien` });
-    if (afterInterview(c) && !c.prochaineRelance) return T.push({ ...base, p: 1, k: "suite", t: `Ton entretien chez ${ent} : et ensuite ?`, s: c.notesEntretien ? "Tes notes sont là : dis-moi juste la suite" : "Note comment ça s'est passé et ce qui suit" });
+    if (afterInterview(c) && (!c.prochaineRelance || relanceAncienne(c))) return T.push({ ...base, p: 1, k: "suite", t: `Ton entretien chez ${ent} : et ensuite ?`, s: c.notesEntretien ? "Tes notes sont là : dis-moi juste la suite" : "Note comment ça s'est passé et ce qui suit" });
     if (c.statut === "entretien" && !c.dateEntretien && !isDue(c) && c.decision !== "pause") return T.push({ ...base, p: 2, k: "ent", t: `Entretien chez ${ent} : date à fixer`, s: "Note la date, ou dis-moi si tu l'as déjà passé", w: "à fixer" });
     if (isDue(c)) { const n = late(c.prochaineRelance); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n }); }
     if (pc && c.decision !== "pause" && (pc.prochaineAction || "9") <= today) { const n = late(pc.prochaineAction); return T.push({ ...base, p: 2, k: "rel", t: `Relancer ${ent} via ${firstName(pc.nom) || pc.nom}`, w: n > 0 ? `${n} j de retard` : "aujourd'hui", hot: n > 0, n, contact: pc.id }); }
@@ -1320,10 +1347,10 @@ function renderHome() {
     : !T.length ? "Tout est à jour. Rien à faire aujourd'hui." : urgent ? `${urgent} chose${urgent > 1 ? "s" : ""} urgente${urgent > 1 ? "s" : ""} aujourd'hui.` : "Rien d'urgent. Tu peux avancer tes candidatures.";
 
   const joinable = all.filter((c) => c.lienVisio && entretienAVenir(c) && c.dateEntretien <= addDays(today, 1)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
-  const withPj = all.filter((c) => piecesOf(c).length && entretienAVenir(c) && c.dateEntretien <= addDays(today, 7)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
+  const withPj = all.filter((c) => (piecesOf(c).length || lieuOf(c)) && entretienAVenir(c) && c.dateEntretien <= addDays(today, 7)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
   $("#hero-join").hidden = !joinable.length && !withPj.length;
   $("#hero-join").innerHTML = joinable.map((c) => joinHTML(c, `Rejoindre ${c.entreprise} · ${c.dateEntretien === today ? "aujourd'hui" : "demain"}${c.heureEntretien ? " " + c.heureEntretien : ""}`)).join("")
-    + withPj.map((c) => `<div class="pj-card"><button type="button" class="linkish pj-card-t" data-open="${esc(c.id)}">Entretien ${esc(c.entreprise || "")} · ${esc(c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }))}${c.heureEntretien ? " à " + esc(c.heureEntretien.replace(":", " h ")) : ""}</button>${piecesHTML(c, true)}</div>`).join("");
+    + withPj.map((c) => `<div class="pj-card"><button type="button" class="linkish pj-card-t" data-open="${esc(c.id)}">Entretien ${esc(c.entreprise || "")} · ${esc(c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }))}${c.heureEntretien ? " à " + esc(c.heureEntretien.replace(":", " h ")) : ""}</button>${adresseHTML(c, true)}${piecesHTML(c, true)}</div>`).join("");
 
   const [first, ...rest] = [null, ...T], tag = (x) => x.w ? `<span class="task-w${x.hot ? " hot" : ""}">${esc(x.w)}</span>` : "";
   const row = (x) => `<${x.href ? "a" : "button type=\"button\""} class="task st-${TASK_ST[x.k]}" ${taskAttrs(x)}><span class="task-dot"></span><span class="task-txt"><b>${esc(x.t)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ""}</span>${tag(x)}${ICON.chev}</${x.href ? "a" : "button"}>`;
@@ -1416,7 +1443,7 @@ function nextOf(c) {
   if (c.reponseMail && !c.reponseMail.envoye) return ["Réponse à envoyer", "hot"];
   if (c.statut === "entretien" && entretienAVenir(c)) return [`Entretien ${c.dateEntretien === today ? "aujourd'hui" : "le " + fmt(c.dateEntretien)}${c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : ""}`, "ent"];
   if (c.statut === "entretien" && !c.dateEntretien) return ["Date d'entretien à fixer", ""];
-  if (afterInterview(c) && !c.prochaineRelance) return c.notesEntretien ? ["Et ensuite ? Dis-moi la suite", "hot"] : ["Dire comment ça s'est passé", "hot"];
+  if (afterInterview(c) && (!c.prochaineRelance || relanceAncienne(c))) return c.notesEntretien ? ["Et ensuite ? Dis-moi la suite", "hot"] : ["Dire comment ça s'est passé", "hot"];
   if (c.statut === "a_envoyer") return ["À envoyer", ""];
   if (c.statut === "offre") return ["Répondre à l'offre", "hot"];
   const pc = viaContact(c);
@@ -1500,7 +1527,7 @@ function renderAgenda() {
   const dayName = (d) => d === today ? "Aujourd'hui" : d === tomorrow ? "Demain" : cap(fmt(d, { weekday: "long", day: "numeric", month: "long" }));
   const ago = (d) => { const n = Math.round((new Date(today + "T12:00:00") - new Date(d + "T12:00:00")) / 864e5); return n <= 1 ? "depuis hier" : `depuis ${n} jours`; };
   const item = (e) => {
-    if (e.st === "entretien") { const c = e.c; return `<button type="button" class="ag2-it ent" id="ev-${evKey(e.key)}" data-open="${esc(c.id)}"><span class="ag2-ic">${esc(hm(c.heureEntretien) || "Entretien")}</span><span class="ag2-tx"><b>${esc(c.entreprise || "")}</b><span>${esc(["Entretien", c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span></span>${ICON.chev}</button>${piecesOf(c).length && e.date >= today ? `<div class="ag2-pj">${piecesHTML(c, true)}</div>` : ""}`; }
+    if (e.st === "entretien") { const c = e.c; return `<button type="button" class="ag2-it ent" id="ev-${evKey(e.key)}" data-open="${esc(c.id)}"><span class="ag2-ic">${esc(hm(c.heureEntretien) || "Entretien")}</span><span class="ag2-tx"><b>${esc(c.entreprise || "")}</b><span>${esc(["Entretien", c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span></span>${ICON.chev}</button>${(piecesOf(c).length || lieuOf(c)) && e.date >= today ? `<div class="ag2-pj">${adresseHTML(c, true)}${piecesHTML(c, true)}</div>` : ""}`; }
     if (e.p) return `<button type="button" class="ag2-it li" id="ev-${evKey(e.key)}" data-contact="${esc(e.p.id)}"><span class="ag2-ic">in</span><span class="ag2-tx"><b>${esc(e.p.nom || e.p.entreprise || "Contact")}</b><span>${esc(e.kind)}</span></span>${ICON.chev}</button>`;
     const lt = e.date < today;
     return `<button type="button" class="ag2-it rel${lt ? " late" : ""}" id="ev-${evKey(e.key)}" data-open="${esc(e.c.id)}"${e.task ? ` data-task="${e.task}"` : ""}><span class="ag2-ic">${lt ? "!" : "↻"}</span><span class="ag2-tx"><b>${esc(e.c.entreprise || "")}</b><span>${esc(e.kind === "Relance" ? "Relancer" : e.kind)}${lt ? ` <em>en retard ${ago(e.date)}</em>` : ""}</span></span>${ICON.chev}</button>`;
@@ -1515,7 +1542,7 @@ function renderAgenda() {
 
   /* 1. En haut, toujours : le prochain entretien et la carte du jour */
   const nextEnt = ev.find((e) => e.st === "entretien" && e.date >= today);
-  const hero = nextEnt ? (() => { const c = nextEnt.c; return `<button type="button" class="ag2-hero" id="ev-hero" data-open="${esc(c.id)}"><span class="ag2-hero-l">Prochain entretien</span><b class="ag2-hero-t">${esc(c.entreprise || "")}</b><span class="ag2-hero-w">${esc(dayName(nextEnt.date))}${c.heureEntretien ? " à " + esc(hm(c.heureEntretien)) : ""}</span><span class="ag2-hero-s">${esc([c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span><span class="ag2-hero-go">Ouvrir la fiche ${ICON.chev}</span></button>${piecesOf(c).length ? `<div class="ag2-pj">${piecesHTML(c, true)}</div>` : ""}`; })() : "";
+  const hero = nextEnt ? (() => { const c = nextEnt.c; return `<button type="button" class="ag2-hero" id="ev-hero" data-open="${esc(c.id)}"><span class="ag2-hero-l">Prochain entretien</span><b class="ag2-hero-t">${esc(c.entreprise || "")}</b><span class="ag2-hero-w">${esc(dayName(nextEnt.date))}${c.heureEntretien ? " à " + esc(hm(c.heureEntretien)) : ""}</span><span class="ag2-hero-s">${esc([c.typeEntretien, c.avecQui && "avec " + c.avecQui].filter(Boolean).join(" · "))}</span><span class="ag2-hero-go">Ouvrir la fiche ${ICON.chev}</span></button>${lieuOf(c) || piecesOf(c).length ? `<div class="ag2-pj">${adresseHTML(c, true)}${piecesHTML(c, true)}</div>` : ""}`; })() : "";
   const tList = ev.filter((e) => e.date === today), tDone = doneOf(today, today);
   const tItems = sortDay(tList.filter((e) => e.st === "entretien")).map(item).join("") + late.filter((e) => !e.p).map(item).join("") + sortDay(tList.filter((e) => e.st !== "entretien")).map(item).join("") + liGroup([...late, ...tList].filter((e) => e.p));
   const nToday = tList.length + late.length;
@@ -2313,7 +2340,8 @@ function visioBox(c) {
   const isVisio = /visio/i.test(c.typeEntretien || "") || !!c.lienVisio;
   if (!c.dateEntretien) return "";
   const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "date à préciser";
-  return `<div class="visio-box"><div><span class="label">Entretien${(c.entretiens || []).length ? " n° " + ((c.entretiens || []).length + 1) : ""}</span><strong style="display:block">${esc(when)}${c.typeEntretien ? " · " + esc(c.typeEntretien) : ""}</strong>${c.avecQui ? `<span class="muted" style="font-size:.85rem;display:block">Avec ${esc(c.avecQui)}</span>` : ""}${c.lieuEntretien ? `<a href="https://maps.apple.com/?q=${enc(c.lieuEntretien)}" target="_blank" rel="noopener" style="font-size:.88rem"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> ${esc(c.lieuEntretien)}</a>` : ""}</div>
+  return `<div class="visio-box"><div><span class="label">Entretien${(c.entretiens || []).length ? " n° " + ((c.entretiens || []).length + 1) : ""}</span><strong style="display:block">${esc(when)}${c.typeEntretien ? " · " + esc(c.typeEntretien) : ""}</strong>${c.avecQui ? `<span class="muted" style="font-size:.85rem;display:block">Avec ${esc(c.avecQui)}</span>` : ""}</div>
+    ${adresseHTML(c)}
     ${piecesHTML(c, true, true)}
     ${c.lienVisio ? joinHTML(c) : isVisio ? `<div class="field"><label for="vx-link">Coller le lien Teams</label><input id="vx-link" placeholder="Colle ici le lien ou toute l'invitation reçue par e-mail"></div>
       <div class="row"><button type="button" class="small" data-act="paste-visio">Coller depuis le presse-papiers</button><button type="button" class="small primary" data-act="save-visio">Enregistrer le lien</button></div>` : ""}
@@ -2339,7 +2367,7 @@ function drawDossier(isNew) {
   const c = editing;
   const docOpts = (type, v) => `<option value="">Aucun${type === "lettre" ? "e" : ""}</option>` + state.docs.filter((d) => d.type === type).map((d) => `<option value="${esc(d.id)}" ${d.id === v ? "selected" : ""}>${esc(d.nom)}</option>`).join("");
   const hist = (c.historique || []).slice().reverse();
-  const canRelance = c.id && (ACTIVE.includes(c.statut) || (c.statut === "entretien" && c.prochaineRelance)) && c.decision !== "stop";
+  const canRelance = c.id && (ACTIVE.includes(c.statut) || (c.statut === "entretien" && ownRelance(c))) && c.decision !== "stop";
   const ofr = [c.groupe && c.groupe !== c.entreprise ? "Groupe " + c.groupe : "", c.domaine, c.ville].filter(Boolean).join(" · ");
   openSheet(`
     <div class="sheet-head"><div style="min-width:0"><span class="label">${isNew ? "Nouvelle candidature" : "Dossier"}</span><h2>${esc(c.poste || "Poste")}${c.entreprise ? " · " + esc(c.entreprise) : ""}</h2></div><button type="button" class="ghost" data-act="close" aria-label="Fermer">Fermer</button></div>

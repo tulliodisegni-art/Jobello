@@ -84,7 +84,7 @@
     const when = c.dateEntretien ? fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }) + (c.heureEntretien ? " à " + c.heureEntretien.replace(":", " h ") : "") : "Date à fixer";
     const ul = (a) => (a || []).filter(Boolean).length ? `<ul>${a.filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
     const bloc = (titre, corps, open = true) => corps ? `<details class="sec"${open ? " open" : ""}><summary>${titre}</summary><div class="body anti">${corps}</div></details>` : "";
-    const lieu = c.lieuEntretien ? `<p>📍 <a href="https://maps.apple.com/?q=${enc(c.lieuEntretien)}" target="_blank" rel="noopener">${esc(c.lieuEntretien)}</a></p>` : "";
+    const lieu = typeof adresseHTML === "function" && lieuOf(c) ? adresseHTML(c) : c.lieuEntretien ? `<p>📍 <a href="https://maps.apple.com/?q=${enc(c.lieuEntretien)}" target="_blank" rel="noopener">${esc(c.lieuEntretien)}</a></p>` : "";
     const qs = Q.length ? Q.map((x) => `<details class="qa"><summary>${esc(x.q)}</summary><p>${esc(x.a)}</p></details>`).join("")
       : (p.techniques || []).concat(p.rh || []).slice(0, 6).map((x) => `<details class="qa"><summary>${esc(x.q)}</summary><p>${esc(x.r)}</p></details>`).join("");
     const vide = !p.pitch && !qs && !(p.aPoser || []).length;
