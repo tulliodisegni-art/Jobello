@@ -336,7 +336,7 @@
     const actives = passees.filter((w) => w.envois || w.reponses || w.reseau);
     const moy = actives.length ? Math.round(actives.reduce((n, w) => n + w.envois, 0) / actives.length * 10) / 10 : 0;
     const enLecture = state.cands.filter((c) => ACTIVE.includes(c.statut) && c.dateEnvoi && c.dateEnvoi >= addDays(t, -21)).length;
-    const totEnv = state.cands.filter((c) => c.dateEnvoi).length, totEnt = state.cands.filter((c) => (c.entretiens || []).length || ["entretien", "offre"].includes(c.statut) || (c.dateEntretien && c.statut !== "a_envoyer")).length;
+    const totEnv = state.cands.filter((c) => c.dateEnvoi).length, totEnt = state.cands.filter((c) => typeof eueEntretien === "function" ? eueEntretien(c) : ((c.entretiens || []).length || ["entretien", "offre"].includes(c.statut))).length;
     const jour = (new Date(t + "T12:00:00").getDay() + 6) % 7; // 0 = lundi
     // La phrase juste : on part de ce qui s'est vraiment passé
     const P = [];
