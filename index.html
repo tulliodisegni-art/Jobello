@@ -3945,7 +3945,7 @@ function prepaHTML(c) {
       ${p.techniques?.length ? `<span class="lbl">Questions techniques probables</span>${qa(p.techniques)}` : ""}
       ${p.rh?.length ? `<span class="lbl">Questions RH et motivation</span>${qa(p.rh)}` : ""}
       ${p.cas ? `<span class="lbl">Étude de cas : comment t'y prendre</span><p>${esc(p.cas)}</p>` : ""}
-      ${p.aPoser?.length ? `<span class="lbl">Tes questions à poser</span><ul>${p.aPoser.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      ${p.aPoser?.length ? `<span class="lbl">Tes questions à poser</span><p class="muted" style="margin:0;font-size:.8rem">Choisis-en 2 ou 3. Pas de salaire ni de télétravail en premier.</p><ul>${p.aPoser.map((x) => { const m = String(x).match(/^((?:Sur|Pour) [^:]{2,30}) : (.+)$/); return `<li>${m ? `<b>${esc(m[1])} :</b> ${esc(m[2])}` : esc(x)}</li>`; }).join("")}</ul>` : ""}
       ${p.salaire ? `<span class="lbl">Si on te parle salaire</span><p>${esc(p.salaire)}</p>` : ""}
       ${p.attention?.length ? `<span class="lbl">Points d'attention</span><ul>${p.attention.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       <span class="muted" style="font-size:.78rem">Préparé le ${fmt(p.date)}${p.origine ? " · " + esc(p.origine) : ""}</span>`
@@ -5013,6 +5013,7 @@ render();
 <script src="postuler.js"></script>
 <script src="direct.js"></script>
 <script src="langue.js"></script>
+<script src="cours.js"></script>
 <script src="entrainement-data.js"></script>
 <script src="entrainement.js"></script>
 <script src="prepa-combinee-data.js"></script>
