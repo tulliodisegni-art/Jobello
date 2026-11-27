@@ -13,7 +13,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 <script>/* Garde-fou du chargement (v72) : si le carnet n'est pas chargé au bout de 15 s, on montre où ça bloque et un bouton pour tout recharger. */
-(function(){var V="v78";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
+(function(){var V="v79";window.JB_VERSION=V;window.__jbStep="page";window.__jbErr="";
 addEventListener("error",function(e){window.__jbErr=String((e&&e.message)||e)+(e&&e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")});
 addEventListener("unhandledrejection",function(e){var r=e&&e.reason;window.__jbErr=String((r&&r.message)||r)});
 window.jbToutRecharger=function(){var p=[];try{if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(e){}try{if(window.caches)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="jobello-meta"}).map(function(k){return caches.delete(k)}))}))}catch(e){}Promise.all(p).catch(function(){}).then(function(){location.replace(location.pathname+"?r="+Date.now())})};
