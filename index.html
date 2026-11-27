@@ -3901,6 +3901,7 @@ function prepaHTML(c) {
       <span class="muted" style="font-size:.78rem">Préparé le ${fmt(p.date)}${p.origine ? " · " + esc(p.origine) : ""}</span>`
       : `<p class="muted" style="margin:0">Claude prépare la fiche : ta présentation, les questions probables avec des réponses tirées de ton parcours, tes questions à poser et la négociation.</p>`}
     ${iaBoutonHTML(c, "prepa", p ? "Refaire la préparation" : "Préparer avec Claude", `<button type="button" class="small${p ? "" : " primary"}" data-act="prepa-ai" id="prepa-btn">${p ? "Refaire la préparation" : "Préparer avec Claude"}</button>`, !p)}
+    ${window.jobelloCombine && window.jobelloCombine.estCombine(c) ? `<a class="btn small primary" href="#entrainement" data-entr-cand="${esc(c.id)}" data-pc-cand="${esc(c.id)}">🧩 Entretien combiné : parcours, plan, cotation ISO, chaînes de cotes</a>` : ""}
     <a class="btn small" href="#entrainement" data-entr-cand="${esc(c.id)}">🎯 S'entraîner à l'entretien technique</a>
   </div></details>`;
 }
@@ -4964,6 +4965,8 @@ render();
 <script src="langue.js"></script>
 <script src="entrainement-data.js"></script>
 <script src="entrainement.js"></script>
+<script src="prepa-combinee-data.js"></script>
+<script src="prepa-combinee.js"></script>
 <script src="atouts.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
 </body>
