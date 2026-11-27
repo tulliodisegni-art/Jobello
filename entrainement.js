@@ -838,5 +838,5 @@
     if (!document.activeElement || !sec.contains(document.activeElement) || document.activeElement.tagName === "BUTTON") { renderHero(); renderQ(); }
   }, 2500);
   brancher();
-  window.jobelloEntrainement = { renderAll, charger, PLANS, GDT, QS };
+  window.jobelloEntrainement = { renderAll, charger, PLANS, GDT, QS, dessin: { sym, frame, datum, svgWrap, L, T, hdim, vdim, axe, box, INK, DIM }, socQs, candOf };
 })();
