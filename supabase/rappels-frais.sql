@@ -63,7 +63,7 @@ begin
   if p_kind = 'envoi' and p_key like 'envoi:%' then
     select array_agg(coalesce(data->>'entreprise', '?')) into reps from docs where owner = p_user and path like 'candidatures/%'
       and coalesce(data->>'statut', '') not in ('refus', 'abandon') and coalesce(data->>'decision', '') <> 'stop'
-      and jsonb_typeof(data->'reponseMail') = 'object' and coalesce(data->'reponseMail'->>'envoye', '') = '';
+      and jsonb_typeof(data->'reponseMail') = 'object' and coalesce(data->'reponseMail'->>'envoye', '') = '' and coalesce(data->'reponseMail'->>'auto', 'false') <> 'true';
     select array_agg(coalesce(data->>'entreprise', '?')) into pretes from docs where owner = p_user and path like 'candidatures/%'
       and data->>'statut' = 'a_envoyer' and coalesce(data->>'decision', '') not in ('stop', 'pause') and coalesce(data->>'claudeLe', '') = ''
       and (coalesce(data->>'cv', '') <> '' or coalesce(data->>'lettre', '') <> '');
@@ -92,7 +92,7 @@ begin
     if coalesce(c->>'statut', '') in ('refus', 'abandon') or coalesce(c->>'decision', '') = 'stop' then return null; end if;
     -- entretien déplacé ou annulé : le rappel ne correspond plus
     if coalesce(c->>'dateEntretien', '') = '' or position((c->>'dateEntretien') in p_key) = 0 then return null; end if;
-    if p_kind = 'merci' and coalesce(c->>'remerciement', '') <> '' then return null; end if;
+    if p_kind = 'merci' and (coalesce(c->>'remerciement', '') <> '' or coalesce(c->'mailAuto'->>'statut', '') in ('a_envoyer', 'envoye')) then return null; end if;
     if p_kind = 'apres' and (coalesce(c->>'attente', '') >= c->>'dateEntretien' or coalesce(c->>'remerciement', '') <> '') then return null; end if;
     return keep;
   end if;

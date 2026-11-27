@@ -168,6 +168,8 @@ html, body { overflow-x: clip; max-width: 100%; }
 .ghost-join { background: transparent; border: 1px dashed currentColor; }
 .prep summary { cursor: pointer; } .prep ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
 .tip { border-left: 3px solid var(--s-follow); padding: 6px 10px; font-size: .88rem; background: color-mix(in srgb, var(--s-follow) 8%, transparent); border-radius: 0 8px 8px 0; }
+.tip.ok-tip { border-left-color: var(--s-offer); background: color-mix(in srgb, var(--s-offer) 9%, transparent); }
+.tip.warn-tip { border-left-color: #e0781f; background: color-mix(in srgb, #e0781f 9%, transparent); }
 .fit { display: flex; flex-direction: column; gap: 10px; }
 .fit-head { display: flex; gap: 12px; align-items: center; }
 .fit-score { font-family: var(--display); font-weight: 600; font-size: 1.6rem; line-height: 1; }
@@ -1301,7 +1303,7 @@ function homeTasks() {
   state.cands.filter((c) => !archivedCand(c)).forEach((c) => {
     const ent = c.entreprise || "Société ?", base = { c, s: c.poste || "" };
     const pc = viaContact(c);
-    if (c.reponseMail && !c.reponseMail.envoye) return T.push({ ...base, p: 0, k: "rep", t: `Répondre à ${ent}`, s: c.reponseMail.type === "entretien" && c.reponseMail.dateProp ? `Entretien proposé le ${dayFr(c.reponseMail.dateProp)}${c.reponseMail.heureProp ? " à " + hFr(c.reponseMail.heureProp) : ""}` : (MAILTYPES[c.reponseMail.type] || "Mail reçu"), w: "réponse prête", hot: true });
+    if (c.reponseMail && !c.reponseMail.envoye && !repAuto(c.reponseMail)) return T.push({ ...base, p: 0, k: "rep", t: `Répondre à ${ent}`, s: c.reponseMail.type === "entretien" && c.reponseMail.dateProp ? `Entretien proposé le ${dayFr(c.reponseMail.dateProp)}${c.reponseMail.heureProp ? " à " + hFr(c.reponseMail.heureProp) : ""}` : (MAILTYPES[c.reponseMail.type] || "Mail reçu"), w: "réponse prête", hot: true });
     if (c.statut === "offre") return T.push({ ...base, p: 0, k: "offre", t: `Répondre à l'offre de ${ent}` });
     if (entretienAVenir(c) && c.dateEntretien <= addDays(today, 14)) {
       const d = c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric" });
@@ -3276,7 +3278,10 @@ function replyText(c) {
   return `${R.salut || "Bonjour,"}\n\n${body}\n\nBien cordialement,\n${sig}`;
 }
 function replyBoxHTML(c) {
-  const R = c.reponseMail; if (!R || R.envoye) return "";
+  const R = c.reponseMail;
+  if (R && R.envoye && R.envoyeAuto) return `<div class="tip ok-tip">✉️ <b>J'ai répondu pour toi</b> le ${esc(fmt(R.envoye))}${R.a ? " à " + esc(R.a) : ""}${R.type === "entretien" && R.dateProp ? ` : entretien confirmé le ${esc(dayFr(R.dateProp))}${R.heureProp ? " à " + esc(hFr(R.heureProp)) : ""}` : ""}.${R.draft || R.texte ? `<details style="margin-top:6px"><summary>Relire le mail</summary><p style="white-space:pre-wrap;margin:6px 0 0">${esc(R.draft || replyText(c))}</p></details>` : ""}</div>`;
+  if (!R || R.envoye) return "";
+  if (repAuto(R)) return `<div class="tip">✉️ <b>Ta réponse part toute seule</b>${R.a ? " à " + esc(R.a) : ""}, depuis ton Gmail, dans l'heure : ${esc(R.type === "entretien" && R.dateProp ? "tu confirmes l'entretien du " + dayFr(R.dateProp) + (R.heureProp ? " à " + hFr(R.heureProp) : "") : "réponse au mail du " + fmt(R.date))}.<div class="row" style="margin-top:6px"><button type="button" class="small ghost" data-act="rp-manual">Non, je réponds moi-même</button></div></div>`;
   const ent = R.type === "entretien" && R.dateProp, alts = R.alts && R.alts.length ? R.alts : [{}, {}];
   const subj = /^re\s*:/i.test(R.objet) ? R.objet : "Re: " + (R.objet || `Candidature au poste ${dePoste(c.poste || "d'ingénieur")}`);
   const txt = R.draft || replyText(c), dest = R.a && !isRelay(R.a) ? R.a : recruiterOf(c).email;
@@ -3580,6 +3585,7 @@ function drawCandSum() {
       <div class="row brief-offre"><button type="button" class="small" data-act="go-soc"><svg class="jic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg> Qui sont-ils ?</button>${c.statut !== "a_envoyer" ? `${c.description ? `<button type="button" class="small" data-act="sum-annonce">Relire l'annonce</button>` : ""}${offerLinks(c, false)}` : ""}</div>
       ${md === "prestataire" ? `<p class="muted" style="margin:0;font-size:.85rem">Société de prestation : tu serais salarié chez eux mais en mission chez un client. Deuxième choix, garde la priorité aux postes en direct.${(societeOf(c) || cibleOf(c))?.modeNote ? " " + esc((societeOf(c) || cibleOf(c)).modeNote) : ""}</p>` : ""}</div>
     ${replyBoxHTML(c)}
+    ${mailAutoHTML(c)}
     ${archivedCand(c) && c.statut !== "refus" ? "" : rrHTML(c)}
     ${applyBoxHTML(c)}
     ${offreHTML(c)}
@@ -4012,7 +4018,7 @@ ${profileText()}`, { signal: aiCtl.signal, cache: false, modelTier: "complex" })
 
 /* ---------- Suivi après entretien ---------- */
 const afterInterview = (c) => c.dateEntretien && c.dateEntretien <= todayISO() && c.statut === "entretien";
-const needThanks = (c) => afterInterview(c) && !c.remerciement && c.dateEntretien >= addDays(todayISO(), -2);
+const needThanks = (c) => afterInterview(c) && !c.remerciement && !mailAutoActif(c) && c.dateEntretien >= addDays(todayISO(), -2);
 function thanksText(c) {
   const who = c.contact && !/@/.test(c.contact.split("·")[0]) ? `Bonjour ${c.contact.split(/[,·]/)[0].trim().split(" ")[0]},` : "Bonjour,";
   return `${who}\n\nMerci pour notre échange ${c.dateEntretien === todayISO() ? "d'aujourd'hui" : "du " + fmt(c.dateEntretien, { day: "numeric", month: "long" })} au sujet du poste de ${c.poste || "…"}. J'ai beaucoup apprécié ${c.notesEntretien ? "la présentation de vos projets" : "de mieux comprendre vos projets et le fonctionnement de l'équipe"}, et cela confirme ma motivation à rejoindre ${c.entreprise || "votre équipe"}.\n\nJe reste à votre disposition pour toute information complémentaire et pour la suite du processus.\n\nBien cordialement,\n${state.profil?.nom || ""}\n${state.profil?.telephone || ""}`;
@@ -4025,11 +4031,26 @@ function suiviHTML(c) {
     ${suiteHTML(c, true)}
     <details class="sec"${c.notesEntretien || needThanks(c) ? " open" : ""}><summary>Mes notes et le remerciement <small>${c.remerciement ? "remerciement envoyé" : c.notesEntretien ? "notes prises" : ""}</small></summary><div class="body">
     <div class="field"><label for="ni-notes">Ce qui s'est dit (questions posées, prochaines étapes, noms)</label><textarea id="ni-notes" rows="4">${esc(c.notesEntretien || "")}</textarea></div>
-    ${c.remerciement ? `<p class="muted" style="margin:0">Remerciement envoyé le ${fmt(c.remerciement)}.</p>` : `<span class="lbl">Message de remerciement, à envoyer le jour même</span>
+    ${c.remerciement ? `<p class="muted" style="margin:0">Remerciement envoyé le ${fmt(c.remerciement)}.</p>` : mailAutoActif(c) ? `<p class="muted" style="margin:0">Le remerciement part tout seul (voir en haut de la fiche).</p>` : `<span class="lbl">Message de remerciement, à envoyer le jour même</span>
     <textarea id="ni-msg" rows="7">${esc(msg)}</textarea>
     <div class="row">${copyBtn("ni-msg")}${mail ? `<a class="btn primary" data-relance="mail" href="mailto:${esc(mail[0])}?subject=${enc("Merci pour notre échange – " + (c.poste || ""))}&body=${enc(msg)}" target="_blank" rel="noopener">Ouvrir le mail prêt</a>` : ""}
       <button type="button" class="small" data-act="ni-ai">Personnaliser avec mes notes</button><button type="button" data-act="ni-sent">C'est envoyé</button></div>`}
     <div class="row"><button type="button" class="small" data-act="ni-save">Enregistrer mes notes</button></div></div></details></div>`;
+}
+/* ---------- Mails envoyés tout seuls depuis le Gmail de Tullio (tâche « Envois auto Jobello », toutes les heures) ----------
+   c.mailAuto = { type: "merci", statut: a_envoyer | envoye | annule | sans_adresse | erreur, a, appelLe, notes, demandeLe, envoyeLe, objet, texte, raison }
+   c.reponseMail.auto = true : réponse à une invitation, envoyée toute seule par la tâche mails (ou la tâche d'envoi). */
+/* Réponse à une invitation d'entretien : part toute seule (tâche « Envois auto Jobello ») sauf si Tullio a dit non, adresse relais ou autre créneau */
+const repAuto = (R) => !!(R && !R.envoye && R.type === "entretien" && R.auto !== false && R.mode !== "autre" && (R.auto === true || (R.date || "") >= "2026-11-27") && R.a && !isRelay(R.a));
+const mailAutoActif = (c) => !!(c && c.mailAuto && ["a_envoyer", "envoye"].includes(c.mailAuto.statut));
+function mailAutoHTML(c) {
+  const m = c.mailAuto; if (!m || m.statut === "annule") return "";
+  const qui = m.a ? ` à ${esc(m.a)}` : "";
+  if (m.statut === "envoye") return `<div class="tip ok-tip">✉️ <b>Mail de remerciement envoyé tout seul</b>${qui}${m.envoyeLe ? " le " + esc(fmt(m.envoyeLe.slice(0, 10))) + " à " + esc(new Date(m.envoyeLe).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })) : ""}.${m.texte ? `<details style="margin-top:6px"><summary>Relire le mail</summary><p style="white-space:pre-wrap;margin:6px 0 0">${esc(m.texte)}</p></details>` : ""}</div>`;
+  if (m.statut === "a_envoyer") return `<div class="tip">✉️ <b>Ton mail de remerciement part tout seul</b>${qui}, depuis ton Gmail, dans l'heure (entre 8 h et 21 h). Rien à faire.<div class="row" style="margin-top:6px"><button type="button" class="small ghost" data-act="ma-cancel">Ne pas l'envoyer</button></div></div>`;
+  return `<div class="tip warn-tip">✉️ <b>Le mail de remerciement n'est pas parti</b> : ${esc(m.statut === "sans_adresse" ? "il me manque l'adresse mail de la personne" : (m.raison || "envoi impossible"))}.
+    <div class="field" style="margin-top:6px"><label for="ma-a">Adresse mail de la personne</label><input id="ma-a" type="email" value="${esc(m.a || "")}" placeholder="prenom.nom@societe.com"></div>
+    <div class="row"><button type="button" class="small primary" data-act="ma-retry">Envoyer tout seul</button><button type="button" class="small ghost" data-act="ma-cancel">Laisser tomber</button></div></div>`;
 }
 /* ---------- Suite d'une candidature après un entretien, jusqu'au point final ---------- */
 let suiteMode = "", hadCallOpen = false;
@@ -4042,6 +4063,8 @@ function hadCallHTML(c) {
       <div class="field"><label for="hc-type">Comment</label><select id="hc-type">${opts(["Téléphone", "Visio", "Sur place"], "Téléphone")}</select></div></div>
     <div class="field"><label for="hc-qui">Avec qui</label><textarea id="hc-qui" class="short" rows="2" placeholder="ex. Mme Martin, recrutement, 06 12 34 56 78 : elle sera ajoutée à ton réseau">${esc(c.contact || "")}</textarea></div>
     <div class="field"><label for="hc-notes">Ce qui s'est dit (facultatif)</label><textarea id="hc-notes" rows="3" placeholder="questions posées, prochaines étapes…"></textarea></div>
+    <label class="check"><input type="checkbox" id="hc-mail" checked> Envoyer tout seul le mail de remerciement</label>
+    <div class="field"><label for="hc-a">À l'adresse</label><input id="hc-a" type="email" value="${esc(recruiterOf(c).email || "")}" placeholder="prenom.nom@societe.com (sinon je la cherche dans tes mails)"></div>
     <div class="row"><button type="button" class="primary" data-act="hc-save">Enregistrer et passer à la suite</button><button type="button" class="ghost" data-act="hc-cancel">Annuler</button></div></div>`;
 }
 const ROUND_TYPES = ["Téléphone", "Visio", "Sur place", "Technique sur place", "Avec le manager", "Avec les dirigeants", "RH / dernier entretien"];
@@ -4717,6 +4740,7 @@ $("#overlay").addEventListener("click", async (e) => {
   if (sheetKind === "candsum" && editing?.reponseMail) {
     if (act === "rp-mode") { editing.reponseMail.mode = t.dataset.m; editing.reponseMail.draft = ""; if (t.dataset.m === "autre" && !editing.reponseMail.alts) editing.reponseMail.alts = [{}, {}]; return drawCandSum(); }
     if (act === "rp-sent") return replySent(t);
+    if (act === "rp-manual") { editing.reponseMail = { ...editing.reponseMail, auto: false }; if (await saveCand(editing)) drawCandSum(); return; }
   }
   if (sheetKind === "mail") {
     if (act === "m-paste") { try { $("#m-text").value = await navigator.clipboard.readText(); toast("Mail collé"); } catch { $("#m-text").focus(); toast("Appuie longuement dans le champ puis « Coller »"); } return; }
@@ -4751,21 +4775,33 @@ $("#overlay").addEventListener("click", async (e) => {
     if (act === "ap-msg-ai") return apMsgAI(t);
     if (act === "q-ai") return qPosteAI(t);
     if (act === "hc-open" || act === "hc-cancel") { hadCallOpen = act === "hc-open"; drawCandSum(); if (hadCallOpen) $("#hc-box")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (act === "ma-cancel" || act === "ma-retry") {
+      const c = editing; if (!c.mailAuto) return;
+      if (act === "ma-cancel") { c.mailAuto = { ...c.mailAuto, statut: "annule" }; c.historique.push({ date: todayISO(), texte: "Mail de remerciement automatique annulé" }); }
+      else { const a = ($("#ma-a")?.value || "").trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a) || isRelay(a)) return toast("Mets l'adresse directe de la personne"); c.mailAuto = { ...c.mailAuto, a, statut: "a_envoyer", raison: "", demandeLe: new Date().toISOString() }; }
+      if (await saveCand(c)) { toast(act === "ma-cancel" ? "D'accord, il ne partira pas" : "Il part tout seul dans l'heure"); drawCandSum(); }
+      return;
+    }
     if (act === "hc-save") {
       const c = editing, today = todayISO(), d = $("#hc-date").value || today, type = $("#hc-type").value, qui = $("#hc-qui").value.replace(/\s+/g, " ").trim(), notes = $("#hc-notes").value.trim();
       const quoi = type === "Téléphone" ? "Appel" : "Entretien " + type.toLowerCase();
+      if ($("#hc-mail")?.checked) {
+        const a = ($("#hc-a")?.value || "").trim();
+        c.mailAuto = { type: "merci", statut: "a_envoyer", a: a && !isRelay(a) ? a : "", qui, appelLe: d, typeAppel: type, notes, demandeLe: new Date().toISOString() };
+        c.historique.push({ date: today, texte: "Mail de remerciement demandé : il part tout seul" });
+      }
       if (c.statut === "entretien" && c.dateEntretien && c.dateEntretien > d) {
         // un entretien est déjà prévu plus tard : on range cet appel sans toucher au prochain
         c.entretiens = [...(c.entretiens || []), { n: (c.entretiens || []).length + 1, date: d, heure: "", type, lieu: "", notes: [qui && "Avec " + qui, notes].filter(Boolean).join("\n"), merci: "" }];
         c.historique.push({ date: today, texte: `${quoi} le ${fmt(d)}${qui ? " avec " + qui : ""}` });
-        hadCallOpen = false; if (await saveCand(c)) { toast("C'est noté dans « Mes entretiens passés »"); drawCandSum(); } return;
+        hadCallOpen = false; if (await saveCand(c)) { toast(c.mailAuto?.statut === "a_envoyer" ? "C'est noté. Le mail de remerciement part tout seul" : "C'est noté dans « Mes entretiens passés »"); drawCandSum(); } return;
       }
       if (c.dateEntretien && c.dateEntretien < d) archiveRound(c);
       Object.assign(c, { statut: "entretien", dateEntretien: d, heureEntretien: "", typeEntretien: type, lienVisio: "", lieuEntretien: "", avecQui: qui, notesEntretien: notes, prochaineRelance: "", attente: "", dateReponse: c.dateReponse || d });
       if (qui && !c.contact) c.contact = qui;
       c.historique.push({ date: today, texte: `${quoi} le ${fmt(d)}${qui ? " avec " + qui : ""}` });
       hadCallOpen = false; suiteMode = "";
-      if (await saveCand(c)) { toast("C'est noté. Dis-moi la suite"); drawCandSum(); $("#apres-entretien")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      if (await saveCand(c)) { toast(c.mailAuto?.statut === "a_envoyer" ? "C'est noté. Le remerciement part tout seul, dis-moi la suite" : "C'est noté. Dis-moi la suite"); drawCandSum(); $("#apres-entretien")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
       return;
     }
     if (act === "go-soc") { const el = $("#sec-societe"); if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); } return; }

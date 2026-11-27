@@ -46,7 +46,7 @@
     if (lancees.length) add("envoi", "lancee:" + first, at(first, H), lancees.length === 1 ? `Ta candidature chez ${lancees[0].entreprise || "?"} est partie ?` : `${lancees.length} candidatures lancées avec Claude`,
       lancees.length === 1 ? "Tu l'as lancée avec Claude. Si elle est partie, touche « C'est envoyé » sur sa fiche." : `${names(lancees)} : tu les as lancées avec Claude. Touche « C'est envoyé » sur celles qui sont parties.`, lancees.length === 1 ? link(lancees[0]) : "./#accueil");
     const pretes = cands.filter((c) => c.statut === "a_envoyer" && actif(c) && (c.cv || c.lettre) && !c.claudeLe);
-    const reps = cands.filter((c) => c.reponseMail && !c.reponseMail.envoye);
+    const reps = cands.filter((c) => c.reponseMail && !c.reponseMail.envoye && !(typeof repAuto === "function" && repAuto(c.reponseMail)));
     if (pretes.length || reps.length) mornings(3).forEach((d, i) => {
       const seul = pretes.length + reps.length === 1 ? (pretes[0] || reps[0]) : null;
       add("envoi", "envoi:" + d, at(d, H), seul ? (reps.length ? `Réponds à ${seul.entreprise || "la société"}` : `Ta candidature chez ${seul.entreprise || "?"} est prête`) : `${pretes.length + reps.length} envois t'attendent`,
@@ -83,7 +83,7 @@
         `Entretien ${ty.adj ? ty.adj + " " : ""}à ${hh(h)}. L'essentiel à relire en 2 minutes.`, link(c, "antiseche"));
       if (!deja) add("apres", "apres:" + id, h ? at(d, h, 120) : at(d, "18:30"), `Alors, ${ty.nom} chez ${e} ?`,
         "Note comment ça s'est passé et ce qui suit, tant que c'est frais.", link(c, "suite"));
-      if (!c.remerciement) add("merci", "merci:" + id, at(addDays(d, 1), H, 3), `Remercie ${e} pour l'entretien`,
+      if (!c.remerciement && !(c.mailAuto && ["a_envoyer", "envoye"].includes(c.mailAuto.statut))) add("merci", "merci:" + id, at(addDays(d, 1), H, 3), `Remercie ${e} pour l'entretien`,
         "Un mail de remerciement court fait la différence. Il est prêt dans Jobello.", link(c));
     });
     // Bilan du lundi : la semaine passée et celle qui commence
