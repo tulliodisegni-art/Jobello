@@ -145,6 +145,9 @@ html, body { overflow-x: clip; max-width: 100%; }
 .pj-add { font-size: .85rem; cursor: pointer; }
 .pj-card { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--s-interview) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--s-interview) 40%, var(--line)); color: var(--fg); }
 .pj-card-t { font-weight: 600; text-align: left; }
+.home-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.venir { display: flex; flex-direction: column; gap: 8px; }
+.venir-s { font-size: .85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adr-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
 .adr-box.small { padding: 8px 10px; }
 .adr-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -911,7 +914,8 @@ button.primary, .btn.primary { background-image: var(--accent); border-color: tr
     <div id="focus" hidden></div>
     <section class="home-block prep-panel" id="prep-panel" hidden><div class="row between"><h2 class="home-h">Dossiers demandés à Claude</h2><span class="home-more" id="prep-meta"></span></div><div class="prep-list" id="prep-list"></div></section>
     <div class="home-grid">
-      <section class="home-block" id="todo-panel"><div class="row between"><h2 class="home-h">À faire</h2><span class="home-more" id="todo-n"></span></div><div class="tasks" id="todo"></div></section>
+      <div class="home-main"><section class="home-block" id="venir-panel" hidden><div class="row between"><h2 class="home-h">À venir</h2><a href="#agenda" class="home-more">Planning ›</a></div><div class="venir" id="venir"></div></section>
+      <section class="home-block" id="todo-panel"><div class="row between"><h2 class="home-h">À faire</h2><span class="home-more" id="todo-n"></span></div><div class="tasks" id="todo"></div></section></div>
       <div class="home-side2">
         <section class="home-block"><div class="row between"><h2 class="home-h">Ma semaine</h2><a href="#agenda" class="home-more">Planning ›</a></div><div class="wk-strip" id="home-week"></div><div class="home-day" id="home-day"></div></section>
         <section class="home-block"><div class="row between"><h2 class="home-h">Où j'en suis</h2><a href="#candidatures" class="home-more">Suivi ›</a></div><div class="funnel" id="funnel"></div></section>
@@ -1305,6 +1309,7 @@ function homeTasks() {
     const pc = viaContact(c);
     if (c.reponseMail && !c.reponseMail.envoye && !repAuto(c.reponseMail)) return T.push({ ...base, p: 0, k: "rep", t: `Répondre à ${ent}`, s: c.reponseMail.type === "entretien" && c.reponseMail.dateProp ? `Entretien proposé le ${dayFr(c.reponseMail.dateProp)}${c.reponseMail.heureProp ? " à " + hFr(c.reponseMail.heureProp) : ""}` : (MAILTYPES[c.reponseMail.type] || "Mail reçu"), w: "réponse prête", hot: true });
     if (c.statut === "offre") return T.push({ ...base, p: 0, k: "offre", t: `Répondre à l'offre de ${ent}` });
+    if (entretienAVenir(c) && c.dateEntretien > today) return; // entretien des jours suivants : bloc « À venir », pas une action
     if (entretienAVenir(c) && c.dateEntretien <= addDays(today, 14)) {
       const d = c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric" });
       return T.push({ ...base, p: 0, k: "ent", t: `Entretien chez ${ent}`, s: [c.typeEntretien, c.poste].filter(Boolean).join(" · "), w: d + (c.heureEntretien ? " · " + c.heureEntretien.replace(":", " h ") : ""), hot: c.dateEntretien <= addDays(today, 1) });
@@ -1323,6 +1328,9 @@ function homeTasks() {
   if (net.length) T.push({ p: 4, k: "net", t: `${net.length} message${net.length > 1 ? "s" : ""} LinkedIn à envoyer`, s: `${sentToday()} / ${LI_LIMIT} envoyés aujourd'hui`, href: "#contacts" });
   return T.sort((a, b) => a.p - b.p || (b.n || 0) - (a.n || 0) || (a.presta || 0) - (b.presta || 0) || (b.score || 0) - (a.score || 0));
 }
+/* Accueil : « À venir » = entretiens fixés des jours suivants (14 j), au-dessus de « À faire » */
+const homeUpcoming = () => { const today = todayISO(); return state.cands.filter((c) => !archivedCand(c) && entretienAVenir(c) && c.dateEntretien > today && c.dateEntretien <= addDays(today, 14))
+  .sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || ""))); };
 const taskAttrs = (x) => x.href ? `href="${x.href}"` : x.contact ? `data-contact="${esc(x.contact)}"` : `data-open="${esc(x.c.id)}"${x.task ? ` data-task="${x.task}"` : ""}`;
 const TASK_ST = { suite: "entretien", rep: "entretien", offre: "offre", ent: "entretien", merci: "entretien", rel: "relancee", send: "a_envoyer", li: "envoyee", net: "envoyee" };
 let homeDay = "";
@@ -1349,7 +1357,7 @@ function renderHome() {
     : !T.length ? "Tout est à jour. Rien à faire aujourd'hui." : urgent ? `${urgent} chose${urgent > 1 ? "s" : ""} urgente${urgent > 1 ? "s" : ""} aujourd'hui.` : "Rien d'urgent. Tu peux avancer tes candidatures.";
 
   const joinable = all.filter((c) => c.lienVisio && entretienAVenir(c) && c.dateEntretien <= addDays(today, 1)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
-  const withPj = all.filter((c) => (piecesOf(c).length || lieuOf(c)) && entretienAVenir(c) && c.dateEntretien <= addDays(today, 7)).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
+  const withPj = all.filter((c) => (piecesOf(c).length || lieuOf(c)) && entretienAVenir(c) && c.dateEntretien <= today).sort((a, b) => (a.dateEntretien + (a.heureEntretien || "")).localeCompare(b.dateEntretien + (b.heureEntretien || "")));
   $("#hero-join").hidden = !joinable.length && !withPj.length;
   $("#hero-join").innerHTML = joinable.map((c) => joinHTML(c, `Rejoindre ${c.entreprise} · ${c.dateEntretien === today ? "aujourd'hui" : "demain"}${c.heureEntretien ? " " + c.heureEntretien : ""}`)).join("")
     + withPj.map((c) => `<div class="pj-card"><button type="button" class="linkish pj-card-t" data-open="${esc(c.id)}">Entretien ${esc(c.entreprise || "")} · ${esc(c.dateEntretien === today ? "aujourd'hui" : c.dateEntretien === addDays(today, 1) ? "demain" : fmt(c.dateEntretien, { weekday: "long", day: "numeric", month: "long" }))}${c.heureEntretien ? " à " + esc(c.heureEntretien.replace(":", " h ")) : ""}</button>${adresseHTML(c, true)}${piecesHTML(c, true)}</div>`).join("");
@@ -1358,6 +1366,9 @@ function renderHome() {
   const row = (x) => `<${x.href ? "a" : "button type=\"button\""} class="task st-${TASK_ST[x.k]}" ${taskAttrs(x)}><span class="task-dot"></span><span class="task-txt"><b>${esc(x.t)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ""}</span>${tag(x)}${ICON.chev}</${x.href ? "a" : "button"}>`;
   $("#focus").innerHTML = "" &&  `<div class="focus st-${TASK_ST[first.k]}"><span class="focus-l">À faire en premier</span><b class="focus-t">${esc(first.t)}</b>${first.s ? `<span class="focus-s">${esc(first.s)}</span>` : ""}${first.w ? `<span class="task-w${first.hot ? " hot" : ""}">${esc(first.w)}</span>` : ""}
     <${first.href ? "a" : "button type=\"button\""} class="btn primary focus-go" ${taskAttrs(first)}>${TASK_BTN[first.k]}</${first.href ? "a" : "button"}></div>`;
+  const U = homeUpcoming(), jourFr = (d) => d === addDays(today, 1) ? "demain" : fmt(d, { weekday: "long", day: "numeric", month: "long" });
+  $("#venir-panel").hidden = !U.length;
+  $("#venir").innerHTML = U.map((c) => `<div class="pj-card venir-card"><button type="button" class="linkish pj-card-t" data-open="${esc(c.id)}">Entretien chez ${esc(c.entreprise || "")} · ${esc(jourFr(c.dateEntretien))}${c.heureEntretien ? " à " + esc(c.heureEntretien.replace(":", " h ")) : ""}</button>${[c.typeEntretien, c.poste].filter(Boolean).length ? `<span class="venir-s">${esc([c.typeEntretien, c.poste].filter(Boolean).join(" · "))}</span>` : ""}${c.dateEntretien <= addDays(today, 7) ? adresseHTML(c, true) + piecesHTML(c, true) : ""}</div>`).join("");
   const shown = rest.slice(0, 6), more = rest.slice(6);
   $("#todo-n").textContent = rest.length ? `${rest.length} action${rest.length > 1 ? "s" : ""}` : "";
   $("#todo-panel").hidden = false;
