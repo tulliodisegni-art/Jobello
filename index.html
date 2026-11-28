@@ -3540,8 +3540,10 @@ function relanceRoutes(c) {
   return r;
 }
 let sumRoute = 0;
+/* Candidature via une plateforme (Indeed…) sans personne à qui écrire : ni mail de recruteur, ni contact LinkedIn */
+const sansCanalRelance = (c) => c.canal === "plateforme" && !viaContact(c) && !recruiterOf(c).email && !contactsOf(c.entreprise).some((p) => !archivedC(p));
 const needsRecruiter = (c) => c.canal === "plateforme" && !archivedCand(c) && !["a_envoyer", "offre"].includes(c.statut) && !viaContact(c) && !c.recruteurSkip
-  && !contactsOf(c.entreprise).some((p) => !archivedC(p));
+  && !(c.recruteurApres && c.recruteurApres > todayISO()) && !contactsOf(c.entreprise).some((p) => !archivedC(p));
 function openDoc(id, type) { const d = id && state.docs.find((x) => x.id === id); return d ? viewDoc(d) : editDoc(null, type); }
 function openCand(id, task, obj) {
   const c = obj || state.cands.find((x) => x.id === id); if (!c) return;
@@ -3632,6 +3634,18 @@ async function freshIndeed(c) {
 function setGo(a, url) {
   a.href = url; a.textContent = "Ouvrir l'offre sur Indeed";
   const h = $("#ap-go-hint"); if (h) h.textContent = "Lien à jour : l'offre s'ouvre directement. Suis ensuite ces étapes :";
+}
+/* Tullio a ouvert le mail prêt / la messagerie / LinkedIn depuis la fiche : on le note tout seul, sans attendre « C'est envoyé » */
+async function autoRelanceFaite(k) {
+  const c = editing; if (!c || !c.id || !$("#rl-msg")) return;
+  if (k === "li") {
+    if (!needsRecruiter(c)) return;
+    c.recruteurApres = addDays(todayISO(), 7); c.historique.push({ date: todayISO(), texte: "Recherche d'un recruteur sur LinkedIn faite" });
+    if (await saveCand(c)) { toast("Noté : je ne te le redemande pas avant 7 jours. Ajoute la personne avec « J'ai trouvé la personne »."); drawCandSum(); }
+    return;
+  }
+  if (!isDue(c) && !needsRecruiter(c)) return;
+  return markRelanced();
 }
 async function markRelanced() {
   const c = editing; if (c.statut !== "entretien") c.statut = "relancee";
@@ -4696,8 +4710,9 @@ $("#overlay").addEventListener("click", async (e) => {
   if (t.dataset.act === "cand-back") { const b = docBack; closeSheet(); if (!b) return; return b.kind === "candsum" && b.c.id ? openCand(b.c.id, null, state.cands.find((x) => x.id === b.c.id) || b.c) : (editing = b.c, drawDossier(!b.c.id)); }
   if (t.dataset.relance) {
     const m = t.closest(".relance-box")?.querySelector("#rl-msg,#ni-msg,#li-text") || $("#rl-msg") || $("#li-text"); if (!m) return;
-    if (t.dataset.relance === "mail") { t.href = t.href.replace(/body=[^&]*/, "body=" + enc(m.value)); return; }
-    copyText(m.value, m, null, "Message copié : colle-le puis envoie");
+    if (t.dataset.relance === "mail") t.href = t.href.replace(/body=[^&]*/, "body=" + enc(m.value));
+    else copyText(m.value, m, null, "Message copié : colle-le puis envoie");
+    if (m.id === "rl-msg" && editing && editing.id) setTimeout(() => autoRelanceFaite(t.dataset.relance), 400);
     return;
   }
   if (t.dataset.route) { sumRoute = +t.dataset.route; return drawCandSum(); }
@@ -4762,14 +4777,18 @@ $("#overlay").addEventListener("click", async (e) => {
     if (act === "rel-mail") return openMail();
     if (act === "rel-later" || act === "rel-pause" || act === "rel-stop" || act === "rel-refus") {
       const c = editing, today = todayISO();
-      if (act === "rel-later") { c.prochaineRelance = addDays(today, 7); c.historique.push({ date: today, texte: "Relance repoussée d'une semaine" }); }
+      if (act === "rel-later") {
+        c.recruteurApres = addDays(today, 7);
+        if (sansCanalRelance(c) && c.historique.some((h) => /^Relance repoussée/.test(h.texte || ""))) { c.prochaineRelance = ""; c.historique.push({ date: today, texte: "Plus de relance : personne à qui écrire (la plateforme ne permet pas de relancer), j'attends leur réponse" }); }
+        else { c.prochaineRelance = addDays(today, 7); c.historique.push({ date: today, texte: "Relance repoussée d'une semaine" }); }
+      }
       if (act === "rel-pause") { c.decision = "pause"; c.prochaineRelance = ""; c.historique.push({ date: today, texte: "Mise en pause : plus de relance" }); }
       if (act === "rel-stop") { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer l'abandon"; return; } Object.assign(c, { statut: "abandon", decision: "stop", prochaineRelance: "" }); c.historique.push({ date: today, texte: "Décision : j'abandonne ce poste" }); }
       if (act === "rel-refus") { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer le refus"; return; } Object.assign(c, { statut: "refus", prochaineRelance: "", dateReponse: c.dateReponse || today }); c.historique.push({ date: today, texte: "Réponse reçue : refus" }); }
       const pc = (act === "rel-stop" || act === "rel-refus") && viaContact(c);
       if (await saveCand(c)) {
         if (pc && state.db && !FINAL.includes(pc.etape)) state.db.collection("contacts").doc(pc.id).update({ etape: "sans_suite", prochaineAction: "", updatedAt: new Date().toISOString() }).catch(() => {});
-        toast(act === "rel-later" ? "Je te le rappelle dans 7 jours" : act === "rel-pause" ? "En pause : plus de rappel" : "Candidature classée dans l'historique"); closeSheet();
+        toast(act === "rel-later" ? (c.prochaineRelance ? "Je te le rappelle dans 7 jours" : "C'est noté : je ne te demande plus de relancer, j'attends leur réponse") : act === "rel-pause" ? "En pause : plus de rappel" : "Candidature classée dans l'historique"); closeSheet();
       }
       return;
     }
