@@ -1,6 +1,6 @@
 // Garde Jobello disponible même avec un réseau faible : la page et ses scripts sont mis de côté.
 // Garde aussi la pastille de l'icône à jour. Reçoit aussi les notifications envoyées par le serveur (voir notifs.js et supabase/).
-const CACHE = "jobello-v88";
+const CACHE = "jobello-v89";
 const SHELL = ["./", "index.html", "config.js", "shim.js", "relais.js", "sync.js", "gate.js", "notifs.js", "plus.js", "ciblage.js", "accueil.js", "portfolio.js", "offres-auto.js", "postuler.js", "direct.js", "langue.js", "cours.js", "entrainement-data.js", "entrainement.js", "prepa-combinee-data.js", "prepa-combinee.js", "atouts.js", "contacts-auto.js", "vendor/supabase.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== "jobello-meta").map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
