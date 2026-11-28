@@ -1,5 +1,5 @@
 /* Jobello : la fiche d'accueil d'un nouvel utilisateur.
-   - À la première ouverture (profil vide), une fiche guidée en 5 étapes : toi, ton métier, tes compétences, ce que tu cherches, c'est prêt.
+   - À la première ouverture (profil vide), une fiche guidée : toi, ton métier, tes compétences, ce que tu cherches, ton portfolio (facultatif, voir portfolio.js), c'est prêt.
    - « Ajouter mon CV actuel » (PDF) : le texte est lu dans le navigateur (pdf.js, déjà utilisé par l'appli) et pré-remplit la fiche.
      Sans clé : une lecture simple (coordonnées, logiciels, compétences, langues, secteurs, diplôme, années d'expérience).
      Avec une clé Anthropic dans ⚙︎ : Claude lit le CV en plus, et peut refaire le CV au propre.
@@ -191,7 +191,7 @@ ${text.slice(0, 12000)}`, { cache: false });
   }
 
   /* ---------- La fiche ---------- */
-  const ETAPES = ["Bienvenue", "Toi", "Ton métier", "Tes compétences", "Ce que tu cherches", "C'est prêt"];
+  const ETAPES = ["Bienvenue", "Toi", "Ton métier", "Tes compétences", "Ce que tu cherches", "Ton portfolio (facultatif)", "C'est prêt"];
   let ovEl = null;
   function chips(key, sug, placeholder) {
     const on = F[key] || [], reste = (sug || []).filter((s) => !on.some((x) => normTxt(x) === normTxt(s)));
@@ -221,9 +221,10 @@ ${text.slice(0, 12000)}`, { cache: false });
       <div class="field"><label for="fi-typeEntreprise">Type d'employeur</label><select id="fi-typeEntreprise" data-fi="typeEntreprise">${TYPES.map(([v, l]) => `<option value="${v}"${F.typeEntreprise === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
       <div class="grid2">${choix("trajetMax", "Trajet maximum depuis chez toi", TRAJET)}${choix("deplacements", "Déplacements", DEPL)}${choix("teletravail", "Télétravail", TELE)}${choix("disponibilite", "Disponible", DISPO)}${champ("salaire", "Salaire visé", "ex. 42 000 € brut / an")}</div>
       ${champ("eviter", "Ce que tu ne veux pas (métiers, secteurs, mots dans les annonces)", "ex. électronique, travail de nuit")}`;
+    if (step === 5) return window.jobelloPortfolioEtape ? window.jobelloPortfolioEtape() : `<p class="fi-lead">Tu pourras ajouter ton portfolio dans « CV & lettres ».</p>`;
     const L = (l, v) => v ? `<div><b>${l}</b><span>${esc(v)}</span></div>` : "";
     return `<p class="fi-lead">Voici ta fiche. Enregistre-la : l'appli s'en sert pour te proposer les offres qui te correspondent et pour refaire ton CV.</p>
-      <div class="fi-recap">${L("Toi", [F.nom, F.ville].filter(Boolean).join(" · "))}${L("Métier", [F.titre, F.experience, F.etudes].filter(Boolean).join(" · "))}${L("Postes visés", F.postes.join(", "))}${L("Secteurs", F.secteurs.join(", "))}${L("Compétences", F.competences.join(", "))}${L("Logiciels", F.logiciels.join(", "))}${L("Langues", F.langues.join(", "))}${L("Contrat", F.contrats.join(", "))}${L("Employeur", (TYPES.find(([v]) => v === F.typeEntreprise) || [])[1])}${L("Trajet max", F.trajetMax)}${L("Salaire", F.salaire)}${L("À éviter", F.eviter)}</div>
+      <div class="fi-recap">${L("Toi", [F.nom, F.ville].filter(Boolean).join(" · "))}${L("Métier", [F.titre, F.experience, F.etudes].filter(Boolean).join(" · "))}${L("Postes visés", F.postes.join(", "))}${L("Secteurs", F.secteurs.join(", "))}${L("Compétences", F.competences.join(", "))}${L("Logiciels", F.logiciels.join(", "))}${L("Langues", F.langues.join(", "))}${L("Contrat", F.contrats.join(", "))}${L("Employeur", (TYPES.find(([v]) => v === F.typeEntreprise) || [])[1])}${L("Trajet max", F.trajetMax)}${L("Salaire", F.salaire)}${L("À éviter", F.eviter)}${L("Portfolio", (() => { const q = state.profil?.portfolio || {}, n = (q.fichiers || []).length; return [n && `${n} fichier${n > 1 ? "s" : ""}`, q.lien && "1 lien"].filter(Boolean).join(" · "); })())}</div>
       ${!F.postes.length ? `<p class="fi-found">Ajoute au moins un poste visé (étape « Ton métier ») : c'est ce qui sert à chercher les offres.</p>` : ""}
       ${cvFile || cvText ? `<p class="fi-note">Ton CV sera rangé dans « Mes CV » sous le nom « Mon CV actuel ».</p>` : ""}`;
   }
